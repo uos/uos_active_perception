@@ -1,0 +1,3 @@
+asp_msgs/BoundingBox bbox
+---
+float32 percentUnseen

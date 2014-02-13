@@ -1,0 +1,16 @@
+<package>
+  <description brief="asp_spatial_reasoning">
+
+     asp_spatial_reasoning
+
+  </description>
+  <author>thorsten</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/asp_spatial_reasoning</url>
+  <depend package="roscpp"/>
+  <depend package="asp_msgs"/>
+  <depend package="moveit_ros_planning"/>
+</package>
+
+

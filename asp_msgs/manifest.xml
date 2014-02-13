@@ -1,0 +1,14 @@
+<package>
+  <description brief="asp_msgs">
+
+     asp_msgs
+
+  </description>
+  <author>thorsten</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/asp_msgs</url>
+  <depend package="geometry_msgs"/>
+</package>
+
+

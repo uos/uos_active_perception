@@ -1,0 +1,9 @@
+# Request is region of interest that contains unobserved space.
+# Response is a list of camera poses from which the ROI can be observed,
+# together with a list of expected observation qualities (portion of target
+# region that is visible) for each camera pose.
+
+asp_msgs/BoundingBox roi
+---
+geometry_msgs/PoseStamped[] camera_poses
+float32[] qualities

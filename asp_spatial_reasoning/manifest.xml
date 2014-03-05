@@ -10,7 +10,9 @@
   <url>http://ros.org/wiki/asp_spatial_reasoning</url>
   <depend package="roscpp"/>
   <depend package="asp_msgs"/>
-  <depend package="moveit_ros_planning"/>
+  <depend package="octomap"/>
+  <depend package="octomap_msgs"/>
+  <depend package="tf"/>
 </package>
 
 

@@ -2,7 +2,7 @@
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"
-#include "asp_spatial_reasoning/GetBboxPercentUnseen.h"
+#include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "octomap_msgs/GetOctomap.h"
 #include "octomap_msgs/conversions.h"
 #include "octomap/octomap.h"
@@ -16,8 +16,8 @@
 AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle("~"),
     m_get_octomap_client(m_node_handle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")),
-    m_get_bbox_percent_unseen_server(m_node_handle.advertiseService("/get_bbox_percent_unseen",
-                                                                    &AspSpatialReasoner::getBboxPercentUnseenCb,
+    m_get_bbox_percent_unseen_server(m_node_handle.advertiseService("/get_bbox_occupancy",
+                                                                    &AspSpatialReasoner::getBboxOccupancyCb,
                                                                     this)),
     m_tf_listener()
 {}
@@ -54,8 +54,8 @@ std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::Boundi
     return bbox_points;
 }
 
-bool AspSpatialReasoner::getBboxPercentUnseenCb(asp_spatial_reasoning::GetBboxPercentUnseen::Request &req,
-                                                asp_spatial_reasoning::GetBboxPercentUnseen::Response &res)
+bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request &req,
+                                            asp_spatial_reasoning::GetBboxOccupancy::Response &res)
 {
     octomap_msgs::Octomap map_msg = getCurrentScene();
     if(map_msg.data.size() == 0)
@@ -90,14 +90,16 @@ bool AspSpatialReasoner::getBboxPercentUnseenCb(asp_spatial_reasoning::GetBboxPe
     double total_size_y = (max[1] - min[1]) * octree->getNodeSize(depth);
     double total_size_z = (max[2] - min[2]) * octree->getNodeSize(depth);
     double total_volume = total_size_x * total_size_y * total_size_z;
-    double observed_volume = 0.0;
+    double free_volume = 0.0, occupied_volume = 0.0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(min,max), end = octree->end_leafs_bbx();
         it != end; ++it)
     {
         double side_len = it.getSize();
-        observed_volume += side_len * side_len * side_len;
+        double v = side_len * side_len * side_len;
+        // TODO: Icrement free and occupied volumes...
     }
-    res.percentUnseen = (total_volume - observed_volume) / total_volume;
+    // TODO: Calculate percentages
+    //res.percentUnseen = (total_volume - observed_volume) / total_volume;
     delete octree;
     return true;
 }

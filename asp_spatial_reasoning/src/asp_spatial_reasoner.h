@@ -2,7 +2,7 @@
 #define ASP_SPATIAL_REASONER_H
 
 #include "ros/ros.h"
-#include "asp_spatial_reasoning/GetBboxPercentUnseen.h"
+#include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_msgs/BoundingBox.h"
 #include "octomap_msgs/Octomap.h"
 #include "tf/transform_listener.h"
@@ -25,8 +25,8 @@ private:
     std::vector<tf::Vector3> bboxVertices(const asp_msgs::BoundingBox&);
 
     // Callbacks
-    bool getBboxPercentUnseenCb(asp_spatial_reasoning::GetBboxPercentUnseen::Request&,
-                                asp_spatial_reasoning::GetBboxPercentUnseen::Response&);
+    bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,
+                            asp_spatial_reasoning::GetBboxOccupancy::Response&);
 };
 
 #endif // ASP_SPATIAL_REASONER_H

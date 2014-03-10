@@ -96,10 +96,18 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
     {
         double side_len = it.getSize();
         double v = side_len * side_len * side_len;
-        // TODO: Icrement free and occupied volumes...
+        if(it->getOccupancy() > 0.5) // TODO: Hack!
+        {
+            occupied_volume += v;
+        }
+        else
+        {
+            free_volume += v;
+        }
     }
-    // TODO: Calculate percentages
-    //res.percentUnseen = (total_volume - observed_volume) / total_volume;
+    res.free = free_volume / total_volume;
+    res.occupied = occupied_volume / total_volume;
+    res.unknown = 1.0 - res.free - res.occupied;
     delete octree;
     return true;
 }

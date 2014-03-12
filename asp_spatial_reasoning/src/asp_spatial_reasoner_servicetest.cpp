@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     // Send request
     asp_spatial_reasoning::GetBboxOccupancy get_bbox;
     get_bbox.request.bbox = box;
-    if(ros::service::call("/get_bbox_percent_unseen", get_bbox))
+    if(ros::service::call("/get_bbox_occupancy", get_bbox))
     {
         ROS_INFO_STREAM("service call successful: " << get_bbox.response.free << " free / " << get_bbox.response.occupied << " occupied / " << get_bbox.response.unknown << " unknown");
     }

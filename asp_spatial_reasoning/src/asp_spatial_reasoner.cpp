@@ -8,6 +8,7 @@
 #include "octomap/octomap.h"
 #include "octomap/math/Vector3.h"
 #include "tf/transform_datatypes.h"
+#include "visualization_msgs/Marker.h"
 
 #include <sstream>
 #include <vector>
@@ -19,7 +20,8 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_get_bbox_percent_unseen_server(m_node_handle.advertiseService("/get_bbox_occupancy",
                                                                     &AspSpatialReasoner::getBboxOccupancyCb,
                                                                     this)),
-    m_tf_listener()
+    m_tf_listener(),
+    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 500))
 {}
 
 octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene()
@@ -91,11 +93,13 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
     double total_size_z = (max[2] - min[2]) * octree->getNodeSize(depth);
     double total_volume = total_size_x * total_size_y * total_size_z;
     double free_volume = 0.0, occupied_volume = 0.0;
+    int i = 0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(min,max), end = octree->end_leafs_bbx();
         it != end; ++it)
     {
         double side_len = it.getSize();
         double v = side_len * side_len * side_len;
+        ROS_INFO_STREAM(it.getDepth() << " v: " << v);
         if(it->getOccupancy() > 0.5) // TODO: Hack!
         {
             occupied_volume += v;
@@ -104,7 +108,28 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         {
             free_volume += v;
         }
+        // Send a marker
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::CUBE;
+        marker.lifetime = ros::Duration();
+        marker.scale.x = side_len;
+        marker.scale.y = side_len;
+        marker.scale.z = side_len;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        marker.color.a = 0.5;
+        marker.pose.position.x = it.getCoordinate().x();
+        marker.pose.position.y = it.getCoordinate().y();
+        marker.pose.position.z = it.getCoordinate().z();
+        marker.header = map_msg.header;
+        marker.id = i;
+        marker.ns = "asp_spatial_reasoner_debug";
+        m_marker_pub.publish(marker);
+        ++i;
     }
+    ROS_INFO_STREAM("Free/Occupied: " << free_volume << "/" << occupied_volume << " Total: " << total_volume);
     res.free = free_volume / total_volume;
     res.occupied = occupied_volume / total_volume;
     res.unknown = 1.0 - res.free - res.occupied;

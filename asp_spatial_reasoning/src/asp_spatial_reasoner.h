@@ -20,6 +20,7 @@ private:
     ros::ServiceClient m_get_octomap_client;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     tf::TransformListener m_tf_listener;
+    ros::Publisher m_marker_pub;
 
     octomap_msgs::Octomap getCurrentScene();
     std::vector<tf::Vector3> bboxVertices(const asp_msgs::BoundingBox&);

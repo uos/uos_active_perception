@@ -22,8 +22,21 @@ private:
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
 
+    /**
+      Polls the current octomap from the octomap_server.
+      */
     octomap_msgs::Octomap getCurrentScene();
+
+    /**
+      Returns a list of all bbox vertices in the same frame as the bbox pose.
+      */
     std::vector<tf::Vector3> bboxVertices(const asp_msgs::BoundingBox&);
+
+    /**
+      Find the volume of the intersection of two axis-aligned bounding boxes.
+      */
+    double getIntersectionVolume(octomath::Vector3& box1min, octomath::Vector3& box1max,
+                                 octomath::Vector3& box2min, octomath::Vector3& box2max);
 
     // Callbacks
     bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,

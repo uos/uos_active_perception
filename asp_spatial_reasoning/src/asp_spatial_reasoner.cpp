@@ -13,6 +13,7 @@
 #include <sstream>
 #include <vector>
 #include <limits>
+#include <algorithm>
 
 AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle("~"),
@@ -21,7 +22,7 @@ AspSpatialReasoner::AspSpatialReasoner() :
                                                                     &AspSpatialReasoner::getBboxOccupancyCb,
                                                                     this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 500))
+    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000))
 {}
 
 octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene()
@@ -56,6 +57,47 @@ std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::Boundi
     return bbox_points;
 }
 
+double AspSpatialReasoner::getIntersectionVolume(octomath::Vector3& box1min, octomath::Vector3& box1max,
+                                                 octomath::Vector3& box2min, octomath::Vector3& box2max)
+{
+//    static int i = 0;
+    octomath::Vector3 max, min;
+    // intersection min is the maximum of the two boxes' mins
+    // intersection max is the minimum of the two boxes' maxes
+    max.x() = std::min(box1max.x(), box2max.x());
+    max.y() = std::min(box1max.y(), box2max.y());
+    max.z() = std::min(box1max.z(), box2max.z());
+    min.x() = std::max(box1min.x(), box2min.x());
+    min.y() = std::max(box1min.y(), box2min.y());
+    min.z() = std::max(box1min.z(), box2min.z());
+    // make sure that max is actually larger in each dimension
+    if(max.x() < min.x()) return 0.0;
+    if(max.y() < min.y()) return 0.0;
+    if(max.z() < min.z()) return 0.0;
+//    // Send a marker
+//    visualization_msgs::Marker marker;
+//    marker.action = visualization_msgs::Marker::ADD;
+//    marker.type = visualization_msgs::Marker::CUBE;
+//    marker.lifetime = ros::Duration();
+//    marker.scale.x = max.x() - min.x();
+//    marker.scale.y = max.y() - min.y();
+//    marker.scale.z = max.z() - min.z();
+//    marker.color.r = 1.0;
+//    marker.color.g = 1.0;
+//    marker.color.b = 1.0;
+//    marker.color.a = 0.5;
+//    marker.pose.position.x = (min.x() + max.x()) / 2;
+//    marker.pose.position.y = (min.y() + max.y()) / 2;
+//    marker.pose.position.z = (min.z() + max.z()) / 2;
+//    marker.header.frame_id = "/map";
+//    marker.header.stamp = ros::Time::now();
+//    marker.id = i++;
+//    marker.ns = "asp_spatial_reasoner_debug";
+//    m_marker_pub.publish(marker);
+    // return the volume
+    return (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
+}
+
 bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request &req,
                                             asp_spatial_reasoning::GetBboxOccupancy::Response &res)
 {
@@ -66,12 +108,19 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         return false;
     }
     octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
-    unsigned int depth = octree->getTreeDepth();
-    ROS_INFO_STREAM("Tree depth is " << depth);
     // Find the axis aligned bounding box in the octomap
-    unsigned short maxkeyval = std::numeric_limits<unsigned short>::max();
-    octomap::OcTreeKey max(0, 0, 0), min(maxkeyval, maxkeyval, maxkeyval);
+    float inf = std::numeric_limits<float>::infinity();
+    octomath::Vector3 max(-inf, -inf, -inf), min(inf, inf, inf);
     std::vector<tf::Vector3> bbox_vertices = bboxVertices(req.bbox);
+    if(!m_tf_listener.waitForTransform(map_msg.header.frame_id,
+                                       req.bbox.pose_stamped.header.frame_id,
+                                       req.bbox.pose_stamped.header.stamp,
+                                       ros::Duration(1)))
+    {
+        ROS_ERROR_STREAM("asp_spatial_reasoner: Timed out while waiting for transform from " <<
+                          req.bbox.pose_stamped.header.frame_id << " to " <<
+                          map_msg.header.frame_id);
+    }
     for(std::vector<tf::Vector3>::iterator it = bbox_vertices.begin(); it != bbox_vertices.end(); ++it)
     {
         geometry_msgs::PointStamped pin, pout;
@@ -80,26 +129,27 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         pin.point.y = it->y();
         pin.point.z = it->z();
         m_tf_listener.transformPoint(map_msg.header.frame_id, pin, pout);
-        octomap::OcTreeKey key = octree->coordToKey(pout.point.x, pout.point.y, pout.point.z, depth);
-        if(key[0] < min[0]) min[0] = key[0];
-        if(key[1] < min[1]) min[1] = key[1];
-        if(key[2] < min[2]) min[2] = key[2];
-        if(key[0] > max[0]) max[0] = key[0];
-        if(key[1] > max[1]) max[1] = key[1];
-        if(key[2] > max[2]) max[2] = key[2];
+        if(pout.point.x < min.x()) min.x() = pout.point.x;
+        if(pout.point.y < min.y()) min.y() = pout.point.y;
+        if(pout.point.z < min.z()) min.z() = pout.point.z;
+        if(pout.point.x > max.x()) max.x() = pout.point.x;
+        if(pout.point.y > max.y()) max.y() = pout.point.y;
+        if(pout.point.z > max.z()) max.z() = pout.point.z;
     }
-    double total_size_x = (max[0] - min[0]) * octree->getNodeSize(depth);
-    double total_size_y = (max[1] - min[1]) * octree->getNodeSize(depth);
-    double total_size_z = (max[2] - min[2]) * octree->getNodeSize(depth);
-    double total_volume = total_size_x * total_size_y * total_size_z;
+    double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
     double free_volume = 0.0, occupied_volume = 0.0;
-    int i = 0;
     for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(min,max), end = octree->end_leafs_bbx();
         it != end; ++it)
     {
-        double side_len = it.getSize();
-        double v = side_len * side_len * side_len;
-        ROS_INFO_STREAM(it.getDepth() << " v: " << v);
+        double side_len_half = it.getSize() / 2.0;
+        octomath::Vector3 vox_min = it.getCoordinate(), vox_max = it.getCoordinate();
+        vox_min.x() -= side_len_half;
+        vox_min.y() -= side_len_half;
+        vox_min.z() -= side_len_half;
+        vox_max.x() += side_len_half;
+        vox_max.y() += side_len_half;
+        vox_max.z() += side_len_half;
+        double v = getIntersectionVolume(min, max, vox_min, vox_max);
         if(it->getOccupancy() > 0.5) // TODO: Hack!
         {
             occupied_volume += v;
@@ -108,28 +158,7 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         {
             free_volume += v;
         }
-        // Send a marker
-        visualization_msgs::Marker marker;
-        marker.action = visualization_msgs::Marker::ADD;
-        marker.type = visualization_msgs::Marker::CUBE;
-        marker.lifetime = ros::Duration();
-        marker.scale.x = side_len;
-        marker.scale.y = side_len;
-        marker.scale.z = side_len;
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 1.0;
-        marker.color.a = 0.5;
-        marker.pose.position.x = it.getCoordinate().x();
-        marker.pose.position.y = it.getCoordinate().y();
-        marker.pose.position.z = it.getCoordinate().z();
-        marker.header = map_msg.header;
-        marker.id = i;
-        marker.ns = "asp_spatial_reasoner_debug";
-        m_marker_pub.publish(marker);
-        ++i;
     }
-    ROS_INFO_STREAM("Free/Occupied: " << free_volume << "/" << occupied_volume << " Total: " << total_volume);
     res.free = free_volume / total_volume;
     res.occupied = occupied_volume / total_volume;
     res.unknown = 1.0 - res.free - res.occupied;

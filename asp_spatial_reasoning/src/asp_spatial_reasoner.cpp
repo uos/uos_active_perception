@@ -98,6 +98,39 @@ double AspSpatialReasoner::getIntersectionVolume(octomath::Vector3& box1min, oct
     return (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
 }
 
+asp_spatial_reasoning::GetBboxOccupancy::Response AspSpatialReasoner::getBboxOccupancyInScene(
+        octomap::OcTree& octree, octomath::Vector3& min, octomath::Vector3& max)
+{
+    double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
+    double free_volume = 0.0, occupied_volume = 0.0;
+    for(octomap::OcTree::leaf_bbx_iterator it = octree.begin_leafs_bbx(min,max), end = octree.end_leafs_bbx();
+        it != end; ++it)
+    {
+        double side_len_half = it.getSize() / 2.0;
+        octomath::Vector3 vox_min = it.getCoordinate(), vox_max = it.getCoordinate();
+        vox_min.x() -= side_len_half;
+        vox_min.y() -= side_len_half;
+        vox_min.z() -= side_len_half;
+        vox_max.x() += side_len_half;
+        vox_max.y() += side_len_half;
+        vox_max.z() += side_len_half;
+        double v = getIntersectionVolume(min, max, vox_min, vox_max);
+        if(it->getOccupancy() > 0.5) // TODO: Hack!
+        {
+            occupied_volume += v;
+        }
+        else
+        {
+            free_volume += v;
+        }
+    }
+    asp_spatial_reasoning::GetBboxOccupancy::Response res;
+    res.free = free_volume / total_volume;
+    res.occupied = occupied_volume / total_volume;
+    res.unknown = 1.0 - res.free - res.occupied;
+    return res;
+}
+
 bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request &req,
                                             asp_spatial_reasoning::GetBboxOccupancy::Response &res)
 {
@@ -136,32 +169,7 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         if(pout.point.y > max.y()) max.y() = pout.point.y;
         if(pout.point.z > max.z()) max.z() = pout.point.z;
     }
-    double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
-    double free_volume = 0.0, occupied_volume = 0.0;
-    for(octomap::OcTree::leaf_bbx_iterator it = octree->begin_leafs_bbx(min,max), end = octree->end_leafs_bbx();
-        it != end; ++it)
-    {
-        double side_len_half = it.getSize() / 2.0;
-        octomath::Vector3 vox_min = it.getCoordinate(), vox_max = it.getCoordinate();
-        vox_min.x() -= side_len_half;
-        vox_min.y() -= side_len_half;
-        vox_min.z() -= side_len_half;
-        vox_max.x() += side_len_half;
-        vox_max.y() += side_len_half;
-        vox_max.z() += side_len_half;
-        double v = getIntersectionVolume(min, max, vox_min, vox_max);
-        if(it->getOccupancy() > 0.5) // TODO: Hack!
-        {
-            occupied_volume += v;
-        }
-        else
-        {
-            free_volume += v;
-        }
-    }
-    res.free = free_volume / total_volume;
-    res.occupied = occupied_volume / total_volume;
-    res.unknown = 1.0 - res.free - res.occupied;
+    res = getBboxOccupancyInScene(*octree, min, max);
     delete octree;
     return true;
 }

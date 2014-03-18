@@ -7,6 +7,7 @@
 #include "octomap_msgs/Octomap.h"
 #include "tf/transform_listener.h"
 #include "octomap/math/Vector3.h"
+#include "octomap/octomap.h"
 
 #include <vector>
 
@@ -37,6 +38,13 @@ private:
       */
     double getIntersectionVolume(octomath::Vector3& box1min, octomath::Vector3& box1max,
                                  octomath::Vector3& box2min, octomath::Vector3& box2max);
+
+    /**
+      Calculate bbox occupancy in a given octomap.
+      */
+    asp_spatial_reasoning::GetBboxOccupancy::Response getBboxOccupancyInScene(octomap::OcTree& octree,
+                                                                              octomath::Vector3& min,
+                                                                              octomath::Vector3& max);
 
     // Callbacks
     bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,

@@ -13,6 +13,7 @@
   <depend package="octomap"/>
   <depend package="octomap_msgs"/>
   <depend package="tf"/>
+  <depend package="random_numbers"/>
 </package>
 
 

@@ -1,5 +1,6 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
+#include "asp_spatial_reasoning/GetObservationCameraPoses.h"
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
 
@@ -52,7 +53,19 @@ int main(int argc, char** argv)
     get_bbox.request.bbox = box;
     if(ros::service::call("/get_bbox_occupancy", get_bbox))
     {
-        ROS_INFO_STREAM("service call successful: " << get_bbox.response.free << " free / " << get_bbox.response.occupied << " occupied / " << get_bbox.response.unknown << " unknown");
+        ROS_INFO_STREAM("service call get_bbox_occupancy successful: " << get_bbox.response.free << " free / " << get_bbox.response.occupied << " occupied / " << get_bbox.response.unknown << " unknown");
+    }
+    else
+    {
+        ROS_ERROR("service call failed!");
+    }
+
+    // Send request
+    asp_spatial_reasoning::GetObservationCameraPoses get_ocp;
+    get_ocp.request.roi = box;
+    if(ros::service::call("/get_observation_camera_poses", get_ocp))
+    {
+        ROS_INFO_STREAM("service call get_observation_camera_poses successful: ");
     }
     else
     {

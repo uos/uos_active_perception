@@ -9,6 +9,7 @@
 #include "octomap/math/Vector3.h"
 #include "tf/transform_datatypes.h"
 #include "visualization_msgs/Marker.h"
+#include "random_numbers/random_numbers.h"
 
 #include <sstream>
 #include <vector>
@@ -18,21 +19,33 @@
 AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle("~"),
     m_get_octomap_client(m_node_handle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")),
-    m_get_bbox_percent_unseen_server(m_node_handle.advertiseService("/get_bbox_occupancy",
-                                                                    &AspSpatialReasoner::getBboxOccupancyCb,
-                                                                    this)),
+    m_get_bbox_percent_unseen_server(m_node_handle.advertiseService(
+                                         "/get_bbox_occupancy",
+                                         &AspSpatialReasoner::getBboxOccupancyCb,
+                                         this)),
+    m_get_observation_camera_poses_server(m_node_handle.advertiseService(
+                                              "/get_observation_camera_poses",
+                                              &AspSpatialReasoner::getObservationCameraPosesCb,
+                                              this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000))
-{}
+    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
+    m_camera_constraints()
+{
+    // Set camera constraints from parameters
+    m_camera_constraints.height_max = 1.5;
+    m_camera_constraints.height_min = 0.5;
+    m_camera_constraints.range_max = 5.0;
+    m_camera_constraints.range_min = 0.5;
+}
 
-octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene()
+octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene() const
 {
     octomap_msgs::GetOctomap getOctomap;
     m_get_octomap_client.call(getOctomap);
     return getOctomap.response.map;
 }
 
-std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::BoundingBox& bbox)
+std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::BoundingBox& bbox) const
 {
     // Construct a vector of bounding box vertices relative to the bounding box pose
     std::vector<tf::Vector3> bbox_points(8);
@@ -57,8 +70,8 @@ std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::Boundi
     return bbox_points;
 }
 
-double AspSpatialReasoner::getIntersectionVolume(octomath::Vector3& box1min, octomath::Vector3& box1max,
-                                                 octomath::Vector3& box2min, octomath::Vector3& box2max)
+double AspSpatialReasoner::getIntersectionVolume(const octomath::Vector3 &box1min, const octomath::Vector3 &box1max,
+                                                 const octomath::Vector3 &box2min, const octomath::Vector3 &box2max) const
 {
 //    static int i = 0;
     octomath::Vector3 max, min;
@@ -98,8 +111,44 @@ double AspSpatialReasoner::getIntersectionVolume(octomath::Vector3& box1min, oct
     return (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
 }
 
+bool AspSpatialReasoner::getAxisAlignedBounds(std::string const & frame_id, asp_msgs::BoundingBox const & bbox,
+                                              octomath::Vector3& min, octomath::Vector3& max) const
+{
+    float inf = std::numeric_limits<float>::infinity();
+    min.x() =  inf; min.y() =  inf; min.z() =  inf;
+    max.x() = -inf; max.y() = -inf; max.z() = -inf;
+
+    std::vector<tf::Vector3> bbox_vertices = bboxVertices(bbox);
+    if(!m_tf_listener.waitForTransform(frame_id,
+                                       bbox.pose_stamped.header.frame_id,
+                                       bbox.pose_stamped.header.stamp,
+                                       ros::Duration(1)))
+    {
+        ROS_ERROR_STREAM("asp_spatial_reasoner: Timed out while waiting for transform from " <<
+                          bbox.pose_stamped.header.frame_id << " to " <<
+                          frame_id);
+        return false;
+    }
+    for(std::vector<tf::Vector3>::iterator it = bbox_vertices.begin(); it != bbox_vertices.end(); ++it)
+    {
+        geometry_msgs::PointStamped pin, pout;
+        pin.header = bbox.pose_stamped.header;
+        pin.point.x = it->x();
+        pin.point.y = it->y();
+        pin.point.z = it->z();
+        m_tf_listener.transformPoint(frame_id, pin, pout);
+        if(pout.point.x < min.x()) min.x() = pout.point.x;
+        if(pout.point.y < min.y()) min.y() = pout.point.y;
+        if(pout.point.z < min.z()) min.z() = pout.point.z;
+        if(pout.point.x > max.x()) max.x() = pout.point.x;
+        if(pout.point.y > max.y()) max.y() = pout.point.y;
+        if(pout.point.z > max.z()) max.z() = pout.point.z;
+    }
+    return true;
+}
+
 asp_spatial_reasoning::GetBboxOccupancy::Response AspSpatialReasoner::getBboxOccupancyInScene(
-        octomap::OcTree& octree, octomath::Vector3& min, octomath::Vector3& max)
+        const octomap::OcTree &octree, const octomath::Vector3 &min, const octomath::Vector3 &max) const
 {
     double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
     double free_volume = 0.0, occupied_volume = 0.0;
@@ -141,35 +190,87 @@ bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupa
         return false;
     }
     octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
-    // Find the axis aligned bounding box in the octomap
-    float inf = std::numeric_limits<float>::infinity();
-    octomath::Vector3 max(-inf, -inf, -inf), min(inf, inf, inf);
-    std::vector<tf::Vector3> bbox_vertices = bboxVertices(req.bbox);
-    if(!m_tf_listener.waitForTransform(map_msg.header.frame_id,
-                                       req.bbox.pose_stamped.header.frame_id,
-                                       req.bbox.pose_stamped.header.stamp,
-                                       ros::Duration(1)))
-    {
-        ROS_ERROR_STREAM("asp_spatial_reasoner: Timed out while waiting for transform from " <<
-                          req.bbox.pose_stamped.header.frame_id << " to " <<
-                          map_msg.header.frame_id);
-    }
-    for(std::vector<tf::Vector3>::iterator it = bbox_vertices.begin(); it != bbox_vertices.end(); ++it)
-    {
-        geometry_msgs::PointStamped pin, pout;
-        pin.header = req.bbox.pose_stamped.header;
-        pin.point.x = it->x();
-        pin.point.y = it->y();
-        pin.point.z = it->z();
-        m_tf_listener.transformPoint(map_msg.header.frame_id, pin, pout);
-        if(pout.point.x < min.x()) min.x() = pout.point.x;
-        if(pout.point.y < min.y()) min.y() = pout.point.y;
-        if(pout.point.z < min.z()) min.z() = pout.point.z;
-        if(pout.point.x > max.x()) max.x() = pout.point.x;
-        if(pout.point.y > max.y()) max.y() = pout.point.y;
-        if(pout.point.z > max.z()) max.z() = pout.point.z;
-    }
+    octomath::Vector3 min, max;
+    getAxisAlignedBounds(map_msg.header.frame_id, req.bbox, min, max);
     res = getBboxOccupancyInScene(*octree, min, max);
+    delete octree;
+    return true;
+}
+
+bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetObservationCameraPoses::Request& req,
+                                                     asp_spatial_reasoning::GetObservationCameraPoses::Response& res)
+{
+    // Retrieve octomap of current scene
+    octomap_msgs::Octomap map_msg = getCurrentScene();
+    if(map_msg.data.size() == 0)
+    {
+        ROS_ERROR("asp_spatial_reasoner: Could not retrieve current octomap");
+        return false;
+    }
+    octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
+
+    // Get axis-aligned bounds
+    octomath::Vector3 roi_min, roi_max;
+    getAxisAlignedBounds(map_msg.header.frame_id, req.roi, roi_min, roi_max);
+
+    // Remember current state of ROI occlusion
+    double old_occlusion = getBboxOccupancyInScene(*octree, roi_min, roi_max).unknown;
+
+    // Gather position samples in space around ROI center
+    int n_samples; m_node_handle.param("n_samples", n_samples, 500);
+    std::vector<geometry_msgs::Pose> samples(n_samples);
+    octomath::Vector3 roi_center((roi_min.x() + roi_max.x()) / 2.0,
+                                 (roi_min.y() + roi_max.y()) / 2.0,
+                                 (roi_min.z() + roi_max.z()) / 2.0);
+    random_numbers::RandomNumberGenerator rng;
+    double max_range_increment = m_camera_constraints.range_max - m_camera_constraints.range_min;
+    double max_height_increment = m_camera_constraints.height_max - m_camera_constraints.height_min;
+    for(std::vector<geometry_msgs::Pose>::iterator it = samples.begin(); it != samples.end(); ++it)
+    {
+        // Create random position within feasible range and height
+        if(rng.uniformInteger(0, 1) < 1) {
+            it->position.x = roi_center.x() + m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
+        } else {
+            it->position.x = roi_center.x() - m_camera_constraints.range_min - rng.uniform01() * max_range_increment;
+        }
+        if(rng.uniformInteger(0, 1) < 1) {
+            it->position.y = roi_center.y() + m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
+        } else {
+            it->position.y = roi_center.y() - m_camera_constraints.range_min - rng.uniform01() * max_range_increment;
+        }
+        //TODO: The following will go wrong if height constraints are not in octomap frame
+        it->position.z = m_camera_constraints.height_min + rng.uniform01() * max_height_increment;
+
+        // Point the created poses towards the ROI center
+        tf::Vector3 forward_axis(1, 0, 0);
+        tf::Vector3 roi_direction(roi_center.x() - it->position.x,
+                                  roi_center.y() - it->position.y,
+                                  roi_center.z() - it->position.z);
+        tf::quaternionTFToMsg(tf::Quaternion(tf::tfCross(forward_axis, roi_direction),
+                                             tf::tfAngle(forward_axis, roi_direction)),
+                              it->orientation);
+        // Send a marker
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.lifetime = ros::Duration();
+        marker.scale.x = 1.0;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        marker.color.a = 0.5;
+        marker.pose = *it;
+        marker.header.frame_id = map_msg.header.frame_id;
+        marker.header.stamp = map_msg.header.stamp;
+        static int markerid = 0;
+        marker.id = markerid++;
+        marker.ns = "asp_spatial_reasoner_debug";
+        m_marker_pub.publish(marker);
+    }
+
+
     delete octree;
     return true;
 }

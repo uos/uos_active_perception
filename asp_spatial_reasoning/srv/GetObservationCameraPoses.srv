@@ -6,4 +6,4 @@
 asp_msgs/BoundingBox roi
 ---
 geometry_msgs/PoseStamped[] camera_poses
-float32[] qualities
+float32[] information_gain

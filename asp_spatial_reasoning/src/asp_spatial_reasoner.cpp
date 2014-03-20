@@ -15,6 +15,7 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 
 AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle("~"),
@@ -31,11 +32,18 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
     m_camera_constraints()
 {
-    // Set camera constraints from parameters
-    m_camera_constraints.height_max = 1.5;
-    m_camera_constraints.height_min = 0.5;
-    m_camera_constraints.range_max = 5.0;
-    m_camera_constraints.range_min = 0.5;
+    // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
+    m_node_handle.param("height_min", m_camera_constraints.height_min, 0.5);
+    m_node_handle.param("height_max", m_camera_constraints.height_max, 1.5);
+    m_node_handle.param("pitch_min" , m_camera_constraints.pitch_min , -0.174532925);
+    m_node_handle.param("pitch_max" , m_camera_constraints.pitch_max , 0.174532925);
+    m_node_handle.param("range_min" , m_camera_constraints.range_min , 0.4);
+    m_node_handle.param("range_max" , m_camera_constraints.range_max , 5.0);
+    m_node_handle.param("hfov"      , m_camera_constraints.hfov      , 1.01229097);
+    m_node_handle.param("vfov"      , m_camera_constraints.vfov      , 0.767944871);
+
+    m_node_handle.param("ray_casting_point_distance", m_ray_casting_point_distance, 0.1);
+
 }
 
 octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene() const
@@ -218,50 +226,93 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
 
     // Gather position samples in space around ROI center
     int n_samples; m_node_handle.param("n_samples", n_samples, 500);
-    std::vector<geometry_msgs::Pose> samples(n_samples);
+    std::vector<geometry_msgs::Pose> samples();
     octomath::Vector3 roi_center((roi_min.x() + roi_max.x()) / 2.0,
                                  (roi_min.y() + roi_max.y()) / 2.0,
                                  (roi_min.z() + roi_max.z()) / 2.0);
     random_numbers::RandomNumberGenerator rng;
     double max_range_increment = m_camera_constraints.range_max - m_camera_constraints.range_min;
     double max_height_increment = m_camera_constraints.height_max - m_camera_constraints.height_min;
-    for(std::vector<geometry_msgs::Pose>::iterator it = samples.begin(); it != samples.end(); ++it)
+    for(int i = 0; i < n_samples; ++i)
     {
         // Create random position within feasible range and height
-        if(rng.uniformInteger(0, 1) < 1) {
-            it->position.x = roi_center.x() + m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
-        } else {
-            it->position.x = roi_center.x() - m_camera_constraints.range_min - rng.uniform01() * max_range_increment;
-        }
-        if(rng.uniformInteger(0, 1) < 1) {
-            it->position.y = roi_center.y() + m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
-        } else {
-            it->position.y = roi_center.y() - m_camera_constraints.range_min - rng.uniform01() * max_range_increment;
-        }
-        //TODO: The following will go wrong if height constraints are not in octomap frame
-        it->position.z = m_camera_constraints.height_min + rng.uniform01() * max_height_increment;
+        double direction = rng.uniform01() * 2.0 * PI;
+        double distance = m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
+        // TODO: Add more distance to account for the ROI volume itself
+        tf::Vector3 position(roi_center.x() + distance * std::cos(direction),
+                             roi_center.y() + distance * std::sin(direction),
+                             m_camera_constraints.height_min + rng.uniform01() * max_height_increment);
+                             // TODO: Above line will go wrong if height constraints are not in octomap frame
 
         // Point the created poses towards the ROI center
         tf::Vector3 forward_axis(1, 0, 0);
-        tf::Vector3 roi_direction(roi_center.x() - it->position.x,
-                                  roi_center.y() - it->position.y,
-                                  roi_center.z() - it->position.z);
-        tf::quaternionTFToMsg(tf::Quaternion(tf::tfCross(forward_axis, roi_direction),
-                                             tf::tfAngle(forward_axis, roi_direction)),
-                              it->orientation);
+        tf::Vector3 roi_direction(roi_center.x() - position.getX(),
+                                  roi_center.y() - position.getY(),
+                                  roi_center.z() - position.getZ());
+
+        tf::Quaternion orientation(tf::tfCross(forward_axis, roi_direction),
+                                   tf::tfAngle(forward_axis, roi_direction));
+        tf::Transform transform(orientation, position);
+
+        // TODO: Filter poses that are occupied or have infeasible pitch.
+        //       Attempt to correct infeasible pitch while keeping ROI in vfov.
+
+        // Project a hallucinated wall into the scene
+        octomap::OcTree hallucination(*octree);
+        octomath::Vector3 cam_pos(position.getX(), position.getY(), position.getZ());
+        double azimuth_start = -m_camera_constraints.hfov / 2.0;
+        double azimuth_end   =  m_camera_constraints.hfov / 2.0;
+        double inclination_start = -m_camera_constraints.vfov / 2.0;
+        double inclination_end   =  m_camera_constraints.vfov / 2.0;
+        double r = m_camera_constraints.range_max;
+        // TODO: Constrain the ray casting region to the ROI
+        double angular_increment = std::acos(1.0 - (std::pow(m_ray_casting_point_distance, 2) /
+                                                   (2.0 * r*r)));
+        for(double azimuth = azimuth_start; azimuth < azimuth_end; azimuth += angular_increment)
+        {
+            for(double inclination = inclination_start; inclination < inclination_end; inclination += angular_increment)
+            {
+                // Construct target point in virtual camera frame
+                float y = r * std::sin(azimuth);
+                float z = r * std::sin(inclination);
+                float x = std::sqrt(r*r - y*y - z*z);
+                // Transform to scene frame
+                tf::Vector3 tfTarget = transform(tf::Vector3(x, y, z));
+                octomath::Vector3 target(tfTarget.getX(), tfTarget.getY(), tfTarget.getZ());
+                octomath::Vector3 hit;
+                // If
+                if(hallucination.castRay(cam_pos, target, hit, true, r))
+                {
+                    hallucination.insertRay(cam_pos, hit, -1.0, true);
+                }
+                else
+                {
+                    hallucination.insertRay(cam_pos, target, -1.0, true);
+                }
+            }
+        }
+        hallucination.updateInnerOccupancy();
+
+        // Check the roi occlusion in the hallucinated scene
+        double new_occlusion = getBboxOccupancyInScene(hallucination, roi_min, roi_max).unknown;
+        double gain = (old_occlusion - new_occlusion) / old_occlusion;
+
         // Send a marker
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;
         marker.lifetime = ros::Duration();
-        marker.scale.x = 1.0;
+        marker.scale.x = m_camera_constraints.range_min;
         marker.scale.y = 0.1;
         marker.scale.z = 0.1;
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 1.0;
+        marker.color.r = 1.0 - gain;
+        marker.color.g = gain;
+        marker.color.b = 0.0;
         marker.color.a = 0.5;
-        marker.pose = *it;
+        marker.pose.position.x = position.getX();
+        marker.pose.position.y = position.getY();
+        marker.pose.position.z = position.getZ();
+        tf::quaternionTFToMsg(orientation, marker.pose.orientation);
         marker.header.frame_id = map_msg.header.frame_id;
         marker.header.stamp = map_msg.header.stamp;
         static int markerid = 0;

@@ -20,6 +20,8 @@ public:
     AspSpatialReasoner();
 
 private:
+    static const double PI = 3.14159265359;
+
     ros::NodeHandle m_node_handle;
     mutable ros::ServiceClient m_get_octomap_client;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
@@ -27,6 +29,7 @@ private:
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
     asp_msgs::CameraConstraints m_camera_constraints;
+    double m_ray_casting_point_distance;
 
     /**
       Polls the current octomap from the octomap_server.

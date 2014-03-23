@@ -214,7 +214,8 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         return false;
     }
     octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
-    //octree->toMaxLikelihood();
+    // TODO: Find out if this is necessary
+    // octree->toMaxLikelihood();
     octree->prune();
 
     // Get axis-aligned bounds
@@ -226,7 +227,6 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     octree->getUnknownLeafCenters(unknown_voxels, roi_min, roi_max);
     std::vector<octomath::Vector3> unknown_voxels_initial(unknown_voxels.begin(), unknown_voxels.end());
 
-    // Gather position samples in space around ROI center
     int n_samples; m_node_handle.param("n_samples", n_samples, 500);
 
     random_numbers::RandomNumberGenerator rng;
@@ -261,16 +261,16 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         // TODO: Filter poses that are occupied or have infeasible pitch.
         //       Attempt to correct infeasible pitch while keeping ROI in vfov.
 
-        // Project a hallucinated wall into the scene
-        octomap::OcTree hallucination(*octree);
+        // Cast rays at unknown voxels and count observable ones
         octomath::Vector3 cam_pos(position.getX(), position.getY(), position.getZ());
         double azimuth_min = -m_camera_constraints.hfov / 2.0;
         double azimuth_max =  m_camera_constraints.hfov / 2.0;
         double inclination_min = -m_camera_constraints.vfov / 2.0;
         double inclination_max =  m_camera_constraints.vfov / 2.0;
         double r = m_camera_constraints.range_max;
-        for(std::vector<octomath::Vector3>::iterator it = unknown_voxels_initial.begin();
-            it != unknown_voxels_initial.end();
+        long n_revealed_voxels = 0;
+        for(std::list<octomath::Vector3>::iterator it = unknown_voxels.begin();
+            it != unknown_voxels.end();
             ++it)
         {
             // Transform voxel center to camera frame
@@ -291,6 +291,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
             // Transform to scene frame
             tf::Vector3 tfTarget(x, y, z);
             tfTarget = camera_tf(tfTarget);
+
             octomath::Vector3 target(tfTarget.getX(), tfTarget.getY(), tfTarget.getZ());
             octomath::Vector3 target_dir = target - cam_pos;
             octomath::Vector3 hit;
@@ -313,36 +314,30 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
             marker.points.push_back(p);
             geometry_msgs::Point p2;
 
-            if(hallucination.castRay(cam_pos, target_dir, hit, true, r))
+            if(!octree->castRay(cam_pos, target_dir, hit, true, target_dir.norm()))
             {
-                hallucination.insertRay(cam_pos, hit, -1.0, true);
+                // Voxel is revealed
+                n_revealed_voxels++;
+                tf::pointTFToMsg(tfTarget, p2);
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+            }
+            else
+            {
                 p2.x = hit.x();
                 p2.y = hit.y();
                 p2.z = hit.z();
                 marker.color.r = 1.0;
                 marker.color.g = 0.0;
                 marker.color.b = 0.0;
-                ROS_INFO("HIIIIT");
-            }
-            else
-            {
-                hallucination.insertRay(cam_pos, target, -1.0, true);
-                tf::pointTFToMsg(tfTarget, p2);
-                marker.color.r = 0.0;
-                marker.color.g = 1.0;
-                marker.color.b = 0.0;
             }
 
             marker.points.push_back(p2);
             //m_marker_pub.publish(marker);
         }
-        hallucination.updateInnerOccupancy();
 
-        // Check the roi occlusion in the hallucinated scene
-        std::list<octomath::Vector3> hallucinated_unknown_voxels;
-        hallucination.getUnknownLeafCenters(hallucinated_unknown_voxels, roi_min, roi_max);
-        ROS_INFO_STREAM("before: " << unknown_voxels_initial.size() << " after: " << hallucinated_unknown_voxels.size());
-        double gain = static_cast<double>(unknown_voxels_initial.size() - hallucinated_unknown_voxels.size()) /
+        double gain = static_cast<double>(n_revealed_voxels) /
                       static_cast<double>(unknown_voxels_initial.size());
 
         // Write pose candidate to answer

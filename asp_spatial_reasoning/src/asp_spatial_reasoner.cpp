@@ -256,44 +256,18 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         tf::Quaternion orientation(tf::tfCross(forward_axis, target_direction),
                                    tf::tfAngle(forward_axis, target_direction));
         tf::Transform camera_tf(orientation, position);
-        tf::Transform camera_tf_inverse = camera_tf.inverse();
 
         // TODO: Filter poses that are occupied or have infeasible pitch.
         //       Attempt to correct infeasible pitch while keeping ROI in vfov.
 
         // Cast rays at unknown voxels and count observable ones
         octomath::Vector3 cam_pos(position.getX(), position.getY(), position.getZ());
-        double azimuth_min = -m_camera_constraints.hfov / 2.0;
-        double azimuth_max =  m_camera_constraints.hfov / 2.0;
-        double inclination_min = -m_camera_constraints.vfov / 2.0;
-        double inclination_max =  m_camera_constraints.vfov / 2.0;
-        double r = m_camera_constraints.range_max;
         long n_revealed_voxels = 0;
         for(std::list<octomath::Vector3>::iterator it = unknown_voxels.begin();
             it != unknown_voxels.end();
             ++it)
         {
-            // Transform voxel center to camera frame
-            tf::Vector3 voxel_in_cam(it->x(), it->y(), it->z());
-            voxel_in_cam = camera_tf_inverse(voxel_in_cam);
-            // Find ray angles and check visibility
-            double azimuth = std::atan2(voxel_in_cam.y(), voxel_in_cam.x());
-            double inclination = std::atan2(voxel_in_cam.z(), voxel_in_cam.x());
-            if(azimuth < azimuth_min || azimuth > azimuth_max ||
-               inclination < inclination_min || inclination > inclination_max)
-            {
-                continue;
-            }
-            // Construct target point in virtual camera frame
-            float y = r * std::sin(azimuth);
-            float z = r * std::sin(inclination);
-            float x = std::sqrt(r*r - y*y - z*z);
-            // Transform to scene frame
-            tf::Vector3 tfTarget(x, y, z);
-            tfTarget = camera_tf(tfTarget);
-
-            octomath::Vector3 target(tfTarget.getX(), tfTarget.getY(), tfTarget.getZ());
-            octomath::Vector3 target_dir = target - cam_pos;
+            octomath::Vector3 target_dir = *it - cam_pos;
             octomath::Vector3 hit;
 
             // Send a marker
@@ -314,11 +288,16 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
             marker.points.push_back(p);
             geometry_msgs::Point p2;
 
-            if(!octree->castRay(cam_pos, target_dir, hit, true, target_dir.norm()))
+            double target_distance = target_dir.norm();
+            if(target_distance < m_camera_constraints.range_max &&
+               !octree->castRay(cam_pos, target_dir, hit, true, target_distance))
             {
                 // Voxel is revealed
                 n_revealed_voxels++;
-                tf::pointTFToMsg(tfTarget, p2);
+
+                p2.x = it->x();
+                p2.y = it->y();
+                p2.z = it->z();
                 marker.color.r = 0.0;
                 marker.color.g = 1.0;
                 marker.color.b = 0.0;

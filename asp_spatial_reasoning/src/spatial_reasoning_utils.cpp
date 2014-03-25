@@ -29,5 +29,6 @@ DiscreteAngleKeymaker::getKey(const double &azimuth, const double &inclination) 
 
 DiscreteAngleKeymaker::getAngles(const int key, double &azimuth, double &inclination) const
 {
-    inclination = key % inclination_bin_count;
+    inclination = resolution * (key % inclination_bin_count);
+    azimuth     = resolution * (key / inclination_bin_count);
 }

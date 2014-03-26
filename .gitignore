@@ -21,3 +21,12 @@ CMakeFiles/
 CMakeCache.txt
 Makefile.ros
 *.swp
+*/msg/*Feedback.msg
+*/msg/*Goal.msg
+*/msg/*Action.msg
+*/msg/*Result.msg
+*/src/*/cfg
+*/src/*/msg
+*/src/*/srv
+asp_msgs/src/asp_msgs/__init__.py
+asp_spatial_reasoning/src/asp_spatial_reasoning/__init__.py

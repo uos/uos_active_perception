@@ -30,3 +30,4 @@ Makefile.ros
 */src/*/srv
 asp_msgs/src/asp_msgs/__init__.py
 asp_spatial_reasoning/src/asp_spatial_reasoning/__init__.py
+CMakeLists.txt.user

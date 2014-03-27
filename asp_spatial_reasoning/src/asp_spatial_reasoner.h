@@ -30,6 +30,7 @@ private:
     ros::Publisher m_marker_pub;
     asp_msgs::CameraConstraints m_camera_constraints;
     double m_ray_casting_point_distance;
+    int m_sample_size;
 
     /**
       Polls the current octomap from the octomap_server.

@@ -42,6 +42,8 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle.param("range_max" , m_camera_constraints.range_max , 5.0);
     m_node_handle.param("hfov"      , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"      , m_camera_constraints.vfov      , 0.767944871);
+
+    m_node_handle.param("sample_size", m_sample_size, 500);
 }
 
 octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene() const
@@ -215,105 +217,124 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     }
     octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
     // TODO: Find out if this is necessary
-    // octree->toMaxLikelihood();
+    octree->toMaxLikelihood();
     octree->prune();
 
-    // Get axis-aligned bounds
-    octomath::Vector3 roi_min, roi_max;
-    getAxisAlignedBounds(map_msg.header.frame_id, req.roi, roi_min, roi_max);
-
     // Gather unknown voxel centers
+    octomath::Vector3 roi_min, roi_max;
+    if(!getAxisAlignedBounds(map_msg.header.frame_id, req.roi, roi_min, roi_max))
+    {
+        return false;
+    }
+
     std::list<octomath::Vector3> unknown_voxels;
     octree->getUnknownLeafCenters(unknown_voxels, roi_min, roi_max);
     std::vector<octomath::Vector3> unknown_voxels_initial(unknown_voxels.begin(), unknown_voxels.end());
 
-    int n_samples; m_node_handle.param("n_samples", n_samples, 500);
+    double azimuth_min = -m_camera_constraints.hfov / 2.0;
+    double azimuth_max =  m_camera_constraints.hfov / 2.0;
+    double inclination_min = -m_camera_constraints.vfov / 2.0;
+    double inclination_max =  m_camera_constraints.vfov / 2.0;
 
     random_numbers::RandomNumberGenerator rng;
     double max_range_increment = m_camera_constraints.range_max - m_camera_constraints.range_min;
-    double max_height_increment = m_camera_constraints.height_max - m_camera_constraints.height_min;
-    for(int i = 0; i < n_samples; ++i)
+    for(int i = 0; i < m_sample_size; ++i)
     {
-        // Pick a random unknown voxel as target
-        octomath::Vector3& target_voxel = unknown_voxels_initial.at(
+        // Pick a random unknown voxel as center
+        octomath::Vector3& center_voxel = unknown_voxels_initial.at(
                     rng.uniformInteger(0, unknown_voxels_initial.size() - 1));
         // Create random position within feasible range and height
         double direction = rng.uniform01() * 2.0 * PI;
         double distance = (octree->getResolution() / 2.0) + m_camera_constraints.range_min
                                                           + rng.uniform01() * max_range_increment;
-        tf::Vector3 position(target_voxel.x() + distance * std::cos(direction),
-                             target_voxel.y() + distance * std::sin(direction),
-                             m_camera_constraints.height_min + rng.uniform01() * max_height_increment);
-                             // TODO: Above line will go wrong if height constraints are not in octomap frame
-                             // TODO: This will include samples that are too far away because height is not considered.
+        double x_offset = distance * std::cos(direction);
+        double y_offset = distance * std::sin(direction);
+        double max_z_offset = std::sqrt(  (m_camera_constraints.range_max * m_camera_constraints.range_max)
+                                        - (distance * distance));
+        double z_min = std::max(center_voxel.z() - max_z_offset, m_camera_constraints.height_min);
+        double z_max = std::min(center_voxel.z() + max_z_offset, m_camera_constraints.height_max);
+        tf::Vector3 position(center_voxel.x() + x_offset,
+                             center_voxel.y() + y_offset,
+                             z_min + rng.uniform01() * (z_max - z_min));
+        // TODO: Above calculations will go wrong if height constraints are not in octomap frame
 
         // Point the created pose towards the target voxel
         tf::Vector3 forward_axis(1, 0, 0);
-        tf::Vector3 target_direction(target_voxel.x() - position.getX(),
-                                     target_voxel.y() - position.getY(),
-                                     target_voxel.z() - position.getZ());
+        tf::Vector3 center_direction(center_voxel.x() - position.getX(),
+                                     center_voxel.y() - position.getY(),
+                                     center_voxel.z() - position.getZ());
 
-        tf::Quaternion orientation(tf::tfCross(forward_axis, target_direction),
-                                   tf::tfAngle(forward_axis, target_direction));
+        tf::Quaternion orientation(tf::tfCross(forward_axis, center_direction),
+                                   tf::tfAngle(forward_axis, center_direction));
         tf::Transform camera_tf(orientation, position);
+        tf::Transform camera_tf_inverse = camera_tf.inverse();
 
-        // TODO: Filter poses that are occupied or have infeasible pitch.
-        //       Attempt to correct infeasible pitch while keeping ROI in vfov.
+        octomath::Vector3 position_om(position.getX(), position.getY(), position.getZ());
+
+        // Filter infeasible pitch
+        double cam_pitch =  0.5 * PI - tf::tfAngle(tf::Vector3(0, 0, 1), center_direction);
+        if(cam_pitch < m_camera_constraints.pitch_min || cam_pitch > m_camera_constraints.pitch_max)
+        {
+            continue;
+        }
 
         // Cast rays at unknown voxels and count observable ones
-        octomath::Vector3 cam_pos(position.getX(), position.getY(), position.getZ());
         long n_revealed_voxels = 0;
         for(std::list<octomath::Vector3>::iterator it = unknown_voxels.begin();
             it != unknown_voxels.end();
             ++it)
         {
-            octomath::Vector3 target_dir = *it - cam_pos;
-            octomath::Vector3 hit;
-
-            // Send a marker
-            visualization_msgs::Marker marker;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.type = visualization_msgs::Marker::ARROW;
-            marker.lifetime = ros::Duration();
-            marker.scale.x = 0.01;
-            //marker.scale.y = 0.01;
-            //marker.scale.z = 0.0;
-            marker.color.a = 0.5;
-            marker.header = map_msg.header;
-            static int markerid = 0;
-            marker.id = markerid++;
-            marker.ns = "asp_spatial_reasoner_debug";
-            geometry_msgs::Point p;
-            tf::pointTFToMsg(camera_tf.getOrigin(), p);
-            marker.points.push_back(p);
-            geometry_msgs::Point p2;
-
+            octomath::Vector3 target_dir = *it - position_om;
             double target_distance = target_dir.norm();
-            if(target_distance < m_camera_constraints.range_max &&
-               !octree->castRay(cam_pos, target_dir, hit, true, target_distance))
+            // Find ray angles
+            tf::Vector3 target_in_cam(it->x(), it->y(), it->z());
+            target_in_cam = camera_tf_inverse(target_in_cam);
+            double ray_azimuth     = std::atan2(target_in_cam.y(), target_in_cam.x());
+            double ray_inclination = std::atan2(target_in_cam.z(), target_in_cam.x());
+            octomath::Vector3 ray_hit;
+
+//            // Send a marker
+//            visualization_msgs::Marker marker;
+//            marker.action = visualization_msgs::Marker::ADD;
+//            marker.type = visualization_msgs::Marker::ARROW;
+//            marker.lifetime = ros::Duration();
+//            marker.scale.x = 0.01;
+//            marker.scale.y = 0.01;
+//            //marker.scale.z = 0.0;
+//            marker.color.a = 0.5;
+//            marker.header = map_msg.header;
+//            static int markerid = 0;
+//            marker.id = markerid++;
+//            marker.ns = "asp_spatial_reasoner_debug";
+//            geometry_msgs::Point p;
+//            tf::pointTFToMsg(camera_tf.getOrigin(), p);
+//            marker.points.push_back(p);
+//            geometry_msgs::Point p2;
+//            p2.x = it->x();
+//            p2.y = it->y();
+//            p2.z = it->z();
+//            marker.points.push_back(p2);
+
+            // Check target voxel visibility
+            if(target_distance < m_camera_constraints.range_max && // in range
+               ray_azimuth > azimuth_min && ray_azimuth < azimuth_max && // in hfov
+               ray_inclination > inclination_min && ray_inclination < inclination_max && // in vfov
+               !octree->castRay(position_om, target_dir, ray_hit, true, target_distance)) // not occluded
             {
                 // Voxel is revealed
                 n_revealed_voxels++;
 
-                p2.x = it->x();
-                p2.y = it->y();
-                p2.z = it->z();
-                marker.color.r = 0.0;
-                marker.color.g = 1.0;
-                marker.color.b = 0.0;
+//                marker.color.r = 0.0;
+//                marker.color.g = 1.0;
+//                marker.color.b = 0.0;
             }
-            else
-            {
-                p2.x = hit.x();
-                p2.y = hit.y();
-                p2.z = hit.z();
-                marker.color.r = 1.0;
-                marker.color.g = 0.0;
-                marker.color.b = 0.0;
-            }
-
-            marker.points.push_back(p2);
-            //m_marker_pub.publish(marker);
+//            else
+//            {
+//                marker.color.r = 1.0;
+//                marker.color.g = 0.0;
+//                marker.color.b = 0.0;
+//            }
+//            m_marker_pub.publish(marker);
         }
 
         double gain = static_cast<double>(n_revealed_voxels) /
@@ -346,8 +367,6 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         marker.ns = "asp_spatial_reasoner_debug";
         m_marker_pub.publish(marker);
     }
-
-
     delete octree;
     return true;
 }

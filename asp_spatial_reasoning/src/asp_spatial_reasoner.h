@@ -4,6 +4,7 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_spatial_reasoning/GetObservationCameraPoses.h"
+#include "asp_spatial_reasoning/GetObjectsToRemove.h"
 #include "asp_msgs/BoundingBox.h"
 #include "asp_msgs/CameraConstraints.h"
 #include "octomap_msgs/Octomap.h"
@@ -26,6 +27,7 @@ private:
     mutable ros::ServiceClient m_get_octomap_client;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
+    ros::ServiceServer m_get_objects_to_remove_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
     asp_msgs::CameraConstraints m_camera_constraints;
@@ -63,12 +65,21 @@ private:
                                                                               octomath::Vector3 const & min,
                                                                               octomath::Vector3 const & max) const;
 
+    double getInformationGainForRegionRemoval(octomap::OcTree const & octree,
+                                              std::list<octomath::Vector3> const & unknown_voxels,
+                                              octomath::Vector3 const & remove_min,
+                                              octomath::Vector3 const & remove_max,
+                                              octomath::Vector3 const & cam_position) const;
+
     // Callbacks
     bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,
                             asp_spatial_reasoning::GetBboxOccupancy::Response&);
 
     bool getObservationCameraPosesCb(asp_spatial_reasoning::GetObservationCameraPoses::Request&,
                                      asp_spatial_reasoning::GetObservationCameraPoses::Response&);
+
+    bool getObjectsToRemoveCb(asp_spatial_reasoning::GetObjectsToRemove::Request&,
+                              asp_spatial_reasoning::GetObjectsToRemove::Response&);
 };
 
 #endif // ASP_SPATIAL_REASONER_H

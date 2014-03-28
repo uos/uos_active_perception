@@ -29,6 +29,10 @@ AspSpatialReasoner::AspSpatialReasoner() :
                                               "/get_observation_camera_poses",
                                               &AspSpatialReasoner::getObservationCameraPosesCb,
                                               this)),
+    m_get_objects_to_remove_server(m_node_handle.advertiseService(
+                                       "/get_objects_to_remove",
+                                       &AspSpatialReasoner::getObjectsToRemoveCb,
+                                       this)),
     m_tf_listener(),
     m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
     m_camera_constraints()
@@ -186,6 +190,42 @@ asp_spatial_reasoning::GetBboxOccupancy::Response AspSpatialReasoner::getBboxOcc
     res.occupied = occupied_volume / total_volume;
     res.unknown = 1.0 - res.free - res.occupied;
     return res;
+}
+
+double AspSpatialReasoner::getInformationGainForRegionRemoval(octomap::OcTree const & octree,
+                                          std::list<octomath::Vector3> const & unknown_voxels,
+                                          octomath::Vector3 const & remove_min,
+                                          octomath::Vector3 const & remove_max,
+                                          octomath::Vector3 const & cam_position) const
+{
+    // Create a hallucinated octree with the object removed
+    octomap::OcTree hallucination(octree);
+    for(octomap::OcTree::leaf_bbx_iterator it = octree.begin_leafs_bbx(remove_min, remove_max);
+        it != octree.end();
+        ++it)
+    {
+        hallucination.deleteNode(it.getKey(), it.getDepth());
+        // TODO: It is either getKey() or getIndexKey(). Don't know the difference, the documentation is bad.
+    }
+
+    // Cast rays to unknown voxels and count revealed ones.
+    long n_revealed_voxels = 0;
+    for(std::list<octomath::Vector3>::const_iterator it = unknown_voxels.begin();
+        it != unknown_voxels.end();
+        ++it)
+    {
+        octomath::Vector3 target_dir = *it - cam_position;
+        double target_distance = target_dir.norm();
+        // Check target voxel visibility
+        octomath::Vector3 ray_hit;
+        if(target_distance < m_camera_constraints.range_max && // in range
+           !hallucination.castRay(cam_position, target_dir, ray_hit, true, target_distance)) // not occluded
+        {
+            n_revealed_voxels++;
+        }
+    }
+
+    return static_cast<double>(unknown_voxels.size()) / static_cast<double>(n_revealed_voxels);
 }
 
 bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request &req,
@@ -368,6 +408,37 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         m_marker_pub.publish(marker);
     }
     delete octree;
+    return true;
+}
+
+bool AspSpatialReasoner::getObjectsToRemoveCb(asp_spatial_reasoning::GetObjectsToRemove::Request& req,
+                                              asp_spatial_reasoning::GetObjectsToRemove::Response& res)
+{
+    // Retrieve octomap of current scene
+    octomap_msgs::Octomap map_msg = getCurrentScene();
+    if(map_msg.data.size() == 0)
+    {
+        ROS_ERROR("asp_spatial_reasoner: Could not retrieve current octomap");
+        return false;
+    }
+    octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
+    // TODO: Find out if this is necessary
+    octree->toMaxLikelihood();
+    octree->prune();
+
+    // Gather unknown voxel centers
+    octomath::Vector3 roi_min, roi_max;
+    if(!getAxisAlignedBounds(map_msg.header.frame_id, req.roi, roi_min, roi_max))
+    {
+        return false;
+    }
+
+    std::list<octomath::Vector3> unknown_voxels;
+    octree->getUnknownLeafCenters(unknown_voxels, roi_min, roi_max);
+
+    // TODO: Use this method on all removable objects in the scene
+    // getInformationGainForRegionRemoval(*octree, unknown_voxels, remove_min, remove_max, cam_position);
+
     return true;
 }
 

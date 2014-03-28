@@ -8,4 +8,4 @@ asp_msgs/BoundingBox roi
 geometry_msgs/PoseStamped camera_pose
 ---
 string[] objects_to_remove # Collision Object names
-float32[] qualities
+float32[] information_gain

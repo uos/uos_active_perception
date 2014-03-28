@@ -385,8 +385,12 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         tf::poseTFToMsg(camera_tf, camera_pose_msg.pose);
         camera_pose_msg.header.frame_id = map_msg.header.frame_id;
         camera_pose_msg.header.stamp = map_msg.header.stamp;
-        res.camera_poses.push_back(camera_pose_msg);
-        res.information_gain.push_back(gain);
+        if(n_revealed_voxels > 0)
+        {
+            res.camera_poses.push_back(camera_pose_msg);
+            res.information_gain.push_back(gain);
+        }
+
 
         // Send a marker
         visualization_msgs::Marker marker;

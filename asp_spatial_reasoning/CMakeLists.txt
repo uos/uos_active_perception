@@ -29,5 +29,6 @@ rosbuild_gensrv()
 #rosbuild_add_executable(example examples/example.cpp)
 #target_link_libraries(example ${PROJECT_NAME})
 
-rosbuild_add_executable(asp_spatial_reasoner src/asp_spatial_reasoner.cpp)
+rosbuild_add_executable(asp_spatial_reasoner src/asp_spatial_reasoner.cpp
+                                             src/perception_mapping.cpp)
 rosbuild_add_executable(asp_spatial_reasoner_servicetest src/asp_spatial_reasoner_servicetest.cpp)

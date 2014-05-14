@@ -3,13 +3,18 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
+#include "pcl_conversions/pcl_conversions.h"
+#include "pcl/point_cloud.h"
+#include "pcl/point_types.h"
 #include "octomap_msgs/GetOctomap.h"
 #include "octomap_msgs/conversions.h"
 #include "octomap/octomap.h"
+#include "octomap_ros/conversions.h"
 #include "octomap/math/Vector3.h"
 #include "tf/transform_datatypes.h"
 #include "visualization_msgs/Marker.h"
 #include "random_numbers/random_numbers.h"
+#include "perception_mapping.h"
 
 #include <sstream>
 #include <vector>
@@ -20,41 +25,54 @@
 
 AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle("~"),
-    m_get_octomap_client(m_node_handle.serviceClient<octomap_msgs::GetOctomap>("/octomap_binary")),
-    m_get_bbox_percent_unseen_server(m_node_handle.advertiseService(
+    m_node_handle_pub(),
+    m_point_cloud_subscriber(m_node_handle_pub.subscribe(
+                                 "cloud_in",
+                                 1,
+                                 &AspSpatialReasoner::pointCloudCb,
+                                 this)),
+    m_get_bbox_percent_unseen_server(m_node_handle_pub.advertiseService(
                                          "/get_bbox_occupancy",
                                          &AspSpatialReasoner::getBboxOccupancyCb,
                                          this)),
-    m_get_observation_camera_poses_server(m_node_handle.advertiseService(
+    m_get_observation_camera_poses_server(m_node_handle_pub.advertiseService(
                                               "/get_observation_camera_poses",
                                               &AspSpatialReasoner::getObservationCameraPosesCb,
                                               this)),
-    m_get_objects_to_remove_server(m_node_handle.advertiseService(
+    m_get_objects_to_remove_server(m_node_handle_pub.advertiseService(
                                        "/get_objects_to_remove",
                                        &AspSpatialReasoner::getObjectsToRemoveCb,
                                        this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
-    m_camera_constraints()
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
+    m_occupancy_octree_pub(m_node_handle_pub.advertise<octomap_msgs::Octomap>("occupancy_octree", 1)),
+    m_camera_constraints(),
+    m_perception_mapping(0.01)
 {
     // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
-    m_node_handle.param("height_min", m_camera_constraints.height_min, 0.5);
-    m_node_handle.param("height_max", m_camera_constraints.height_max, 1.5);
-    m_node_handle.param("pitch_min" , m_camera_constraints.pitch_min , -0.174532925);
-    m_node_handle.param("pitch_max" , m_camera_constraints.pitch_max , 0.174532925);
-    m_node_handle.param("range_min" , m_camera_constraints.range_min , 0.4);
-    m_node_handle.param("range_max" , m_camera_constraints.range_max , 5.0);
-    m_node_handle.param("hfov"      , m_camera_constraints.hfov      , 1.01229097);
-    m_node_handle.param("vfov"      , m_camera_constraints.vfov      , 0.767944871);
+    m_node_handle.param("height_min"    , m_camera_constraints.height_min, 0.5);
+    m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5);
+    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.174532925);
+    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , 0.174532925);
+    m_node_handle.param("range_min"     , m_camera_constraints.range_min , 0.4);
+    m_node_handle.param("range_max"     , m_camera_constraints.range_max , 5.0);
+    m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
+    m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.767944871);
+    m_node_handle.param("resolution"    , m_resolution                   , 0.1); // [m]
+    m_node_handle.param("sample_size"   , m_sample_size                  , 500);
+    m_node_handle.param("world_frame_id", m_world_frame_id               , std::string("/odom_combined"));
 
-    m_node_handle.param("sample_size", m_sample_size, 500);
+    m_perception_mapping.setResolution(m_resolution);
 }
 
 octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene() const
 {
-    octomap_msgs::GetOctomap getOctomap;
-    m_get_octomap_client.call(getOctomap);
-    return getOctomap.response.map;
+    octomap_msgs::Octomap msg;
+    octomap_msgs::binaryMapToMsg(m_perception_mapping.getOccupancyMap(), msg);
+    msg.header.frame_id = m_world_frame_id;
+    msg.header.stamp = ros::Time::now();
+    msg.resolution = m_resolution;
+    return msg;
 }
 
 std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::BoundingBox& bbox) const
@@ -444,6 +462,40 @@ bool AspSpatialReasoner::getObjectsToRemoveCb(asp_spatial_reasoning::GetObjectsT
     // getInformationGainForRegionRemoval(*octree, unknown_voxels, remove_min, remove_max, cam_position);
 
     return true;
+}
+
+void AspSpatialReasoner::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
+{
+    // Find sensor origin
+    tf::StampedTransform sensor_to_world_tf;
+    try
+    {
+        m_tf_listener.waitForTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, ros::Duration(2.0));
+        m_tf_listener.lookupTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, sensor_to_world_tf);
+    }
+    catch(tf::TransformException& ex)
+    {
+        ROS_ERROR_STREAM("asp_spatial_reasoner: Transform error of sensor data: "
+                         << ex.what()
+                         << ", cannot integrate data.");
+        return;
+    }
+
+    // Ugly converter cascade to get octomap_cloud
+    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+    octomap::Pointcloud octomap_cloud;
+    // ****************************************************************************************************************
+    // * WARNING! THE FOLLOWING LINE DESTROYS THE MESSAGE!
+    // * This is fine as long as this code always runs in its own process. Should this ever be run with shared memory,
+    // * this is unsafe and should be replaced by:
+    // * pcl::fromROSMsg(cloud, pcl_cloud);
+    // ****************************************************************************************************************
+    pcl::moveFromROSMsg(const_cast<sensor_msgs::PointCloud2&>(cloud), pcl_cloud);
+    octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
+
+    m_perception_mapping.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf));
+
+    m_occupancy_octree_pub.publish(getCurrentScene());
 }
 
 int main(int argc, char** argv)

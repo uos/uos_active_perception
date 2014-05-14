@@ -8,9 +8,11 @@
 #include "asp_msgs/BoundingBox.h"
 #include "asp_msgs/CameraConstraints.h"
 #include "octomap_msgs/Octomap.h"
+#include "sensor_msgs/PointCloud2.h"
 #include "tf/transform_listener.h"
 #include "octomap/math/Vector3.h"
 #include "octomap/octomap.h"
+#include "perception_mapping.h"
 
 #include <vector>
 #include <string>
@@ -23,16 +25,20 @@ public:
 private:
     static const double PI = 3.14159265359;
 
-    ros::NodeHandle m_node_handle;
-    mutable ros::ServiceClient m_get_octomap_client;
+    ros::NodeHandle m_node_handle, m_node_handle_pub;
+    ros::Subscriber m_point_cloud_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
     ros::ServiceServer m_get_objects_to_remove_server;
     tf::TransformListener m_tf_listener;
-    ros::Publisher m_marker_pub;
+    ros::Publisher m_marker_pub,
+                   m_occupancy_octree_pub;
     asp_msgs::CameraConstraints m_camera_constraints;
-    double m_ray_casting_point_distance;
+    PerceptionMapping m_perception_mapping;
+    double m_ray_casting_point_distance,
+           m_resolution;
     int m_sample_size;
+    std::string m_world_frame_id;
 
     /**
       Polls the current octomap from the octomap_server.
@@ -80,6 +86,8 @@ private:
 
     bool getObjectsToRemoveCb(asp_spatial_reasoning::GetObjectsToRemove::Request&,
                               asp_spatial_reasoning::GetObjectsToRemove::Response&);
+
+    void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
 };
 
 #endif // ASP_SPATIAL_REASONER_H

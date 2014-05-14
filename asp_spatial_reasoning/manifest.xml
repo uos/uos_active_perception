@@ -14,6 +14,9 @@
   <depend package="octomap_msgs"/>
   <depend package="tf"/>
   <depend package="random_numbers"/>
+  <depend package="pcl_ros"/>
+  <depend package="pcl_conversions"/>
+  <depend package="pcl_msgs"/>
 </package>
 
 

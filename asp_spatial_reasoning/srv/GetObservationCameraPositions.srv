@@ -1,0 +1,10 @@
+# Request is region of interest that contains observable space (fringe regions)
+# and the requested amount of samples (response may contain less).
+# Response is a list of camera positions from which the ROI can be observed,
+# together with a list of expected information gain for each camera position.
+
+asp_msgs/BoundingBox roi
+int32 sample_size
+---
+geometry_msgs/PointStamped[] camera_positions
+float32[] information_gain

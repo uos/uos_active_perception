@@ -1,6 +1,7 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_spatial_reasoning/GetObservationCameraPoses.h"
+#include "asp_spatial_reasoning/GetObservationCameraPositions.h"
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
 
@@ -23,9 +24,9 @@ int main(int argc, char** argv)
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
-    n.param("x", box.pose_stamped.pose.position.x, 0.0);
-    n.param("y", box.pose_stamped.pose.position.y, 0.0);
-    n.param("z", box.pose_stamped.pose.position.z, 0.0);
+    n.param("x", box.pose_stamped.pose.position.x, 5.5);
+    n.param("y", box.pose_stamped.pose.position.y, 10.0);
+    n.param("z", box.pose_stamped.pose.position.z, 1.0);
     n.param("xdim", box.dimensions.x, 1.0);
     n.param("ydim", box.dimensions.y, 1.0);
     n.param("zdim", box.dimensions.z, 1.0);
@@ -61,9 +62,10 @@ int main(int argc, char** argv)
     }
 
     // Send request
-    asp_spatial_reasoning::GetObservationCameraPoses get_ocp;
+    asp_spatial_reasoning::GetObservationCameraPositions get_ocp;
     get_ocp.request.roi = box;
-    if(ros::service::call("/get_observation_camera_poses", get_ocp))
+    get_ocp.request.sample_size = 1000;
+    if(ros::service::call("/get_observation_camera_positions", get_ocp))
     {
         ROS_INFO_STREAM("service call get_observation_camera_poses successful: ");
     }

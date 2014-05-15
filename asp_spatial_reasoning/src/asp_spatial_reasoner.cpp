@@ -39,6 +39,10 @@ AspSpatialReasoner::AspSpatialReasoner() :
                                               "/get_observation_camera_poses",
                                               &AspSpatialReasoner::getObservationCameraPosesCb,
                                               this)),
+    m_get_observation_camera_positions_server(m_node_handle_pub.advertiseService(
+                                                "/get_observation_camera_positions",
+                                                &AspSpatialReasoner::getObservationCameraPositionsCb,
+                                                this)),
     m_get_objects_to_remove_server(m_node_handle_pub.advertiseService(
                                        "/get_objects_to_remove",
                                        &AspSpatialReasoner::getObjectsToRemoveCb,
@@ -46,6 +50,7 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_tf_listener(),
     m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/visualization_marker", 10000)),
     m_occupancy_octree_pub(m_node_handle_pub.advertise<octomap_msgs::Octomap>("occupancy_octree", 1)),
+    m_fringe_octree_pub(m_node_handle_pub.advertise<octomap_msgs::Octomap>("fringe_octree", 1)),
     m_camera_constraints(),
     m_perception_mapping(0.01)
 {
@@ -65,10 +70,10 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_perception_mapping.setResolution(m_resolution);
 }
 
-octomap_msgs::Octomap AspSpatialReasoner::getCurrentScene() const
+octomap_msgs::Octomap AspSpatialReasoner::composeMsg(octomap::OcTree const & octree) const
 {
     octomap_msgs::Octomap msg;
-    octomap_msgs::binaryMapToMsg(m_perception_mapping.getOccupancyMap(), msg);
+    octomap_msgs::binaryMapToMsg(octree, msg);
     msg.header.frame_id = m_world_frame_id;
     msg.header.stamp = ros::Time::now();
     msg.resolution = m_resolution;
@@ -246,20 +251,41 @@ double AspSpatialReasoner::getInformationGainForRegionRemoval(octomap::OcTree co
     return static_cast<double>(unknown_voxels.size()) / static_cast<double>(n_revealed_voxels);
 }
 
+std::vector<octomap::point3d> AspSpatialReasoner::sampleObservationSpace
+(
+        std::vector<octomap::point3d> const & points_of_interest,
+        int sample_size
+){
+    std::vector<octomap::point3d> samples(sample_size);
+    random_numbers::RandomNumberGenerator rng;
+    double max_range_increment = m_camera_constraints.range_max - m_camera_constraints.range_min;
+    for(int i = 0; i < sample_size; ++i)
+    {
+        // Pick a random poi as center
+        octomap::point3d const & poi = points_of_interest.at(rng.uniformInteger(0, points_of_interest.size() - 1));
+        // Create random position within feasible range and height
+        double direction = rng.uniform01() * 2.0 * PI;
+        double distance = m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
+        double x_offset = distance * std::cos(direction);
+        double y_offset = distance * std::sin(direction);
+        double max_z_offset = std::sqrt(  (m_camera_constraints.range_max * m_camera_constraints.range_max)
+                                        - (distance * distance));
+        double z_min = std::max(poi.z() - max_z_offset, m_camera_constraints.height_min);
+        double z_max = std::min(poi.z() + max_z_offset, m_camera_constraints.height_max);
+        samples[i] = octomap::point3d(poi.x() + x_offset,
+                                      poi.y() + y_offset,
+                                      z_min + rng.uniform01() * (z_max - z_min));
+        // TODO: Above calculations will go wrong if height constraints are not in octomap frame
+    }
+    return samples;
+}
+
 bool AspSpatialReasoner::getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request &req,
                                             asp_spatial_reasoning::GetBboxOccupancy::Response &res)
 {
-    octomap_msgs::Octomap map_msg = getCurrentScene();
-    if(map_msg.data.size() == 0)
-    {
-        ROS_ERROR("asp_spatial_reasoner: Could not retrieve current octomap");
-        return false;
-    }
-    octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
     octomath::Vector3 min, max;
-    getAxisAlignedBounds(map_msg.header.frame_id, req.bbox, min, max);
-    res = getBboxOccupancyInScene(*octree, min, max);
-    delete octree;
+    getAxisAlignedBounds(m_world_frame_id, req.bbox, min, max);
+    res = getBboxOccupancyInScene(m_perception_mapping.getOccupancyMap(), min, max);
     return true;
 }
 
@@ -267,16 +293,13 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
                                                      asp_spatial_reasoning::GetObservationCameraPoses::Response& res)
 {
     // Retrieve octomap of current scene
-    octomap_msgs::Octomap map_msg = getCurrentScene();
+    octomap_msgs::Octomap map_msg = composeMsg(m_perception_mapping.getOccupancyMap());
     if(map_msg.data.size() == 0)
     {
         ROS_ERROR("asp_spatial_reasoner: Could not retrieve current octomap");
         return false;
     }
     octomap::OcTree* octree = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(map_msg));
-    // TODO: Find out if this is necessary
-    octree->toMaxLikelihood();
-    octree->prune();
 
     // Gather unknown voxel centers
     octomath::Vector3 roi_min, roi_max;
@@ -437,7 +460,7 @@ bool AspSpatialReasoner::getObjectsToRemoveCb(asp_spatial_reasoning::GetObjectsT
                                               asp_spatial_reasoning::GetObjectsToRemove::Response& res)
 {
     // Retrieve octomap of current scene
-    octomap_msgs::Octomap map_msg = getCurrentScene();
+    octomap_msgs::Octomap map_msg = composeMsg(m_perception_mapping.getOccupancyMap());
     if(map_msg.data.size() == 0)
     {
         ROS_ERROR("asp_spatial_reasoner: Could not retrieve current octomap");
@@ -486,8 +509,8 @@ void AspSpatialReasoner::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     octomap::Pointcloud octomap_cloud;
     // ****************************************************************************************************************
     // * WARNING! THE FOLLOWING LINE DESTROYS THE MESSAGE!
-    // * This is fine as long as this code always runs in its own process. Should this ever be run with shared memory,
-    // * this is unsafe and should be replaced by:
+    // * This is fine as long as this code always runs in its own process.
+    // * Should this ever be run with shared memory this is unsafe and should be replaced by:
     // * pcl::fromROSMsg(cloud, pcl_cloud);
     // ****************************************************************************************************************
     pcl::moveFromROSMsg(const_cast<sensor_msgs::PointCloud2&>(cloud), pcl_cloud);
@@ -495,7 +518,71 @@ void AspSpatialReasoner::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 
     m_perception_mapping.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf));
 
-    m_occupancy_octree_pub.publish(getCurrentScene());
+    m_occupancy_octree_pub.publish(composeMsg(m_perception_mapping.getOccupancyMap()));
+    m_fringe_octree_pub.publish(composeMsg(m_perception_mapping.getFringeMap()));
+}
+
+bool AspSpatialReasoner::getObservationCameraPositionsCb
+(
+        asp_spatial_reasoning::GetObservationCameraPositions::Request& req,
+        asp_spatial_reasoning::GetObservationCameraPositions::Response& res
+){
+    // TODO: Shrink the ROI to an area that is in principle observable
+    // (not higher/lower than the camera constraints allow observations to be made)
+
+    // Gather unknown voxel centers
+    octomath::Vector3 roi_min, roi_max;
+    if(!getAxisAlignedBounds(m_world_frame_id, req.roi, roi_min, roi_max))
+    {
+        return false;
+    }
+    std::vector<octomap::point3d> fringe_centers = m_perception_mapping.getFringeCenters(roi_min, roi_max);
+
+    std::vector<octomap::point3d> samples = sampleObservationSpace(fringe_centers, req.sample_size);
+    for(std::vector<octomap::point3d>::iterator pos_it = samples.begin(); pos_it != samples.end(); ++pos_it)
+    {
+        long n_revealed_voxels = 0;
+        for(std::vector<octomap::point3d>::iterator fringe_it = fringe_centers.begin();
+            fringe_it != fringe_centers.end();
+            ++fringe_it)
+        {
+            n_revealed_voxels += m_perception_mapping.countRevealableVoxels(*pos_it,
+                                                                            *fringe_it,
+                                                                            m_camera_constraints.range_max);
+        }
+        // Write pose candidate to answer
+        geometry_msgs::PointStamped camera_position_msg;
+        camera_position_msg.point = octomap::pointOctomapToMsg(*pos_it);
+        camera_position_msg.header.frame_id = m_world_frame_id;
+        camera_position_msg.header.stamp = ros::Time::now();
+        if(n_revealed_voxels > 0)
+        {
+            res.camera_positions.push_back(camera_position_msg);
+            res.information_gain.push_back(static_cast<float>(n_revealed_voxels));
+        }
+
+        // Send a marker
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.lifetime = ros::Duration();
+        marker.scale.x = 0.1;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
+        float gain = n_revealed_voxels / 50.0;
+        if(gain > 1.0) gain = 1.0;
+        marker.color.r = 1.0 - gain;
+        marker.color.g = gain;
+        marker.color.b = 0.0;
+        marker.color.a = 0.5;
+        marker.pose.position = camera_position_msg.point;
+        marker.header = camera_position_msg.header;
+        static int markerid = 0;
+        marker.id = markerid++;
+        marker.ns = "asp_spatial_reasoner_debug";
+        m_marker_pub.publish(marker);
+    }
+    return true;
 }
 
 int main(int argc, char** argv)

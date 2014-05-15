@@ -4,6 +4,7 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_spatial_reasoning/GetObservationCameraPoses.h"
+#include "asp_spatial_reasoning/GetObservationCameraPositions.h"
 #include "asp_spatial_reasoning/GetObjectsToRemove.h"
 #include "asp_msgs/BoundingBox.h"
 #include "asp_msgs/CameraConstraints.h"
@@ -29,10 +30,12 @@ private:
     ros::Subscriber m_point_cloud_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
+    ros::ServiceServer m_get_observation_camera_positions_server;
     ros::ServiceServer m_get_objects_to_remove_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub,
-                   m_occupancy_octree_pub;
+                   m_occupancy_octree_pub,
+                   m_fringe_octree_pub;
     asp_msgs::CameraConstraints m_camera_constraints;
     PerceptionMapping m_perception_mapping;
     double m_ray_casting_point_distance,
@@ -43,7 +46,7 @@ private:
     /**
       Polls the current octomap from the octomap_server.
       */
-    octomap_msgs::Octomap getCurrentScene() const;
+    octomap_msgs::Octomap composeMsg(octomap::OcTree const & octree) const;
 
     /**
       Returns a list of all bbox vertices in the same frame as the bbox pose.
@@ -77,6 +80,9 @@ private:
                                               octomath::Vector3 const & remove_max,
                                               octomath::Vector3 const & cam_position) const;
 
+    std::vector<octomap::point3d> sampleObservationSpace(std::vector<octomap::point3d> const & points_of_interest,
+                                                         int sample_size);
+
     // Callbacks
     bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,
                             asp_spatial_reasoning::GetBboxOccupancy::Response&);
@@ -88,6 +94,9 @@ private:
                               asp_spatial_reasoning::GetObjectsToRemove::Response&);
 
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
+
+    bool getObservationCameraPositionsCb(asp_spatial_reasoning::GetObservationCameraPositions::Request& req,
+                                         asp_spatial_reasoning::GetObservationCameraPositions::Response& resp);
 };
 
 #endif // ASP_SPATIAL_REASONER_H

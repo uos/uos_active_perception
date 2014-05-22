@@ -80,7 +80,7 @@ private:
                                               octomath::Vector3 const & remove_max,
                                               octomath::Vector3 const & cam_position) const;
 
-    std::vector<octomap::point3d> sampleObservationSpace(std::vector<octomap::point3d> const & points_of_interest,
+    std::vector<tf::Transform> sampleObservationSpace(std::vector<octomap::point3d> const & points_of_interest,
                                                          int sample_size);
 
     // Callbacks

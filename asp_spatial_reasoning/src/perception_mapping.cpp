@@ -98,3 +98,15 @@ std::vector<octomap::point3d> PerceptionMapping::getFringeCenters(octomap::point
     }
     return centers;
 }
+
+std::vector<octomap::point3d> PerceptionMapping::getFringeCenters()
+{
+    std::vector<octomap::point3d> centers;
+    for(octomap::OcTree::leaf_iterator it = m_fringe_map.begin_leafs();
+        it != m_fringe_map.end_leafs();
+        ++it)
+    {
+        centers.push_back(it.getCoordinate());
+    }
+    return centers;
+}

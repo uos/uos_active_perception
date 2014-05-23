@@ -1,7 +1,6 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_spatial_reasoning/GetObservationCameraPoses.h"
-#include "asp_spatial_reasoning/GetObservationCameraPositions.h"
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
 
@@ -62,10 +61,10 @@ int main(int argc, char** argv)
     }
 
     // Send request
-    asp_spatial_reasoning::GetObservationCameraPositions get_ocp;
+    asp_spatial_reasoning::GetObservationCameraPoses get_ocp;
     get_ocp.request.roi = box;
     get_ocp.request.sample_size = 1000;
-    if(ros::service::call("/get_observation_camera_positions", get_ocp))
+    if(ros::service::call("/get_observation_camera_poses", get_ocp))
     {
         ROS_INFO_STREAM("service call get_observation_camera_poses successful: ");
     }

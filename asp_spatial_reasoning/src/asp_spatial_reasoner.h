@@ -4,7 +4,6 @@
 #include "ros/ros.h"
 #include "asp_spatial_reasoning/GetBboxOccupancy.h"
 #include "asp_spatial_reasoning/GetObservationCameraPoses.h"
-#include "asp_spatial_reasoning/GetObservationCameraPositions.h"
 #include "asp_spatial_reasoning/GetObjectsToRemove.h"
 #include "asp_msgs/BoundingBox.h"
 #include "asp_msgs/CameraConstraints.h"
@@ -81,7 +80,7 @@ private:
                                               octomath::Vector3 const & cam_position) const;
 
     std::vector<tf::Transform> sampleObservationSpace(std::vector<octomap::point3d> const & points_of_interest,
-                                                         int sample_size);
+                                                         int sample_size) const;
 
     // Callbacks
     bool getBboxOccupancyCb(asp_spatial_reasoning::GetBboxOccupancy::Request&,
@@ -94,9 +93,6 @@ private:
                               asp_spatial_reasoning::GetObjectsToRemove::Response&);
 
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
-
-    bool getObservationCameraPositionsCb(asp_spatial_reasoning::GetObservationCameraPositions::Request& req,
-                                         asp_spatial_reasoning::GetObservationCameraPositions::Response& resp);
 };
 
 #endif // ASP_SPATIAL_REASONER_H

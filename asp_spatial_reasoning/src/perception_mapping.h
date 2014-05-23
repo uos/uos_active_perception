@@ -17,6 +17,7 @@ public:
                               octomap::point3d const & fringe,
                               double const & max_range);
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
+    std::vector<octomap::point3d> getFringeCenters();
 
 private:
     octomap::OcTree m_occupancy_map, m_fringe_map;

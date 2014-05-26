@@ -318,6 +318,9 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     double inclination_max =  m_camera_constraints.vfov / 2.0;
 
     // Gather unknown voxel centers
+    // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
+    //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
+    //       all the fringe voxels in the octree.
     std::vector<octomap::point3d> fringe_centers;
     if(req.roi.pose_stamped.header.frame_id.length() == 0)
     {

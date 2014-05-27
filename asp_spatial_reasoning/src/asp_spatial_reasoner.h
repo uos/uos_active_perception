@@ -50,7 +50,7 @@ private:
     /**
       Returns a list of all bbox vertices in the same frame as the bbox pose.
       */
-    std::vector<tf::Vector3> bboxVertices(asp_msgs::BoundingBox const &) const;
+    static std::vector<tf::Vector3> bboxVertices(asp_msgs::BoundingBox const &);
 
     /**
       Find the volume of the intersection of two axis-aligned bounding boxes.
@@ -65,6 +65,10 @@ private:
       */
     bool getAxisAlignedBounds(std::string const & frame, asp_msgs::BoundingBox const & bbox,
                               octomath::Vector3& min, octomath::Vector3& max) const;
+
+    static void getAxisAlignedBounds(asp_msgs::BoundingBox const & bbox,
+                                     octomath::Vector3& min,
+                                     octomath::Vector3& max);
 
     /**
       Calculate bbox occupancy in a given octomap.

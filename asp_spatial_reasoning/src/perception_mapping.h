@@ -13,9 +13,9 @@ public:
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);
-    int countRevealableVoxels(octomap::point3d const & camera,
-                              octomap::point3d const & fringe,
-                              double const & max_range);
+    double fringeSubmergence(octomap::point3d const & camera,
+                             octomap::point3d const & fringe,
+                             double const & max_range);
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
 

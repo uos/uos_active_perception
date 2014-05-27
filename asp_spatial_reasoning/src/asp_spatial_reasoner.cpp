@@ -76,7 +76,7 @@ octomap_msgs::Octomap AspSpatialReasoner::composeMsg(octomap::OcTree const & oct
     return msg;
 }
 
-std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::BoundingBox& bbox) const
+std::vector<tf::Vector3> AspSpatialReasoner::bboxVertices(const asp_msgs::BoundingBox& bbox)
 {
     // Construct a vector of bounding box vertices relative to the bounding box pose
     std::vector<tf::Vector3> bbox_points(8);
@@ -145,6 +145,9 @@ double AspSpatialReasoner::getIntersectionVolume(const octomath::Vector3 &box1mi
 bool AspSpatialReasoner::getAxisAlignedBounds(std::string const & frame_id, asp_msgs::BoundingBox const & bbox,
                                               octomath::Vector3& min, octomath::Vector3& max) const
 {
+    // TODO: 1. Rename method
+    //       2. Remove frame_id, use instance frame id
+    //       3. Transform bbox, then use static method below
     float inf = std::numeric_limits<float>::infinity();
     min.x() =  inf; min.y() =  inf; min.z() =  inf;
     max.x() = -inf; max.y() = -inf; max.z() = -inf;
@@ -176,6 +179,28 @@ bool AspSpatialReasoner::getAxisAlignedBounds(std::string const & frame_id, asp_
         if(pout.point.z > max.z()) max.z() = pout.point.z;
     }
     return true;
+}
+
+/**
+  Calculates axis aligned bounds for a bounding box without transform.
+  */
+void AspSpatialReasoner::getAxisAlignedBounds(asp_msgs::BoundingBox const & bbox,
+                                                     octomath::Vector3& min,
+                                                     octomath::Vector3& max)
+{
+    float inf = std::numeric_limits<float>::infinity();
+    min.x() =  inf; min.y() =  inf; min.z() =  inf;
+    max.x() = -inf; max.y() = -inf; max.z() = -inf;
+    std::vector<tf::Vector3> bbox_vertices = bboxVertices(bbox);
+    for(std::vector<tf::Vector3>::iterator it = bbox_vertices.begin(); it != bbox_vertices.end(); ++it)
+    {
+        if(it->x() < min.x()) min.x() = it->x();
+        if(it->y() < min.y()) min.y() = it->y();
+        if(it->z() < min.z()) min.z() = it->z();
+        if(it->x() > max.x()) max.x() = it->x();
+        if(it->y() > max.y()) max.y() = it->y();
+        if(it->z() > max.z()) max.z() = it->z();
+    }
 }
 
 asp_spatial_reasoning::GetBboxOccupancy::Response AspSpatialReasoner::getBboxOccupancyInScene(
@@ -309,7 +334,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     // (not higher/lower than the camera constraints allow observations to be made)
 
     std::vector<visualization_msgs::Marker> markers;
-    double max_gain = m_resolution * m_resolution * m_resolution;
+    double max_gain = m_resolution;
 
     // Some derived camera parameters
     double azimuth_min = -m_camera_constraints.hfov / 2.0;
@@ -338,19 +363,32 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         // TODO: What happens if there are no fringe voxels in the ROI (because it is inside unknown space)?
     }
 
+    // Initialize cambox size
+    asp_msgs::BoundingBox cambox;
+    cambox.dimensions.x = m_camera_constraints.range_max;
+    cambox.dimensions.y = m_camera_constraints.range_max * std::sqrt(2.0 * (1.0 - std::cos(m_camera_constraints.hfov)));
+    cambox.dimensions.z = m_camera_constraints.range_max * std::sqrt(2.0 * (1.0 - std::cos(m_camera_constraints.vfov)));
+
     std::vector<tf::Transform> samples = sampleObservationSpace(fringe_centers, req.sample_size);
     for(std::vector<tf::Transform>::iterator pose_it = samples.begin(); pose_it != samples.end(); ++pose_it)
     {
         tf::Transform camera_inverse = pose_it->inverse();
         octomap::point3d cam_point = octomap::pointTfToOctomap(pose_it->getOrigin());
-        long n_revealed_voxels = 0;
-        for(std::vector<octomap::point3d>::iterator fringe_it = fringe_centers.begin();
-            fringe_it != fringe_centers.end();
+
+        // Set cambox pose and get aligned bounds
+        octomap::point3d cambox_min, cambox_max;
+        tf::poseTFToMsg(*pose_it, cambox.pose_stamped.pose);
+        getAxisAlignedBounds(cambox, cambox_min, cambox_max);
+
+        double gain = 0.0;
+        for(octomap::OcTree::leaf_bbx_iterator fringe_it =
+                m_perception_mapping.getFringeMap().begin_leafs_bbx(cambox_min, cambox_max);
+            fringe_it != m_perception_mapping.getFringeMap().end_leafs_bbx();
             ++fringe_it)
         {
+            octomap::point3d fringe_center = fringe_it.getCoordinate();
             // Check if fringe voxel is in camera viewport
-            tf::Vector3 fringe_in_cam(fringe_it->x(), fringe_it->y(), fringe_it->z());
-            fringe_in_cam = camera_inverse(fringe_in_cam);
+            tf::Vector3 fringe_in_cam = camera_inverse(octomap::pointOctomapToTf(fringe_center));
             double ray_azimuth     = std::atan2(fringe_in_cam.y(), fringe_in_cam.x());
             double ray_inclination = std::atan2(fringe_in_cam.z(), fringe_in_cam.x());
             bool in_viewport = ray_azimuth > azimuth_min && ray_azimuth < azimuth_max && // in hfov
@@ -358,9 +396,9 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
 
             if(in_viewport)
             {
-                n_revealed_voxels += m_perception_mapping.countRevealableVoxels(cam_point,
-                                                                                *fringe_it,
-                                                                                m_camera_constraints.range_max);
+                gain += m_perception_mapping.fringeSubmergence(cam_point,
+                                                               fringe_center,
+                                                               m_camera_constraints.range_max);
             }
         }
         // Write pose candidate to answer
@@ -368,11 +406,11 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         tf::poseTFToMsg(*pose_it, camera_pose_msg.pose);
         camera_pose_msg.header.frame_id = m_world_frame_id;
         camera_pose_msg.header.stamp = ros::Time::now();
-        double gain = n_revealed_voxels * m_resolution * m_resolution * m_resolution;
-        if(gain > max_gain) {
+        if(gain > max_gain)
+        {
             max_gain = gain;
         }
-        if(n_revealed_voxels > 0)
+        if(gain > m_resolution)
         {
             res.camera_poses.push_back(camera_pose_msg);
             res.information_gain.push_back(gain);
@@ -386,7 +424,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         marker.scale.x = m_camera_constraints.range_min;
         marker.scale.y = 0.1;
         marker.scale.z = 0.1;
-        if(n_revealed_voxels > 0) {
+        if(gain > m_resolution) {
             marker.color.g = gain;
         } else {
             marker.color.b = 1.0;
@@ -401,6 +439,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     }
 
     // Publish markers
+    ROS_INFO_STREAM("Publishing " << markers.size() << " markers");
     for(std::vector<visualization_msgs::Marker>::iterator it = markers.begin(); it != markers.end(); ++it)
     {
         if(it->color.b < 1.0) {

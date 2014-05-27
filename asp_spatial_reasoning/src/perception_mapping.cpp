@@ -57,34 +57,21 @@ void PerceptionMapping::setResolution(double const & resolution)
     m_fringe_map.setResolution(resolution);
 }
 
-/**
-  Computes the amount of unknown voxels visible through a fringe voxel.
-  */
-int PerceptionMapping::countRevealableVoxels(octomap::point3d const & camera,
-                                             octomap::point3d const & fringe,
-                                             double const & max_range)
+double PerceptionMapping::fringeSubmergence(octomap::point3d const & camera,
+                                            octomap::point3d const & fringe,
+                                            double const & max_range)
 {
     octomath::Vector3 ray_dir, ray_end;
     // Find out where the ray ends
     ray_dir = fringe - camera;
-    m_occupancy_map.castRay(camera, ray_dir, ray_end, true, max_range);
-    if(camera.distance(ray_end) < camera.distance(fringe))
+    if(!m_occupancy_map.castRay(camera, ray_dir, ray_end, true, ray_dir.norm()))
     {
-        // Fringe could not be observed
-        return 0;
+        return max_range - camera.distance(fringe);
     }
-    // Observe what happens after the ray enters the fringe
-    octomap::KeyRay ray;
-    m_occupancy_map.computeRayKeys(fringe, ray_end, ray);
-    int unknown_voxels = 0;
-    for(octomap::KeyRay::iterator it = ray.begin(); it != ray.end(); ++it)
+    else
     {
-        if(!m_occupancy_map.search(*it))
-        {
-            unknown_voxels++;
-        }
+        return 0.0;
     }
-    return unknown_voxels;
 }
 
 std::vector<octomap::point3d> PerceptionMapping::getFringeCenters(octomap::point3d min, octomap::point3d max)

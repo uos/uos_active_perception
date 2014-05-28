@@ -15,6 +15,7 @@
 #include "visualization_msgs/Marker.h"
 #include "random_numbers/random_numbers.h"
 #include "perception_mapping.h"
+#include "boost/numeric/interval.hpp"
 
 #include <sstream>
 #include <vector>
@@ -53,8 +54,8 @@ AspSpatialReasoner::AspSpatialReasoner() :
     // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
     m_node_handle.param("height_min"    , m_camera_constraints.height_min, 0.5);
     m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5);
-    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.174532925);
-    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , 0.174532925);
+    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -1.5);//-0.174532925);
+    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , -1.5);//0.174532925);
     m_node_handle.param("range_min"     , m_camera_constraints.range_min , 0.4);
     m_node_handle.param("range_max"     , m_camera_constraints.range_max , 5.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
@@ -272,6 +273,9 @@ double AspSpatialReasoner::getInformationGainForRegionRemoval(octomap::OcTree co
     return static_cast<double>(unknown_voxels.size()) / static_cast<double>(n_revealed_voxels);
 }
 
+/**
+  ASSUMPTION: Camera constraints are defined in the world frame.
+  */
 std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
 (
         std::vector<octomap::point3d> const & points_of_interest,
@@ -280,24 +284,52 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
 {
     std::vector<tf::Transform> samples;
     random_numbers::RandomNumberGenerator rng;
-    double max_range_increment = m_camera_constraints.range_max - m_camera_constraints.range_min;
     for(int i = 0; i < sample_size; ++i)
     {
         // Pick a random poi as center
         octomap::point3d const & poi = points_of_interest.at(rng.uniformInteger(0, points_of_interest.size() - 1));
+
+        // Find parameter constraints
+        using boost::numeric::intersect;
+        typedef boost::numeric::interval<double,
+                                         boost::numeric::interval_lib::policies<
+                                            boost::numeric::interval_lib::save_state<boost::numeric::interval_lib::rounded_transc_std<double> >,
+                                            boost::numeric::interval_lib::checking_base<double> > > Interval;
+        // Hardware constraints
+        Interval r(m_camera_constraints.range_min, m_camera_constraints.range_max);
+        Interval dH(poi.z() - m_camera_constraints.height_max, poi.z() - m_camera_constraints.height_min);
+        Interval p(std::sin(m_camera_constraints.pitch_min - m_camera_constraints.vfov / 2.0),
+                   std::sin(m_camera_constraints.pitch_max + m_camera_constraints.vfov / 2.0));
+        Interval sin_p = boost::numeric::sin(p);
+        // Possible view angles according to hardware constraints
+        sin_p = intersect(sin_p, dH / r);
+
+        // Select a distance and height (randomize selection order)
+        double distance, dHeight;
+        if(rng.uniform01() < 0.5)
+        {
+            // possible ranges that satisfy view distance, height and pitch constraints
+            r = intersect(r, dH / sin_p);
+            distance = r.lower() + rng.uniform01() * (r.upper() - r.lower());
+            dH = intersect(dH, distance * sin_p);
+            dHeight = dH.lower() + rng.uniform01() * (dH.upper() - dH.lower());
+        }
+        else
+        {
+            // possible height offsets that satisfy view distance, height and pitch constraints
+            dH = intersect(dH, r * sin_p);
+            dHeight = dH.lower() + rng.uniform01() * (dH.upper() - dH.lower());
+            r = intersect(r, dHeight / sin_p);
+            distance = r.lower() + rng.uniform01() * (r.upper() - r.lower());
+        }
+
         // Create random position within feasible range and height
         double direction = rng.uniform01() * 2.0 * PI;
-        double distance = m_camera_constraints.range_min + rng.uniform01() * max_range_increment;
         double x_offset = distance * std::cos(direction);
         double y_offset = distance * std::sin(direction);
-        double max_z_offset = std::sqrt(  (m_camera_constraints.range_max * m_camera_constraints.range_max)
-                                        - (distance * distance));
-        double z_min = std::max(poi.z() - max_z_offset, m_camera_constraints.height_min);
-        double z_max = std::min(poi.z() + max_z_offset, m_camera_constraints.height_max);
         tf::Vector3 position(poi.x() + x_offset,
                              poi.y() + y_offset,
-                             z_min + rng.uniform01() * (z_max - z_min));
-        // TODO: Above calculations will go wrong if height constraints are not in octomap frame
+                             poi.z() - dHeight);
 
         // Point the created pose towards the target voxel
         tf::Vector3 forward_axis(1, 0, 0);
@@ -307,13 +339,8 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         tf::Quaternion orientation(tf::tfCross(forward_axis, poi_direction),
                                    tf::tfAngle(forward_axis, poi_direction));
 
-        // Filter infeasible pitch
-        // TODO: This is overly restrictive. If pitch can be adjusted and the POI is still in view that should be done.
-        double cam_pitch =  0.5 * PI - tf::tfAngle(tf::Vector3(0, 0, 1), poi_direction);
-        if(cam_pitch >= m_camera_constraints.pitch_min && cam_pitch <= m_camera_constraints.pitch_max)
-        {
-            samples.push_back(tf::Transform(orientation, position));
-        }
+        // TODO: Adjust camera pitch if out of bounds (POI still guaranteed to be in viewport)
+        samples.push_back(tf::Transform(orientation, position));
     }
     return samples;
 }

@@ -54,8 +54,8 @@ AspSpatialReasoner::AspSpatialReasoner() :
     // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
     m_node_handle.param("height_min"    , m_camera_constraints.height_min, 0.5);
     m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5);
-    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -1.5);//-0.174532925);
-    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , -1.5);//0.174532925);
+    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.174532925);
+    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , 0.174532925);
     m_node_handle.param("range_min"     , m_camera_constraints.range_min , 0.4);
     m_node_handle.param("range_max"     , m_camera_constraints.range_max , 5.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
@@ -291,10 +291,13 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
 
         // Find parameter constraints
         using boost::numeric::intersect;
-        typedef boost::numeric::interval<double,
-                                         boost::numeric::interval_lib::policies<
-                                            boost::numeric::interval_lib::save_state<boost::numeric::interval_lib::rounded_transc_std<double> >,
-                                            boost::numeric::interval_lib::checking_base<double> > > Interval;
+        typedef boost::numeric::interval<
+                    double,
+                    boost::numeric::interval_lib::policies<
+                        boost::numeric::interval_lib::save_state<
+                            boost::numeric::interval_lib::rounded_transc_std<double> >,
+                        boost::numeric::interval_lib::checking_base<double> > >
+                Interval;
         // Hardware constraints
         Interval r(m_camera_constraints.range_min, m_camera_constraints.range_max);
         Interval dH(poi.z() - m_camera_constraints.height_max, poi.z() - m_camera_constraints.height_min);
@@ -303,6 +306,12 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         Interval sin_p = boost::numeric::sin(p);
         // Possible view angles according to hardware constraints
         sin_p = intersect(sin_p, dH / r);
+
+        if(boost::numeric::empty(sin_p))
+        {
+            ROS_WARN("Skipped unobservable POI");
+            continue;
+        }
 
         // Select a distance and height (randomize selection order)
         double distance, dHeight;
@@ -407,6 +416,24 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         tf::poseTFToMsg(*pose_it, cambox.pose_stamped.pose);
         getAxisAlignedBounds(cambox, cambox_min, cambox_max);
 
+        // Send a marker
+        visualization_msgs::Marker lines_marker;
+        lines_marker.action = visualization_msgs::Marker::ADD;
+        lines_marker.type = visualization_msgs::Marker::LINE_LIST;
+        lines_marker.lifetime = ros::Duration();
+        lines_marker.scale.x = 0.001;
+        lines_marker.scale.y = 0.001;
+        lines_marker.scale.z = 0.001;
+        lines_marker.color.g = 1.0;
+        lines_marker.color.r = 1.0;
+        lines_marker.color.b = 1.0;
+        lines_marker.color.a = 0.5;
+        lines_marker.header.frame_id = m_world_frame_id;
+        lines_marker.header.stamp = ros::Time::now();
+        static int markerid = 0;
+        lines_marker.id = markerid++;
+        lines_marker.ns = "asp_spatial_reasoner_debug";
+
         double gain = 0.0;
         for(octomap::OcTree::leaf_bbx_iterator fringe_it =
                 m_perception_mapping.getFringeMap().begin_leafs_bbx(cambox_min, cambox_max);
@@ -423,9 +450,14 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
 
             if(in_viewport)
             {
-                gain += m_perception_mapping.fringeSubmergence(cam_point,
+                double gaingain = m_perception_mapping.fringeSubmergence(cam_point,
                                                                fringe_center,
                                                                m_camera_constraints.range_max);
+                gain += gaingain;
+                if(gaingain > m_resolution) {
+                    lines_marker.points.push_back(octomap::pointOctomapToMsg(cam_point));
+                    lines_marker.points.push_back(octomap::pointOctomapToMsg(fringe_center));
+                }
             }
         }
         // Write pose candidate to answer
@@ -444,6 +476,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         }
 
         // Send a marker
+        markers.push_back(lines_marker);
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;
@@ -459,7 +492,6 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         marker.color.a = 0.5;
         marker.pose = camera_pose_msg.pose;
         marker.header = camera_pose_msg.header;
-        static int markerid = 0;
         marker.id = markerid++;
         marker.ns = "asp_spatial_reasoner_debug";
         markers.push_back(marker);

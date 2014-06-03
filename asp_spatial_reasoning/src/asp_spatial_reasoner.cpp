@@ -301,8 +301,8 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         // Hardware constraints
         Interval r(m_camera_constraints.range_min, m_camera_constraints.range_max);
         Interval dH(poi.z() - m_camera_constraints.height_max, poi.z() - m_camera_constraints.height_min);
-        Interval p(std::sin(m_camera_constraints.pitch_min - m_camera_constraints.vfov / 2.0),
-                   std::sin(m_camera_constraints.pitch_max + m_camera_constraints.vfov / 2.0));
+        Interval p(m_camera_constraints.pitch_min - m_camera_constraints.vfov / 2.0,
+                   m_camera_constraints.pitch_max + m_camera_constraints.vfov / 2.0);
         Interval sin_p = boost::numeric::sin(p);
         // Possible view angles according to hardware constraints
         sin_p = intersect(sin_p, dH / r);

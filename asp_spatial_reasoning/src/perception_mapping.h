@@ -16,6 +16,8 @@ public:
     double fringeSubmergence(octomap::point3d const & camera,
                              octomap::point3d const & fringe,
                              double const & max_range);
+    double estimateRayGain(octomap::point3d const & camera,
+                           octomap::point3d const & end) const;
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
 

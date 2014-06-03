@@ -20,7 +20,7 @@ void PerceptionMapping::integratePointCloud(octomap::Pointcloud const & scan,
         ++it)
     {
         // Only do something if the observed node is free
-        if(m_occupancy_map.search(it->first)->getOccupancy() < 0.5)
+        if(!m_occupancy_map.isNodeOccupied(m_occupancy_map.search(it->first)))
         {
             octomap::OcTreeKey key = it->first;
             m_fringe_map.deleteNode(key);
@@ -72,6 +72,51 @@ double PerceptionMapping::fringeSubmergence(octomap::point3d const & camera,
     {
         return 0.0;
     }
+}
+
+/**
+  Traces a ray and returns the sum over all segments of the ray that cross unknown space AFTER seeing free space
+  at least once before.
+  */
+double PerceptionMapping::estimateRayGain(octomap::point3d const & camera, octomap::point3d const & end) const
+{
+    octomap::KeyRay ray;
+    m_occupancy_map.computeRayKeys(camera, end, ray);
+    // TODO: computeRayKeys for the whole ray is extremely slow. Instead, the implementation of castRay should be
+    //       adapted for this method so that ray traversal is terminated early.
+    double gain = 0.0;
+    bool traversing_free = false, gaining = false;
+    octomap::point3d gain_onset;
+    for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
+    {
+        if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(*key_it))
+        {
+            if(!m_occupancy_map.isNodeOccupied(node_ptr))
+            {
+                if(gaining)
+                {
+                    gain += gain_onset.distance(m_occupancy_map.keyToCoord(*key_it));
+                    gaining = false;
+                }
+                traversing_free = true;
+            }
+            else
+            {
+                break;
+            }
+        }
+        else if(traversing_free)
+        {
+            traversing_free = false;
+            gaining = true;
+            gain_onset = m_occupancy_map.keyToCoord(*key_it);
+        }
+    }
+    if(gaining)
+    {
+        gain += gain_onset.distance(end);
+    }
+    return gain;
 }
 
 std::vector<octomap::point3d> PerceptionMapping::getFringeCenters(octomap::point3d min, octomap::point3d max)

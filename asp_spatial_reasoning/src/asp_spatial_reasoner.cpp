@@ -52,12 +52,12 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_perception_mapping(0.01)
 {
     // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
-    m_node_handle.param("height_min"    , m_camera_constraints.height_min, 0.5);
+    m_node_handle.param("height_min"    , m_camera_constraints.height_min, 1.5);
     m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5);
     m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.174532925);
-    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , 0.174532925);
+    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , -0.174532925);
     m_node_handle.param("range_min"     , m_camera_constraints.range_min , 0.4);
-    m_node_handle.param("range_max"     , m_camera_constraints.range_max , 5.0);
+    m_node_handle.param("range_max"     , m_camera_constraints.range_max , 3.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.767944871);
     m_node_handle.param("resolution"    , m_resolution                   , 0.1); // [m]
@@ -377,6 +377,8 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
     double azimuth_max =  m_camera_constraints.hfov / 2.0;
     double inclination_min = -m_camera_constraints.vfov / 2.0;
     double inclination_max =  m_camera_constraints.vfov / 2.0;
+    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
+    double angle_increment = std::acos(1 - ((m_resolution * m_resolution) / (2.0 * m_camera_constraints.range_max)));
 
     // Gather unknown voxel centers
     // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
@@ -399,22 +401,10 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         // TODO: What happens if there are no fringe voxels in the ROI (because it is inside unknown space)?
     }
 
-    // Initialize cambox size
-    asp_msgs::BoundingBox cambox;
-    cambox.dimensions.x = m_camera_constraints.range_max;
-    cambox.dimensions.y = m_camera_constraints.range_max * std::sqrt(2.0 * (1.0 - std::cos(m_camera_constraints.hfov)));
-    cambox.dimensions.z = m_camera_constraints.range_max * std::sqrt(2.0 * (1.0 - std::cos(m_camera_constraints.vfov)));
-
     std::vector<tf::Transform> samples = sampleObservationSpace(fringe_centers, req.sample_size);
     for(std::vector<tf::Transform>::iterator pose_it = samples.begin(); pose_it != samples.end(); ++pose_it)
     {
-        tf::Transform camera_inverse = pose_it->inverse();
         octomap::point3d cam_point = octomap::pointTfToOctomap(pose_it->getOrigin());
-
-        // Set cambox pose and get aligned bounds
-        octomap::point3d cambox_min, cambox_max;
-        tf::poseTFToMsg(*pose_it, cambox.pose_stamped.pose);
-        getAxisAlignedBounds(cambox, cambox_min, cambox_max);
 
         // Send a marker
         visualization_msgs::Marker lines_marker;
@@ -435,28 +425,19 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         lines_marker.ns = "asp_spatial_reasoner_debug";
 
         double gain = 0.0;
-        for(octomap::OcTree::leaf_bbx_iterator fringe_it =
-                m_perception_mapping.getFringeMap().begin_leafs_bbx(cambox_min, cambox_max);
-            fringe_it != m_perception_mapping.getFringeMap().end_leafs_bbx();
-            ++fringe_it)
+        for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
         {
-            octomap::point3d fringe_center = fringe_it.getCoordinate();
-            // Check if fringe voxel is in camera viewport
-            tf::Vector3 fringe_in_cam = camera_inverse(octomap::pointOctomapToTf(fringe_center));
-            double ray_azimuth     = std::atan2(fringe_in_cam.y(), fringe_in_cam.x());
-            double ray_inclination = std::atan2(fringe_in_cam.z(), fringe_in_cam.x());
-            bool in_viewport = ray_azimuth > azimuth_min && ray_azimuth < azimuth_max && // in hfov
-                               ray_inclination > inclination_min && ray_inclination < inclination_max; // in vfov
-
-            if(in_viewport)
+            for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
             {
-                double gaingain = m_perception_mapping.fringeSubmergence(cam_point,
-                                                               fringe_center,
-                                                               m_camera_constraints.range_max);
+                tf::Vector3 ray_end_in_cam(m_camera_constraints.range_max * std::cos(azimuth),
+                                           m_camera_constraints.range_max * std::sin(azimuth),
+                                           m_camera_constraints.range_max * std::sin(inclination));
+                octomap::point3d ray_end = octomap::pointTfToOctomap((*pose_it)(ray_end_in_cam));
+				double gaingain = m_perception_mapping.estimateRayGain(cam_point, ray_end);
                 gain += gaingain;
                 if(gaingain > m_resolution) {
                     lines_marker.points.push_back(octomap::pointOctomapToMsg(cam_point));
-                    lines_marker.points.push_back(octomap::pointOctomapToMsg(fringe_center));
+                    lines_marker.points.push_back(octomap::pointOctomapToMsg(ray_end));
                 }
             }
         }

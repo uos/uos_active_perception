@@ -309,7 +309,7 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
 
         if(boost::numeric::empty(sin_p))
         {
-            ROS_WARN("Skipped unobservable POI");
+            ROS_WARN_STREAM("Skipped unobservable POI: z=" << poi.z());
             continue;
         }
 
@@ -336,19 +336,30 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         double direction = rng.uniform01() * 2.0 * PI;
         double x_offset = distance * std::cos(direction);
         double y_offset = distance * std::sin(direction);
-        tf::Vector3 position(poi.x() + x_offset,
-                             poi.y() + y_offset,
+        tf::Vector3 position(poi.x() - x_offset,
+                             poi.y() - y_offset,
                              poi.z() - dHeight);
+
+        // Adjust camera pitch if out of bounds (POI still guaranteed to be in viewport)
+        // This is done by calculating an adjusted z_offset
+        double z_offset = dHeight;
+        double pitch = std::asin(dHeight / distance);
+        if(pitch > m_camera_constraints.pitch_max)
+        {
+            z_offset = std::sqrt(distance * distance - dHeight * dHeight) * std::tan(m_camera_constraints.pitch_max);
+        }
+        else if(pitch < m_camera_constraints.pitch_min)
+        {
+            z_offset = std::sqrt(distance * distance - dHeight * dHeight) * std::tan(m_camera_constraints.pitch_min);
+        }
 
         // Point the created pose towards the target voxel
         tf::Vector3 forward_axis(1, 0, 0);
-        tf::Vector3 poi_direction(poi.x() - position.getX(),
-                                  poi.y() - position.getY(),
-                                  poi.z() - position.getZ());
+        tf::Vector3 poi_direction(x_offset,
+                                  y_offset,
+                                  z_offset);
         tf::Quaternion orientation(tf::tfCross(forward_axis, poi_direction),
                                    tf::tfAngle(forward_axis, poi_direction));
-
-        // TODO: Adjust camera pitch if out of bounds (POI still guaranteed to be in viewport)
         samples.push_back(tf::Transform(orientation, position));
     }
     return samples;

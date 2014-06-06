@@ -51,16 +51,16 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_camera_constraints(),
     m_perception_mapping(0.01)
 {
-    // Set camera constraints from parameters (Defaults: Kinect on [insert robot])
-    m_node_handle.param("height_min"    , m_camera_constraints.height_min, 1.5);
-    m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5);
-    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.174532925);
-    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , -0.174532925);
+    // Set camera constraints from parameters (Defaults: xtion on calvin)
+    m_node_handle.param("height_min"    , m_camera_constraints.height_min, 1.5875);
+    m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5875);
+    m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.935815); // [-53.6182 deg]
+    m_node_handle.param("pitch_max"     , m_camera_constraints.pitch_max , -0.935815); // [-53.6182 deg]
     m_node_handle.param("range_min"     , m_camera_constraints.range_min , 0.4);
     m_node_handle.param("range_max"     , m_camera_constraints.range_max , 3.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
-    m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.767944871);
-    m_node_handle.param("resolution"    , m_resolution                   , 0.1); // [m]
+    m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
+    m_node_handle.param("resolution"    , m_resolution                   , 0.1);
     m_node_handle.param("sample_size"   , m_sample_size                  , 500);
     m_node_handle.param("world_frame_id", m_world_frame_id               , std::string("/odom_combined"));
 
@@ -379,6 +379,8 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
 {
     // TODO: Shrink the ROI to an area that is in principle observable
     // (not higher/lower than the camera constraints allow observations to be made)
+    // Should be implemented together with the ObservationSampler class which will wrap the
+    // sampleObservationSpace method and allow to ask for single samples
 
     std::vector<visualization_msgs::Marker> markers;
     double max_gain = m_resolution;

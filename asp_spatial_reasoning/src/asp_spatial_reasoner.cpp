@@ -60,6 +60,7 @@ AspSpatialReasoner::AspSpatialReasoner() :
     m_node_handle.param("range_max"     , m_camera_constraints.range_max , 3.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
+    m_node_handle.param("roll"          , m_camera_constraints.roll      , PI);
     m_node_handle.param("resolution"    , m_resolution                   , 0.1);
     m_node_handle.param("sample_size"   , m_sample_size                  , 500);
     m_node_handle.param("world_frame_id", m_world_frame_id               , std::string("/odom_combined"));
@@ -340,26 +341,22 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
                              poi.y() - y_offset,
                              poi.z() - dHeight);
 
-        // Adjust camera pitch if out of bounds (POI still guaranteed to be in viewport)
-        // This is done by calculating an adjusted z_offset
-        double z_offset = dHeight;
+        // Adjust camera pitch
         double pitch = std::asin(dHeight / distance);
         if(pitch > m_camera_constraints.pitch_max)
         {
-            z_offset = std::sqrt(distance * distance - dHeight * dHeight) * std::tan(m_camera_constraints.pitch_max);
+            pitch = m_camera_constraints.pitch_max;
         }
         else if(pitch < m_camera_constraints.pitch_min)
         {
-            z_offset = std::sqrt(distance * distance - dHeight * dHeight) * std::tan(m_camera_constraints.pitch_min);
+            pitch = m_camera_constraints.pitch_min;
         }
 
         // Point the created pose towards the target voxel
-        tf::Vector3 forward_axis(1, 0, 0);
-        tf::Vector3 poi_direction(x_offset,
-                                  y_offset,
-                                  z_offset);
-        tf::Quaternion orientation(tf::tfCross(forward_axis, poi_direction),
-                                   tf::tfAngle(forward_axis, poi_direction));
+        // We want to do intrinsic YPR which is equivalent to fixed axis RPY
+        tf::Quaternion orientation;
+        orientation.setRPY(m_camera_constraints.roll, -pitch, 2.0 * PI - direction);
+
         samples.push_back(tf::Transform(orientation, position));
     }
     return samples;
@@ -470,7 +467,7 @@ bool AspSpatialReasoner::getObservationCameraPosesCb(asp_spatial_reasoning::GetO
         }
 
         // Send a marker
-        markers.push_back(lines_marker);
+        //markers.push_back(lines_marker);
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;

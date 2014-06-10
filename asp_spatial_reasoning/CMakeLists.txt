@@ -33,3 +33,4 @@ rosbuild_add_executable(asp_spatial_reasoner src/asp_spatial_reasoner.cpp
                                              src/perception_mapping.cpp)
 rosbuild_add_executable(asp_spatial_reasoner_servicetest src/asp_spatial_reasoner_servicetest.cpp)
 rosbuild_add_executable(quaternion_info src/quaternion_info.cpp)
+rosbuild_add_executable(active_explorer_node src/active_explorer_node.cpp)

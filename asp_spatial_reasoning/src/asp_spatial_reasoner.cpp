@@ -337,8 +337,8 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         double direction = rng.uniform01() * 2.0 * PI;
         double x_offset = distance * std::cos(direction);
         double y_offset = distance * std::sin(direction);
-        tf::Vector3 position(poi.x() - x_offset,
-                             poi.y() - y_offset,
+        tf::Vector3 position(poi.x() + x_offset,
+                             poi.y() + y_offset,
                              poi.z() - dHeight);
 
         // Adjust camera pitch
@@ -355,7 +355,7 @@ std::vector<tf::Transform> AspSpatialReasoner::sampleObservationSpace
         // Point the created pose towards the target voxel
         // We want to do intrinsic YPR which is equivalent to fixed axis RPY
         tf::Quaternion orientation;
-        orientation.setRPY(m_camera_constraints.roll, -pitch, 2.0 * PI - direction);
+        orientation.setRPY(m_camera_constraints.roll, -pitch, PI + direction);
 
         samples.push_back(tf::Transform(orientation, position));
     }

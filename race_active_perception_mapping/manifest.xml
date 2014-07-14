@@ -15,4 +15,5 @@
   <depend package="pcl_conversions"/>
   <depend package="pcl_msgs"/>
   <depend package="octomap_ros"/>
+  <depend package="octomap_msgs"/>
 </package>

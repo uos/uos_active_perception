@@ -11,6 +11,7 @@
 #include <octomap_ros/conversions.h>
 #include <octomap/octomap.h>
 #include <visualization_msgs/Marker.h>
+#include <race_active_perception_mapping/PerceptionMap.h>
 
 ActivePerceptionMapServer::ActivePerceptionMapServer() :
     m_node_handle("~"),
@@ -21,11 +22,11 @@ ActivePerceptionMapServer::ActivePerceptionMapServer() :
                                  &ActivePerceptionMapServer::pointCloudCb,
                                  this)),
     m_tf_listener(),
-    m_occupancy_octree_pub(m_node_handle_pub.advertise<octomap_msgs::OctomapBinary>("occupancy_octree", 1)),
-    m_fringe_octree_pub(m_node_handle_pub.advertise<octomap_msgs::OctomapBinary>("fringe_octree", 1)),
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/perception_map_marker", 10)),
+    m_map_pub(m_node_handle_pub.advertise<race_active_perception_mapping::PerceptionMap>("perception_map", 1)),
     m_perception_map(0.01)
 {
-    m_node_handle.param("resolution"    , m_resolution    , 0.1);
+    m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
     m_perception_map.setResolution(m_resolution);
@@ -62,9 +63,59 @@ void ActivePerceptionMapServer::pointCloudCb(sensor_msgs::PointCloud2 const & cl
     octomap::Pointcloud octomap_cloud;
     pcl::fromROSMsg(cloud, pcl_cloud);
     octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
+
+    // Integrate point cloud
     m_perception_map.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf));
-    m_occupancy_octree_pub.publish(composeMsg(m_perception_map.getOccupancyMap()));
-    m_fringe_octree_pub.publish(composeMsg(m_perception_map.getFringeMap()));
+
+    // Publish map
+    race_active_perception_mapping::PerceptionMap msg;
+    msg.header.frame_id = m_world_frame_id;
+    msg.header.stamp = cloud.header.stamp;
+    octomap_msgs::binaryMapToMsgData(m_perception_map.getOccupancyMap(), msg.occupancy_data);
+    octomap_msgs::binaryMapToMsgData(m_perception_map.getFringeMap(), msg.fringe_data);
+    m_map_pub.publish(msg);
+
+    // Publish rviz map visualization
+    visualization_msgs::Marker marker;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CUBE_LIST;
+    marker.lifetime = ros::Duration();
+    marker.scale.x = m_resolution;
+    marker.scale.y = m_resolution;
+    marker.scale.z = m_resolution;
+    marker.header.frame_id = m_world_frame_id;
+    marker.header.stamp = ros::Time::now();
+    marker.id = 0;
+    // occupancy markers
+    marker.color.r = 0.0;
+    marker.color.g = 0.0;
+    marker.color.b = 1.0;
+    marker.color.a = 1.0;
+    marker.ns = "occupancy";
+    for(octomap::OcTree::leaf_iterator it = m_perception_map.getOccupancyMap().begin_leafs();
+        it != m_perception_map.getOccupancyMap().end_leafs();
+        it++)
+    {
+        if(m_perception_map.getOccupancyMap().isNodeOccupied(*it))
+        {
+            marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+        }
+    }
+    m_marker_pub.publish(marker);
+    // fringe markers
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    marker.color.a = 0.2;
+    marker.ns = "fringe";
+    marker.points.clear();
+    for(octomap::OcTree::leaf_iterator it = m_perception_map.getFringeMap().begin_leafs();
+        it != m_perception_map.getFringeMap().end_leafs();
+        it++)
+    {
+        marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+    }
+    m_marker_pub.publish(marker);
 }
 
 int main(int argc, char** argv)

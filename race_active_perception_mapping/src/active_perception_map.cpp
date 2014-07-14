@@ -9,6 +9,13 @@ ActivePerceptionMap::ActivePerceptionMap(double const & resolution) :
     m_occupancy_map.enableChangeDetection(true);
 }
 
+ActivePerceptionMap::ActivePerceptionMap(octomap::OcTree const & occupancy_map, octomap::OcTree const & fringe_map) :
+    m_occupancy_map(occupancy_map),
+    m_fringe_map(fringe_map)
+{
+    m_occupancy_map.enableChangeDetection(true);
+}
+
 void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                                               octomap::pose6d const & frame_origin)
 {

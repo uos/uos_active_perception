@@ -8,6 +8,7 @@ class ActivePerceptionMap
 {
 public:
     ActivePerceptionMap(double const & resolution);
+    ActivePerceptionMap(octomap::OcTree const & occupancy_map, octomap::OcTree const & fringe_map);
     void integratePointCloud(octomap::Pointcloud const & scan,
                              octomap::pose6d const & frame_origin);
     octomap::OcTree const & getOccupancyMap() const;

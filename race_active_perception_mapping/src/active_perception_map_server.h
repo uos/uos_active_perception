@@ -19,8 +19,8 @@ private:
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     ros::Subscriber m_point_cloud_subscriber;
     tf::TransformListener m_tf_listener;
-    ros::Publisher m_occupancy_octree_pub,
-                   m_fringe_octree_pub;
+    ros::Publisher m_marker_pub,
+                   m_map_pub;
     ActivePerceptionMap m_perception_map;
     double m_resolution;
     std::string m_world_frame_id;

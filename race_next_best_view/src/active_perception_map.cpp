@@ -1,17 +1,11 @@
 #include "active_perception_map.h"
 
 #include <octomap/octomap.h>
+#include <octomap_ros/conversions.h>
 
 ActivePerceptionMap::ActivePerceptionMap(double const & resolution) :
     m_occupancy_map(resolution),
     m_fringe_map(resolution)
-{
-    m_occupancy_map.enableChangeDetection(true);
-}
-
-ActivePerceptionMap::ActivePerceptionMap(octomap::OcTree const & occupancy_map, octomap::OcTree const & fringe_map) :
-    m_occupancy_map(occupancy_map),
-    m_fringe_map(fringe_map)
 {
     m_occupancy_map.enableChangeDetection(true);
 }
@@ -147,4 +141,68 @@ std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters()
         centers.push_back(it.getCoordinate());
     }
     return centers;
+}
+
+/**
+  Generates a map visualization as rviz marker.
+  Caller is supposed to fill in the fields
+  - header
+  - ns
+  - id
+  */
+visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
+{
+    visualization_msgs::Marker marker;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CUBE_LIST;
+    marker.lifetime = ros::Duration();
+    marker.scale.x = m_occupancy_map.getResolution();
+    marker.scale.y = m_occupancy_map.getResolution();
+    marker.scale.z = m_occupancy_map.getResolution();
+    marker.color.r = 0.0;
+    marker.color.g = 0.0;
+    marker.color.b = 1.0;
+    marker.color.a = 1.0;
+    for(octomap::OcTree::leaf_iterator it = m_occupancy_map.begin_leafs();
+        it != m_occupancy_map.end_leafs();
+        it++)
+    {
+        if(m_occupancy_map.isNodeOccupied(*it))
+        {
+            marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+        }
+    }
+    return marker;
+}
+
+/**
+  Generates a map visualization as rviz marker.
+  Caller is supposed to fill in the fields
+  - header
+  - ns
+  - id
+  */
+visualization_msgs::Marker ActivePerceptionMap::genFringeMarker() const
+{
+    visualization_msgs::Marker marker;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CUBE_LIST;
+    marker.lifetime = ros::Duration();
+    marker.scale.x = m_fringe_map.getResolution();
+    marker.scale.y = m_fringe_map.getResolution();
+    marker.scale.z = m_fringe_map.getResolution();
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    marker.color.a = 0.1;
+    for(octomap::OcTree::leaf_iterator it = m_fringe_map.begin_leafs();
+        it != m_fringe_map.end_leafs();
+        it++)
+    {
+        if(m_fringe_map.isNodeOccupied(*it))
+        {
+            marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+        }
+    }
+    return marker;
 }

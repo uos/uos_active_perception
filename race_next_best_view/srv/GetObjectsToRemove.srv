@@ -4,7 +4,7 @@
 # together with a list of expected observation qualities (portion of target region
 # that is visible) for removed object.
 
-asp_msgs/BoundingBox roi
+race_msgs/BoundingBox roi
 geometry_msgs/PoseStamped camera_pose
 ---
 string[] objects_to_remove # Collision Object names

@@ -1,13 +1,13 @@
 <package>
-  <description brief="race_active_perception_mapping">
+  <description brief="race_next_best_view">
 
-     race_active_perception_mapping
+     race_next_best_view
 
   </description>
   <author>Thorsten Gedicke</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/race_active_perception_mapping</url>
+  <url>http://ros.org/wiki/race_next_best_view</url>
   <depend package="roscpp"/>
   <depend package="tf"/>
   <depend package="pcl"/>
@@ -16,4 +16,5 @@
   <depend package="pcl_msgs"/>
   <depend package="octomap_ros"/>
   <depend package="octomap_msgs"/>
+  <depend package="race_msgs"/>
 </package>

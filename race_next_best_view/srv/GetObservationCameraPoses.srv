@@ -4,7 +4,7 @@
 # together with a list of expected information gain for each camera pose.
 # Information gain is measured as revealed space [m^3]
 
-asp_msgs/BoundingBox roi
+race_msgs/BoundingBox roi
 int32 sample_size
 ---
 geometry_msgs/PoseStamped[] camera_poses

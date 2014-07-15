@@ -3,12 +3,13 @@
 
 #include <octomap/OcTree.h>
 #include <octomap/Pointcloud.h>
+#include <visualization_msgs/Marker.h>
 
 class ActivePerceptionMap
 {
 public:
     ActivePerceptionMap(double const & resolution);
-    ActivePerceptionMap(octomap::OcTree const & occupancy_map, octomap::OcTree const & fringe_map);
+
     void integratePointCloud(octomap::Pointcloud const & scan,
                              octomap::pose6d const & frame_origin);
     octomap::OcTree const & getOccupancyMap() const;
@@ -21,6 +22,8 @@ public:
                            octomap::point3d const & end) const;
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
+    visualization_msgs::Marker genOccupancyMarker() const;
+    visualization_msgs::Marker genFringeMarker() const;
 
 private:
     octomap::OcTree m_occupancy_map, m_fringe_map;

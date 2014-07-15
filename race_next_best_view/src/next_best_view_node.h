@@ -2,10 +2,10 @@
 #define NEXT_BEST_VIEW_NODE_H
 
 #include "active_perception_map.h"
+#include "camera_constraints.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
-#include <race_next_best_view/CameraConstraints.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <race_next_best_view/GetBboxOccupancy.h>
 #include <race_next_best_view/GetObjectsToRemove.h>
@@ -29,7 +29,7 @@ private:
     ros::ServiceServer m_get_objects_to_remove_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
-    race_next_best_view::CameraConstraints m_camera_constraints;
+    CameraConstraints m_camera_constraints;
     ActivePerceptionMap m_perception_map;
     double m_resolution;
     std::string m_world_frame_id;

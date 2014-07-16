@@ -18,7 +18,7 @@
     <param name="range_max"  type="double" value="3.0" />
     <param name="hfov"       type="double" value="1.01229097" /> <!-- [58 deg] -->
     <param name="vfov"       type="double" value="0.767944871" /> <!-- [44 deg] -->
-    <param name="roll"       type="double" value="3.14159265359" /> <!-- [180 deg] -->
+    <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />
     <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/points" />

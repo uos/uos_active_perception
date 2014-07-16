@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<launch>
+  <node name="next_best_view_node" pkg="race_next_best_view" type="next_best_view_node" output="screen" respawn="true">
+    <!-- camera constraints -->
+    <param name="height_min" type="double" value="1.5875" />
+    <param name="height_max" type="double" value="1.5875" />
+    <param name="pitch_min"  type="double" value="-0.935815" /> <!-- [-53.6182 deg] -->
+    <param name="pitch_max"  type="double" value="-0.935815" /> <!-- [-53.6182 deg] -->
+    <param name="range_min"  type="double" value="0.4" />
+    <param name="range_max"  type="double" value="3.0" />
+    <param name="hfov"       type="double" value="1.01229097" />
+    <param name="vfov"       type="double" value="0.785398163" />
+    <param name="roll"       type="double" value="3.14159265359" /> <!-- [180 deg] -->
+    <!-- frames / topics -->
+    <param name="world_frame_id" type="string" value="/map" />
+    <remap from="cloud_in" to="/kinect/depth_registered/points_filtered" />
+  </node>
+</launch>

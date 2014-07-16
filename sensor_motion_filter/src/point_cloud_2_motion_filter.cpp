@@ -36,7 +36,7 @@ void PointCloud2MotionFilter::pointCloudCb(sensor_msgs::PointCloud2 const & clou
         if(current_tf.getOrigin().distance(m_last_tf.getOrigin()) > m_max_distance ||
            current_tf.getRotation().angleShortestPath(m_last_tf.getRotation()) > m_max_rotation)
         {
-            ROS_INFO("point_cloud_2_motion_filter: blocked (motion)");
+            ROS_DEBUG("point_cloud_2_motion_filter: blocked (motion)");
             m_last_movement = current_tf.stamp_;
             m_last_tf = current_tf;
             return;
@@ -45,7 +45,7 @@ void PointCloud2MotionFilter::pointCloudCb(sensor_msgs::PointCloud2 const & clou
         if((ros::Time::now() - m_last_movement) < ros::Duration(m_block_time) ||
            (ros::Time::now() - m_last_tf.stamp_) > ros::Duration(m_block_time))
         {
-            ROS_INFO("point_cloud_2_motion_filter: blocked (recent movement or no recent data)");
+            ROS_DEBUG("point_cloud_2_motion_filter: blocked (recent movement or no recent data)");
             m_last_tf = current_tf;
             return;
         }

@@ -1,0 +1,15 @@
+<package>
+  <description brief="race_object_search">
+
+     race_object_search
+
+  </description>
+  <author>Thorsten Gedicke</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/race_object_search</url>
+  <depend package="race_next_best_view"/>
+  <depend package="move_base"/>
+</package>
+
+

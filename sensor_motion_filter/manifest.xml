@@ -1,0 +1,14 @@
+<package>
+  <description brief="sensor_motion_filter">
+
+     sensor_motion_filter
+
+  </description>
+  <author>Thorsten Gedicke</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/sensor_motion_filter</url>
+  <depend package="tf" />
+</package>
+
+

@@ -33,7 +33,7 @@ NextBestViewNode::NextBestViewNode() :
                                        &NextBestViewNode::getObjectsToRemoveCb,
                                        this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10)),
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 1000)),
     m_perception_map(0.01)
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);

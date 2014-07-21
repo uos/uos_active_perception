@@ -11,19 +11,23 @@ ActivePerceptionMap::ActivePerceptionMap(double const & resolution) :
 }
 
 void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
-                                              octomap::pose6d const & frame_origin)
+                                              octomap::pose6d const & scan_pose,
+                                              tf::Pose const & camera_pose,
+                                              CameraConstraints const & camera_constraints)
 {
-    m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), frame_origin);
-    // Update fringe map
+    // update occupancy map
+    m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), scan_pose);
+
+    // generate new fringe voxels
     for(octomap::KeyBoolMap::const_iterator it = m_occupancy_map.changedKeysBegin();
         it != m_occupancy_map.changedKeysEnd();
         ++it)
     {
-        // Only do something if the observed node is free
-        if(!m_occupancy_map.isNodeOccupied(m_occupancy_map.search(it->first)))
+        octomap::OcTreeKey key = it->first;
+        m_fringe_map.deleteNode(key);
+        // Only add to fringe if the observed node is free
+        if(!m_occupancy_map.isNodeOccupied(m_occupancy_map.search(key)))
         {
-            octomap::OcTreeKey key = it->first;
-            m_fringe_map.deleteNode(key);
             // Check neighbor voxels for fringeiness
             for(unsigned int i = 0; i < 6; i++)
             {
@@ -38,6 +42,34 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
             }
         }
     }
+
+    // remove seen fringe voxels
+    // Some derived camera parameters
+    double azimuth_min = -camera_constraints.hfov / 2.0;
+    double azimuth_max =  camera_constraints.hfov / 2.0;
+    double inclination_min = -camera_constraints.vfov / 2.0;
+    double inclination_max =  camera_constraints.vfov / 2.0;
+    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
+    double angle_increment =
+            std::acos(1.0 - (std::pow(m_fringe_map.getResolution(), 2) /
+                             (2.0 * std::pow(camera_constraints.range_max, 2))));
+    for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
+    {
+        for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
+        {
+            tf::Vector3 ray_end_in_cam(camera_constraints.range_max * std::cos(azimuth),
+                                       camera_constraints.range_max * std::sin(azimuth),
+                                       camera_constraints.range_max * std::sin(inclination));
+            octomap::point3d ray_end = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam));
+            octomap::KeyRay ray;
+            m_fringe_map.computeRayKeys(scan_pose.trans(), ray_end, ray);
+            for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
+            {
+                m_fringe_map.deleteNode(*key_it);
+            }
+        }
+    }
+
     m_occupancy_map.resetChangeDetection();
 }
 

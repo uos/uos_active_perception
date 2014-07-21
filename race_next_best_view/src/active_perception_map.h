@@ -1,8 +1,11 @@
 #ifndef ACTIVE_PERCEPTION_MAP_H
 #define ACTIVE_PERCEPTION_MAP_H
 
+#include "camera_constraints.h"
+
 #include <octomap/OcTree.h>
 #include <octomap/Pointcloud.h>
+#include <tf/tf.h>
 #include <visualization_msgs/Marker.h>
 
 class ActivePerceptionMap
@@ -11,7 +14,9 @@ public:
     ActivePerceptionMap(double const & resolution);
 
     void integratePointCloud(octomap::Pointcloud const & scan,
-                             octomap::pose6d const & frame_origin);
+                             octomap::pose6d const & scan_pose,
+                             tf::Pose const & camera_pose,
+                             CameraConstraints const & camera_constraints);
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);

@@ -33,13 +33,14 @@ NextBestViewNode::NextBestViewNode() :
                                        &NextBestViewNode::getObjectsToRemoveCb,
                                        this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 1000)),
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000)),
     m_perception_map(0.01)
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
     // Set camera constraints from parameters (Defaults: xtion on calvin)
+    m_node_handle.param("camera_frame_id",m_camera_constraints.frame_id  , std::string("/head_mount_kinect"));
     m_node_handle.param("height_min"    , m_camera_constraints.height_min, 1.5875);
     m_node_handle.param("height_max"    , m_camera_constraints.height_max, 1.5875);
     m_node_handle.param("pitch_min"     , m_camera_constraints.pitch_min , -0.935815); // [-53.6182 deg]
@@ -280,7 +281,8 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double inclination_min = -m_camera_constraints.vfov / 2.0;
     double inclination_max =  m_camera_constraints.vfov / 2.0;
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment = std::acos(1 - ((m_resolution * m_resolution) / (2.0 * m_camera_constraints.range_max)));
+    double angle_increment =
+            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
 
     // Gather unknown voxel centers
     // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
@@ -404,11 +406,12 @@ bool NextBestViewNode::getObjectsToRemoveCb(race_next_best_view::GetObjectsToRem
 void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 {
     // Find sensor origin
-    tf::StampedTransform sensor_to_world_tf;
+    tf::StampedTransform sensor_to_world_tf, camera_to_world_tf;
     try
     {
         m_tf_listener.waitForTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, ros::Duration(2.0));
         m_tf_listener.lookupTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, sensor_to_world_tf);
+        m_tf_listener.lookupTransform(m_world_frame_id, m_camera_constraints.frame_id, cloud.header.stamp, camera_to_world_tf);
     }
     catch(tf::TransformException& ex)
     {
@@ -425,7 +428,7 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
 
     // Integrate point cloud
-    m_perception_map.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf));
+    m_perception_map.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf), camera_to_world_tf, m_camera_constraints);
 
     // Publish rviz map visualization
     visualization_msgs::Marker marker = m_perception_map.genOccupancyMarker();

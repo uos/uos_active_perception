@@ -39,6 +39,7 @@ NextBestViewNode::NextBestViewNode() :
     m_perception_map(0.01)
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
+    m_node_handle.param("ray_skip"      , m_ray_skip      , 1.00);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
     // Set camera constraints from parameters (Defaults: xtion on calvin)
@@ -284,7 +285,8 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double inclination_max =  m_camera_constraints.vfov / 2.0;
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
     double angle_increment =
-            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
+            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))))
+            * m_ray_skip;
 
     // Gather unknown voxel centers
     // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.

@@ -31,7 +31,7 @@ private:
     ros::Publisher m_marker_pub;
     CameraConstraints m_camera_constraints;
     ActivePerceptionMap m_perception_map;
-    double m_resolution;
+    double m_resolution, m_ray_skip;
     std::string m_world_frame_id;
 
     static double getIntersectionVolume(const octomath::Vector3 &box1min, const octomath::Vector3 &box1max,

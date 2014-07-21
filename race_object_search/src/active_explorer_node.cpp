@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     while(ros::ok()) {
         ROS_INFO("retrieving pose candidates");
         race_next_best_view::GetObservationCameraPoses pose_candidates;
-        pose_candidates.request.sample_size = 100;
+        pose_candidates.request.sample_size = 200;
         pose_candidates.request.roi.dimensions.x = 5;
         pose_candidates.request.roi.dimensions.y = 5;
         pose_candidates.request.roi.dimensions.z = 2;

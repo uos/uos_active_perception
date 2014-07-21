@@ -21,6 +21,7 @@
     <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />
+    <param name="camera_frame_id" type="string" value="/head_mount_kinect_ir_link" />
     <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
   </node>
 </launch>

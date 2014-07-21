@@ -13,6 +13,7 @@
     <param name="roll"       type="double" value="3.14159265359" /> <!-- [180 deg] -->
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />
+    <param name="camera_frame_id" type="string" value="/head_mount_kinect" />
     <remap from="cloud_in" to="/kinect/depth_registered/points_filtered" />
   </node>
 </launch>

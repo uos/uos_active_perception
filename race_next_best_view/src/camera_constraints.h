@@ -1,8 +1,11 @@
 #ifndef CAMERA_CONSTRAINTS_H
 #define CAMERA_CONSTRAINTS_H
 
+#include <string>
+
 struct CameraConstraints
 {
+  std::string frame_id;
   double height_min;
   double height_max;
   double pitch_min;
@@ -14,7 +17,8 @@ struct CameraConstraints
   double roll;
   
   CameraConstraints()
-  : height_min(0.0)
+  : frame_id("")
+  , height_min(0.0)
   , height_max(0.0)
   , pitch_min(0.0)
   , pitch_max(0.0)

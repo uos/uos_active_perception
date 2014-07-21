@@ -37,4 +37,5 @@ link_libraries(${OCTOMAP_LIBRARY_DIRS}/liboctomap.so ${OCTOMAP_LIBRARY_DIRS}/lib
 MESSAGE(STATUS "OctoMap paths:" ${OCTOMAP_INCLUDE_DIRS} " " ${OCTOMAP_LIBRARY_DIRS})
 
 rosbuild_add_executable(next_best_view_node src/active_perception_map.cpp
-                                            src/next_best_view_node.cpp)
+                                            src/next_best_view_node.cpp
+                                            src/camera_constraints.h)

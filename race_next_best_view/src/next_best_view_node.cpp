@@ -12,6 +12,8 @@
 #include <boost/numeric/interval.hpp>
 #include <boost/random.hpp>
 
+#include <ctime>
+
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
     m_node_handle_pub(),
@@ -149,7 +151,7 @@ std::vector<tf::Transform> NextBestViewNode::sampleObservationSpace
         int sample_size
 ) const
 {
-    boost::mt19937 rng;
+    boost::mt19937 rng(std::time(0));
     std::vector<tf::Transform> samples;
     for(int i = 0; i < sample_size; ++i)
     {

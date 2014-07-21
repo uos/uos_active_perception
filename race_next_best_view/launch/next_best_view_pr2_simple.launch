@@ -16,8 +16,8 @@
     <param name="pitch_max"  type="double" value="0.0" /> <!-- [0 deg] -->
     <param name="range_min"  type="double" value="0.4" />
     <param name="range_max"  type="double" value="3.0" />
-    <param name="hfov"       type="double" value="1.01229097" /> <!-- [58 deg] -->
-    <param name="vfov"       type="double" value="0.767944871" /> <!-- [44 deg] -->
+    <param name="hfov"       type="double" value="0.994837674" /> <!-- [57 deg] -->
+    <param name="vfov"       type="double" value="0.750491578" /> <!-- [43 deg] -->
     <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />

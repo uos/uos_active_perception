@@ -18,7 +18,40 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
     // update occupancy map
     m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), scan_pose);
 
-    // generate new fringe voxels
+    // Detect space that should have been seen but was not (exceeding sensor max range).
+    // This space is assumed to be empty and updated in the occupancy map.
+    double azimuth_min = -camera_constraints.hfov / 2.0;
+    double azimuth_max =  camera_constraints.hfov / 2.0;
+    double inclination_min = -camera_constraints.vfov / 2.0;
+    double inclination_max =  camera_constraints.vfov / 2.0;
+    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
+    double angle_increment =
+            std::acos(1.0 - (std::pow(m_occupancy_map.getResolution(), 2) /
+                             (2.0 * std::pow(camera_constraints.range_max, 2))));
+    for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
+    {
+        for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
+        {
+            tf::Vector3 ray_end_in_cam(camera_constraints.range_max * std::cos(azimuth),
+                                       camera_constraints.range_max * std::sin(azimuth),
+                                       camera_constraints.range_max * std::sin(inclination));
+            octomap::point3d maxd_ray_end = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam));
+            octomap::point3d ray_end;
+            if(!m_occupancy_map.castRay(scan_pose.trans(), maxd_ray_end - scan_pose.trans(), ray_end, true, camera_constraints.range_max))
+            {
+                ray_end = maxd_ray_end;
+            }
+            octomap::KeyRay ray;
+            m_occupancy_map.computeRayKeys(scan_pose.trans(), ray_end, ray);
+            for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
+            {
+                m_occupancy_map.updateNode(*key_it, false, true);
+            }
+        }
+    }
+    m_occupancy_map.updateInnerOccupancy();
+
+    // update fringe voxels
     for(octomap::KeyBoolMap::const_iterator it = m_occupancy_map.changedKeysBegin();
         it != m_occupancy_map.changedKeysEnd();
         ++it)
@@ -39,33 +72,6 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                 {
                     m_fringe_map.updateNode(neighbor, true);
                 }
-            }
-        }
-    }
-
-    // remove seen fringe voxels
-    // Some derived camera parameters
-    double azimuth_min = -camera_constraints.hfov / 2.0;
-    double azimuth_max =  camera_constraints.hfov / 2.0;
-    double inclination_min = -camera_constraints.vfov / 2.0;
-    double inclination_max =  camera_constraints.vfov / 2.0;
-    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment =
-            std::acos(1.0 - (std::pow(m_fringe_map.getResolution(), 2) /
-                             (2.0 * std::pow(camera_constraints.range_max, 2))));
-    for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
-    {
-        for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
-        {
-            tf::Vector3 ray_end_in_cam(camera_constraints.range_max * std::cos(azimuth),
-                                       camera_constraints.range_max * std::sin(azimuth),
-                                       camera_constraints.range_max * std::sin(inclination));
-            octomap::point3d ray_end = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam));
-            octomap::KeyRay ray;
-            m_fringe_map.computeRayKeys(scan_pose.trans(), ray_end, ray);
-            for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
-            {
-                m_fringe_map.deleteNode(*key_it);
             }
         }
     }

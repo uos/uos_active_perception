@@ -129,13 +129,13 @@ double ActivePerceptionMap::estimateRayGain(octomap::point3d const & camera, oct
     {
         if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(*key_it))
         {
+            if(gaining)
+            {
+                gain += gain_onset.distance(m_occupancy_map.keyToCoord(*key_it));
+                gaining = false;
+            }
             if(!m_occupancy_map.isNodeOccupied(node_ptr))
             {
-                if(gaining)
-                {
-                    gain += gain_onset.distance(m_occupancy_map.keyToCoord(*key_it));
-                    gaining = false;
-                }
                 traversing_free = true;
             }
             else

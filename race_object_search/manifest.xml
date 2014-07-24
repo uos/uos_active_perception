@@ -10,6 +10,7 @@
   <url>http://ros.org/wiki/race_object_search</url>
   <depend package="race_next_best_view"/>
   <depend package="move_base"/>
+  <depend package="nav_msgs"/>
 </package>
 
 

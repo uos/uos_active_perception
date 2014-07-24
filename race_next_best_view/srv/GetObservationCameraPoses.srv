@@ -1,11 +1,15 @@
-# Request is region of interest that contains observable space (fringe regions)
-# and the requested amount of samples (response may contain less).
-# Response is a list of camera poses from which the ROI can be observed,
-# together with a list of expected information gain for each camera pose.
-# Information gain is measured as revealed space [m^3]
+# Request:
+# - roi: List of  regions of interest
+# - sample_size: The requested amount of samples (response may contain less).
+# - ray_skip: Probability that a ray cast will be skipped (speeds up information gain estimation).
+# Response:
+# - camera_poses: A List of camera poses in the world coordinate frame from which the ROI can be observed,
+# - information_gain: A list of expected information gain for each camera pose.
+#                     Information gain is measured as revealed space [m^3]
 
-race_msgs/BoundingBox roi
+race_msgs/BoundingBox[] roi
 int32 sample_size
+float32 ray_skip
 ---
-geometry_msgs/PoseStamped[] camera_poses
+geometry_msgs/Pose[] camera_poses
 float32[] information_gain

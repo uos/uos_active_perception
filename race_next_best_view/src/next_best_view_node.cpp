@@ -270,6 +270,8 @@ bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy:
 bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request& req,
                                                    race_next_best_view::GetObservationCameraPoses::Response& res)
 {
+    boost::mt19937 rng(std::time(0));
+    boost::uniform_01<> rand_u01;
     // TODO: Shrink the ROI to an area that is in principle observable
     // (not higher/lower than the camera constraints allow observations to be made)
     // Should be implemented together with the ObservationSampler class which will wrap the
@@ -285,15 +287,14 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double inclination_max =  m_camera_constraints.vfov / 2.0;
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
     double angle_increment =
-            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))))
-            * m_ray_skip;
+            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
 
     // Gather unknown voxel centers
     // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
     //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
     //       all the fringe voxels in the octree.
     std::vector<octomap::point3d> fringe_centers;
-    if(req.roi.pose_stamped.header.frame_id.length() == 0)
+    if(req.roi.empty())
     {
         // If the request frame id is empty, use all fringe voxels
         fringe_centers = m_perception_map.getFringeCenters();
@@ -301,7 +302,8 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     else
     {
         octomath::Vector3 roi_min, roi_max;
-        if(!getAxisAlignedBounds(req.roi, roi_min, roi_max))
+        // TODO: Evaluate the other roi elements
+        if(!getAxisAlignedBounds(req.roi[0], roi_min, roi_max))
         {
             return false;
         }
@@ -333,10 +335,16 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         lines_marker.ns = "nbv_viewlines";
 
         double gain = 0.0;
+        int n_rays = 0;
         for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
         {
             for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
             {
+                if(rand_u01(rng) < req.ray_skip)
+                {
+                    continue;
+                }
+                n_rays++;
                 tf::Vector3 ray_end_in_cam(m_camera_constraints.range_max * std::cos(azimuth),
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
@@ -349,11 +357,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                 }
             }
         }
+        gain /= n_rays;
         // Write pose candidate to answer
-        geometry_msgs::PoseStamped camera_pose_msg;
-        tf::poseTFToMsg(*pose_it, camera_pose_msg.pose);
-        camera_pose_msg.header.frame_id = m_world_frame_id;
-        camera_pose_msg.header.stamp = ros::Time::now();
+        geometry_msgs::Pose camera_pose_msg;
+        tf::poseTFToMsg(*pose_it, camera_pose_msg);
         if(gain > max_gain)
         {
             max_gain = gain;
@@ -369,7 +376,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;
-        marker.lifetime = ros::Duration();
+        marker.lifetime = ros::Duration(10);
         marker.scale.x = 1;
         marker.scale.y = 1;
         marker.scale.z = 0.2;
@@ -379,8 +386,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             marker.color.b = 1.0;
         }
         marker.color.a = 0.5;
-        marker.pose = camera_pose_msg.pose;
-        marker.header = camera_pose_msg.header;
+        marker.pose = camera_pose_msg;
+        marker.header.frame_id = m_world_frame_id;
+        marker.header.stamp = ros::Time::now();
         marker.id = markerid++;
         marker.ns = "nbv_samples";
         markers.push_back(marker);

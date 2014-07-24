@@ -36,16 +36,21 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                                        camera_constraints.range_max * std::sin(azimuth),
                                        camera_constraints.range_max * std::sin(inclination));
             octomap::point3d maxd_ray_end = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam));
-            octomap::point3d ray_end;
-            if(!m_occupancy_map.castRay(scan_pose.trans(), maxd_ray_end - scan_pose.trans(), ray_end, true, camera_constraints.range_max))
-            {
-                ray_end = maxd_ray_end;
-            }
             octomap::KeyRay ray;
-            m_occupancy_map.computeRayKeys(scan_pose.trans(), ray_end, ray);
+            m_occupancy_map.computeRayKeys(scan_pose.trans(), maxd_ray_end, ray);
             for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
             {
-                m_occupancy_map.updateNode(*key_it, false, true);
+                if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(*key_it))
+                {
+                    if(m_occupancy_map.isNodeOccupied(node_ptr))
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    m_occupancy_map.updateNode(*key_it, false, true);
+                }
             }
         }
     }

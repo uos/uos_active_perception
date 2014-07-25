@@ -148,7 +148,7 @@ double ActivePerceptionMap::estimateRayGain(octomap::point3d const & camera, oct
                 break;
             }
         }
-        else if(traversing_free)
+        else if(!gaining)
         {
             traversing_free = false;
             gaining = true;

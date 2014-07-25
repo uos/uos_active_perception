@@ -293,22 +293,50 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
     //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
     //       all the fringe voxels in the octree.
+    //       [Not really valid anymore, because fringe voxels are additionally generated for roi boundaries.
+    //        Also, this does not seem to be a bottleneck.]
     std::vector<octomap::point3d> fringe_centers;
     if(req.roi.empty())
     {
-        // If the request frame id is empty, use all fringe voxels
+        // If the requested roi is empty, use all fringe voxels
         fringe_centers = m_perception_map.getFringeCenters();
     }
-    else
+    for(unsigned int i_roi = 0; i_roi < req.roi.size(); i_roi++)
     {
         octomath::Vector3 roi_min, roi_max;
-        // TODO: Evaluate the other roi elements
-        if(!getAxisAlignedBounds(req.roi[0], roi_min, roi_max))
+        if(getAxisAlignedBounds(req.roi[i_roi], roi_min, roi_max))
         {
-            return false;
+            std::vector<octomap::point3d> roi_fringe_centers;
+            // add fringe voxels within the roi
+            roi_fringe_centers = m_perception_map.getFringeCenters(roi_min, roi_max);
+            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+            // generate fringe voxels at roi boundary
+            roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(roi_min, roi_max);
+            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
         }
-        fringe_centers = m_perception_map.getFringeCenters(roi_min, roi_max);
-        // TODO: What happens if there are no fringe voxels in the ROI (because it is inside unknown space)?
+    }
+    // publish a marker for active fringe voxels
+    {
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::CUBE_LIST;
+        marker.lifetime = ros::Duration();
+        marker.scale.x = m_resolution;
+        marker.scale.y = m_resolution;
+        marker.scale.z = m_resolution;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        marker.color.a = 1.0;
+        for(unsigned int i = 0; i < fringe_centers.size(); i++)
+        {
+            marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
+        }
+        marker.ns = "active_fringe";
+        marker.id = 0;
+        marker.header.frame_id = m_world_frame_id;
+        marker.header.stamp = ros::Time::now();
+        m_marker_pub.publish(marker);
     }
 
     std::vector<tf::Transform> samples = sampleObservationSpace(fringe_centers, req.sample_size);

@@ -187,6 +187,58 @@ std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters()
 }
 
 /**
+  If a bounding box lies within unknown space and therefore does not contain any fringe voxels in itself,
+  we want to start observations at the box's faces. This method returns the centers of all voxels that
+  - are part of the face of the bounding box and
+  - are unknown and
+  - are not already fringe voxels
+  */
+std::vector<octomap::point3d> ActivePerceptionMap::genBoundaryFringeCenters
+(
+        octomap::point3d const & min,
+        octomap::point3d const & max) const
+{
+    std::vector<octomap::point3d> centers;
+    octomap::OcTreeKey min_key = m_occupancy_map.coordToKey(min);
+    octomap::OcTreeKey max_key = m_occupancy_map.coordToKey(max);
+    octomap::OcTreeKey key;
+
+    for(int x = min_key[0]; x <= max_key[0]; x++)
+    {
+        for(int y = min_key[1]; y <= max_key[1]; y++)
+        {
+            // lower face
+            key = octomap::OcTreeKey(x, y, min_key[2]);
+            if(!m_fringe_map.search(key) && !m_occupancy_map.search(key))
+            {
+                centers.push_back(m_occupancy_map.keyToCoord(key));
+            }
+            // upper face
+            key = octomap::OcTreeKey(x, y, max_key[2]);
+            if(!m_fringe_map.search(key) && !m_occupancy_map.search(key))
+            {
+                centers.push_back(m_occupancy_map.keyToCoord(key));
+            }
+            // side faces
+            if(x == min_key[0] || y == min_key[1] ||
+               x == max_key[0] || y == max_key[1])
+            {
+                for(int z = min_key[2] + 1; z < max_key[2]; z++)
+                {
+                    key = octomap::OcTreeKey(x, y, z);
+                    if(!m_fringe_map.search(key) && !m_occupancy_map.search(key))
+                    {
+                        centers.push_back(m_occupancy_map.keyToCoord(key));
+                    }
+                }
+            }
+        }
+    }
+
+    return centers;
+}
+
+/**
   Generates a map visualization as rviz marker.
   Caller is supposed to fill in the fields
   - header

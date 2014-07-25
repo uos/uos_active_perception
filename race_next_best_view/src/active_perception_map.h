@@ -27,6 +27,8 @@ public:
                            octomap::point3d const & end) const;
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
+    std::vector<octomap::point3d> genBoundaryFringeCenters(octomap::point3d const & min,
+                                                           octomap::point3d const & max) const;
     visualization_msgs::Marker genOccupancyMarker() const;
     visualization_msgs::Marker genFringeMarker() const;
 

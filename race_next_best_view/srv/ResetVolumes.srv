@@ -1,0 +1,5 @@
+# Request:
+# - volumes: List of  Volumes to remove from the map of known space.
+
+race_msgs/BoundingBox[] volumes
+---

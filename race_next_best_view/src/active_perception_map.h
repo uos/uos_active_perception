@@ -17,6 +17,7 @@ public:
                              octomap::pose6d const & scan_pose,
                              tf::Pose const & camera_pose,
                              CameraConstraints const & camera_constraints);
+    void resetVolume(octomap::point3d const & min, octomap::point3d const & max);
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);
@@ -37,6 +38,10 @@ private:
 
     std::vector<octomap::OcTreeKey> getBoundaryVoxels(octomap::point3d const & min,
                                                       octomap::point3d const & max) const;
+
+    static void deleteMapVolume(octomap::OcTree & tree,
+                                octomap::point3d const & min,
+                                octomap::point3d const & max);
 };
 
 #endif // ACTIVE_PERCEPTION_MAP_H

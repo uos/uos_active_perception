@@ -34,6 +34,10 @@ NextBestViewNode::NextBestViewNode() :
                                        "/get_objects_to_remove",
                                        &NextBestViewNode::getObjectsToRemoveCb,
                                        this)),
+    m_reset_volumes_server(m_node_handle_pub.advertiseService(
+                                       "/reset_volumes",
+                                       &NextBestViewNode::resetVolumesCb,
+                                       this)),
     m_tf_listener(),
     m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000)),
     m_perception_map(0.01)
@@ -483,6 +487,29 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     marker.id = 0;
     marker.ns = "fringe_map";
     m_marker_pub.publish(marker);
+}
+
+bool NextBestViewNode::resetVolumesCb
+(
+        race_next_best_view::ResetVolumes::Request & req,
+        race_next_best_view::ResetVolumes::Response & resp)
+{
+    bool success = true;
+    for(std::vector<race_msgs::BoundingBox>::iterator it = req.volumes.begin();
+        it < req.volumes.end();
+        ++it)
+    {
+        octomath::Vector3 min, max;
+        if(getAxisAlignedBounds(*it, min, max))
+        {
+            m_perception_map.resetVolume(min, max);
+        }
+        else
+        {
+            success = false;
+        }
+    }
+    return success;
 }
 
 int main(int argc, char** argv)

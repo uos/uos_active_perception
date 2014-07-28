@@ -84,6 +84,38 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
     m_occupancy_map.resetChangeDetection();
 }
 
+/**
+  Removes a bounding box from the map. Fringe voxels are updated accordingly.
+  */
+void ActivePerceptionMap::resetVolume(octomap::point3d const & min, octomap::point3d const & max)
+{
+    deleteMapVolume(m_occupancy_map, min, max);
+    deleteMapVolume(m_fringe_map, min, max);
+
+    // check boundary voxels for fringeness
+    std::vector<octomap::OcTreeKey> boundary = getBoundaryVoxels(min, max);
+    for(std::vector<octomap::OcTreeKey>::iterator it = boundary.begin();
+        it < boundary.end();
+        ++it)
+    {
+        // Check if neighbors are known
+        for(unsigned int i = 0; i < 6; i++)
+        {
+            // Get neighbor key
+            octomap::OcTreeKey neighbor = *it;
+            neighbor[i/2] += (i % 2 == 0) ? -1 : 1;
+            // Check if this is known in occupancy map
+            if(octomap::OcTreeNode * node_ptr = m_occupancy_map.search(neighbor))
+            {
+                if(!m_occupancy_map.isNodeOccupied(node_ptr))
+                {
+                     m_fringe_map.updateNode(*it, true);
+                }
+            }
+        }
+    }
+}
+
 octomap::OcTree const & ActivePerceptionMap::getOccupancyMap() const
 {
     return m_occupancy_map;
@@ -310,4 +342,25 @@ std::vector<octomap::OcTreeKey> ActivePerceptionMap::getBoundaryVoxels
     }
 
     return boundary;
+}
+
+void ActivePerceptionMap::deleteMapVolume
+(
+        octomap::OcTree & tree,
+        octomap::point3d const & min,
+        octomap::point3d const & max)
+{
+    bool box_is_empty = false;
+    while(!box_is_empty)
+    {
+        box_is_empty = true;
+        for(octomap::OcTree::leaf_bbx_iterator it = tree.begin_leafs_bbx(min, max);
+            it != tree.end_leafs_bbx();
+            ++it)
+        {
+            box_is_empty = false;
+            tree.deleteNode(it.getKey());
+            // TODO: Pruned nodes at higher levels could be deleted directly if they are completely within the box.
+        }
+    }
 }

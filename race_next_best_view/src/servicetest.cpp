@@ -3,6 +3,7 @@
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
 #include "race_next_best_view/GetBboxOccupancy.h"
+#include "race_next_best_view/ResetVolumes.h"
 
 
 int main(int argc, char** argv)
@@ -63,7 +64,19 @@ int main(int argc, char** argv)
     get_ocp.request.ray_skip = 0.8;
     if(ros::service::call("/get_observation_camera_poses", get_ocp))
     {
-        ROS_INFO_STREAM("service call get_observation_camera_poses successful: ");
+        ROS_INFO_STREAM("service call get_observation_camera_poses successful.");
+    }
+    else
+    {
+        ROS_ERROR("service call failed!");
+    }
+    
+    // Send request
+    race_next_best_view::ResetVolumes reset_volumes_call;
+    reset_volumes_call.request.volumes.push_back(box);
+    if(ros::service::call("/reset_volumes", reset_volumes_call))
+    {
+        ROS_INFO_STREAM("service call reset_volumes successful.");
     }
     else
     {

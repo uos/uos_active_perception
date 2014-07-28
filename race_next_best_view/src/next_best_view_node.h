@@ -10,6 +10,7 @@
 #include <race_next_best_view/GetBboxOccupancy.h>
 #include <race_next_best_view/GetObjectsToRemove.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
+#include <race_next_best_view/ResetVolumes.h>
 
 #include <string>
 #include <vector>
@@ -27,6 +28,7 @@ private:
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
     ros::ServiceServer m_get_objects_to_remove_server;
+    ros::ServiceServer m_reset_volumes_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
     CameraConstraints m_camera_constraints;
@@ -56,6 +58,9 @@ private:
 
     bool getObjectsToRemoveCb(race_next_best_view::GetObjectsToRemove::Request&,
                               race_next_best_view::GetObjectsToRemove::Response&);
+
+    bool resetVolumesCb(race_next_best_view::ResetVolumes::Request&,
+                        race_next_best_view::ResetVolumes::Response&);
 };
 
 #endif // NEXT_BEST_VIEW_NODE_H

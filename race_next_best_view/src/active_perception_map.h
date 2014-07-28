@@ -34,6 +34,9 @@ public:
 
 private:
     octomap::OcTree m_occupancy_map, m_fringe_map;
+
+    std::vector<octomap::OcTreeKey> getBoundaryVoxels(octomap::point3d const & min,
+                                                      octomap::point3d const & max) const;
 };
 
 #endif // ACTIVE_PERCEPTION_MAP_H

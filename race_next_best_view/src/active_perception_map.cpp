@@ -350,17 +350,16 @@ void ActivePerceptionMap::deleteMapVolume
         octomap::point3d const & min,
         octomap::point3d const & max)
 {
-    bool box_is_empty = false;
-    while(!box_is_empty)
+    octomap::OcTreeKey min_key = tree.coordToKey(min);
+    octomap::OcTreeKey max_key = tree.coordToKey(max);
+    for(int x = min_key[0]; x <= max_key[0]; x++)
     {
-        box_is_empty = true;
-        for(octomap::OcTree::leaf_bbx_iterator it = tree.begin_leafs_bbx(min, max);
-            it != tree.end_leafs_bbx();
-            ++it)
+        for(int y = min_key[1]; y <= max_key[1]; y++)
         {
-            box_is_empty = false;
-            tree.deleteNode(it.getKey());
-            // TODO: Pruned nodes at higher levels could be deleted directly if they are completely within the box.
+            for(int z = min_key[2]; z <= max_key[2]; z++)
+            {
+                tree.deleteNode(octomap::OcTreeKey(x, y, z));
+            }
         }
     }
 }

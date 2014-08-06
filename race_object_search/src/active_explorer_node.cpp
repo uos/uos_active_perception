@@ -3,6 +3,7 @@
 #include <tf/transform_listener.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include <pr2_controllers_msgs/PointHeadAction.h>
+#include <pr2_controllers_msgs/SingleJointPositionAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <nav_msgs/GetPlan.h>
@@ -15,6 +16,24 @@
 
 double const DRIVE_SPEED = 1.0; // [m/s]
 double const TURN_SPEED = 2.0; // [rad/s]
+double const LIFT_SPEED = 0.05; // [m/s]
+
+/**
+  Figures out the required torso position for a given camera height using magic numbers.
+  */
+double torso_position_for_cam_height(double const & cam_height)
+{
+    double torso_state = 1.64410058027 * cam_height - 2.41576402321;
+    if(torso_state > 0.2) {
+        return 0.2;
+    }
+    else if(torso_state < 0.03) {
+        return 0.03;
+    }
+    else {
+        return torso_state;
+    }
+}
 
 geometry_msgs::PoseStamped frame_id_to_pose(std::string const & frame_id)
 {
@@ -34,6 +53,8 @@ int main(int argc, char** argv)
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> moveBaseClient("move_base", true);
     actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction>
             pointHeadClient("/head_traj_controller/point_head_action", true);
+    actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction>
+            liftTorsoClient("/torso_controller/position_joint_action", true);
     // wait for the action servers to come up
     while(!moveBaseClient.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the move_base action server to come up");
@@ -161,6 +182,18 @@ int main(int argc, char** argv)
             ROS_INFO("goal approach failed");
         }
 
+        ROS_INFO("Lifting torso...");
+        pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
+        torso_goal.position = torso_position_for_cam_height(best_cam_pose.getOrigin().getZ());
+        liftTorsoClient.sendGoal(torso_goal);
+        liftTorsoClient.waitForResult(ros::Duration(10.0));
+        if(liftTorsoClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("torso lifted with success");
+        } else {
+            ROS_INFO("torso failed");
+            liftTorsoClient.cancelAllGoals();
+        }
+
         ROS_INFO("Pointing head...");
         pr2_controllers_msgs::PointHeadGoal head_goal;
         head_goal.target.header.frame_id = "/map";
@@ -168,7 +201,7 @@ int main(int argc, char** argv)
         tf::pointTFToMsg(best_cam_pose * tf::Point(1,0,0), head_goal.target.point);
 
         pointHeadClient.sendGoal(head_goal);
-        pointHeadClient.waitForResult(ros::Duration(2.0));
+        pointHeadClient.waitForResult(ros::Duration(5.0));
         if(pointHeadClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("head moved with success");
         } else {

@@ -2,6 +2,7 @@
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
 #include <move_base_msgs/MoveBaseAction.h>
+#include <pr2_controllers_msgs/PointHeadAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <nav_msgs/GetPlan.h>
@@ -31,16 +32,21 @@ int main(int argc, char** argv)
     tf::TransformListener tf_listener;
     ros::Publisher marker_pub(nh.advertise<visualization_msgs::Marker>("/exploration_marker", 10));
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> moveBaseClient("move_base", true);
-    // wait for the action server to come up
+    actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction>
+            pointHeadClient("/head_traj_controller/point_head_action", true);
+    // wait for the action servers to come up
     while(!moveBaseClient.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the move_base action server to come up");
+    };
+    while(!pointHeadClient.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the point_head action server to come up");
     };
 
     while(ros::ok()) {
         ROS_INFO("retrieving pose candidates");
         race_next_best_view::GetObservationCameraPoses pose_candidates_call;
-        pose_candidates_call.request.sample_size = 500;
-        pose_candidates_call.request.ray_skip = 0.95;
+        pose_candidates_call.request.sample_size = 200;
+        pose_candidates_call.request.ray_skip = 0.98;
         //pose_candidates_call.request.roi.dimensions.x = 5;
         //pose_candidates_call.request.roi.dimensions.y = 5;
         //pose_candidates_call.request.roi.dimensions.z = 2;
@@ -54,18 +60,34 @@ int main(int argc, char** argv)
         ROS_INFO("evaluating pose candidate utility values");
 
         // get the base_footprint's current pose in kinect frame and the world frame
-        tf::StampedTransform base_to_cam_tf, base_to_world_tf;
-        tf_listener.lookupTransform("/head_mount_kinect_ir_link", "/base_footprint", ros::Time(0), base_to_cam_tf);
+        tf::StampedTransform cam_to_world_tf, base_to_world_tf;
+        tf_listener.lookupTransform("/map", "/head_mount_kinect_ir_link", ros::Time(0), cam_to_world_tf);
         tf_listener.lookupTransform("/map", "/base_footprint", ros::Time(0), base_to_world_tf);
+        tf::Vector3 cam_base_offset = cam_to_world_tf.getOrigin() - base_to_world_tf.getOrigin();
 
         std::vector<double> candidate_utilities(pose_candidates_call.response.camera_poses.size());
-        geometry_msgs::Pose best_base_pose; double best_utility = 0;
-        for(unsigned int i = 0; i < candidate_utilities.size(); i++) {
-            // calculate the base pose for this camera pose, assuming a static transform between them
-            tf::Pose pose_candidate_tf;
-            tf::poseMsgToTF(pose_candidates_call.response.camera_poses[i], pose_candidate_tf);
+        tf::Pose best_cam_pose; best_cam_pose.setIdentity();
+        geometry_msgs::Pose best_base_pose;
+        double best_utility = 0;
+        for(unsigned int i = 0; i < candidate_utilities.size(); i++)
+        {
+            tf::Pose pose_candidate_cam_tf;
+            tf::poseMsgToTF(pose_candidates_call.response.camera_poses[i], pose_candidate_cam_tf);
+
+            // calculate the base pose for this camera pose, assuming a static transform between them 
+            tf::Pose pose_candidate_base_tf;
             geometry_msgs::Pose pose_candidate_base;
-            tf::poseTFToMsg(pose_candidate_tf * base_to_cam_tf, pose_candidate_base);
+            {
+            pose_candidate_base_tf.setIdentity();
+            pose_candidate_base_tf.setOrigin(pose_candidate_cam_tf.getOrigin() - cam_base_offset);
+            pose_candidate_base_tf.getOrigin().setZ(0);
+            tf::Vector3 xr = tf::Transform(pose_candidate_cam_tf.getRotation(), tf::Vector3(0,0,0))(tf::Vector3(1,0,0));
+            tf::Quaternion q;
+            q.setRPY(0, 0, std::atan2(xr.getY(), xr.getX()));
+            pose_candidate_base_tf.setRotation(q);
+            tf::poseTFToMsg(pose_candidate_base_tf, pose_candidate_base);
+            }
+
             // generate path planner request
             nav_msgs::GetPlan get_plan_call;
             tf::poseTFToMsg(base_to_world_tf, get_plan_call.request.start.pose);
@@ -96,6 +118,7 @@ int main(int argc, char** argv)
             double exec_time = path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
             candidate_utilities[i] = pose_candidates_call.response.information_gain[i] / exec_time;
             if(candidate_utilities[i] > best_utility) {
+                best_cam_pose = pose_candidate_cam_tf;
                 best_utility = candidate_utilities[i];
                 best_base_pose = pose_candidate_base;
             }
@@ -107,6 +130,7 @@ int main(int argc, char** argv)
             continue;
         }
 
+        ROS_INFO("Moving base...");
         move_base_msgs::MoveBaseGoal goal;
         goal.target_pose.header.frame_id = "/map";
         goal.target_pose.header.stamp = ros::Time::now();
@@ -129,14 +153,29 @@ int main(int argc, char** argv)
         marker.ns = "active_explorer_debug";
         marker_pub.publish(marker);
 
-        ROS_INFO("Sending goal");
         moveBaseClient.sendGoal(goal);
         moveBaseClient.waitForResult();
         if(moveBaseClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("goal reached with success");
-            ros::Duration(7.0).sleep();
         } else {
             ROS_INFO("goal approach failed");
         }
+
+        ROS_INFO("Pointing head...");
+        pr2_controllers_msgs::PointHeadGoal head_goal;
+        head_goal.target.header.frame_id = "/map";
+        head_goal.target.header.stamp = ros::Time::now();
+        tf::pointTFToMsg(best_cam_pose * tf::Point(1,0,0), head_goal.target.point);
+
+        pointHeadClient.sendGoal(head_goal);
+        pointHeadClient.waitForResult(ros::Duration(2.0));
+        if(pointHeadClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("head moved with success");
+        } else {
+            ROS_INFO("head movement failed");
+            pointHeadClient.cancelAllGoals();
+        }
+
+        ros::Duration(7.0).sleep();
     }
 }

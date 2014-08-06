@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<launch>
+  <node name="point_cloud_2_motion_filter" pkg="sensor_motion_filter" type="point_cloud_2_motion_filter" output="screen" respawn="true">
+    <param name="static_frame" type="string" value="/map" />
+    <param name="block_time"   type="double" value="3.0" />
+    <param name="max_distance" type="double" value="0.01" />
+    <param name="max_rotation" type="double" value="0.002" />
+    <remap from="cloud_in" to="/head_mount_kinect/depth_registered/points" />
+    <remap from="cloud_out" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
+  </node>
+  <node name="next_best_view_node" pkg="race_next_best_view" type="next_best_view_node" output="screen" respawn="true">
+    <param name="ray_skip" type="double" value="5" />
+    <!-- camera constraints (fixed kinect on gazebo pr2)-->
+    <param name="height_min" type="double" value="1.4756" />
+    <param name="height_max" type="double" value="1.4756" />
+    <param name="pitch_min"  type="double" value="-1.22173048" /> <!-- [-70 deg] (extreme limit -74.2691 deg) -->
+    <param name="pitch_max"  type="double" value="0.34906585" /> <!-- [20 deg] (extreme limit 21.27 deg) -->
+    <param name="range_min"  type="double" value="0.4" />
+    <param name="range_max"  type="double" value="3.0" />
+    <param name="hfov"       type="double" value="0.994837674" /> <!-- [57 deg] -->
+    <param name="vfov"       type="double" value="0.750491578" /> <!-- [43 deg] -->
+    <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
+    <!-- frames / topics -->
+    <param name="world_frame_id" type="string" value="/map" />
+    <param name="camera_frame_id" type="string" value="/head_mount_kinect_ir_link" />
+    <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
+  </node>
+</launch>

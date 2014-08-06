@@ -11,6 +11,7 @@
   <depend package="race_next_best_view"/>
   <depend package="move_base"/>
   <depend package="nav_msgs"/>
+  <depend package="pr2_controllers_msgs"/>
 </package>
 
 

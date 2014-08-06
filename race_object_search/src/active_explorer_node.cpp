@@ -16,7 +16,10 @@
 
 double const DRIVE_SPEED = 1.0; // [m/s]
 double const TURN_SPEED = 2.0; // [rad/s]
-double const LIFT_SPEED = 0.05; // [m/s]
+double const LIFT_SPEED = 0.02; // [m/s]
+double const HEAD_SPEED = 3.14; // [rad/s]
+double const ACQUISITION_TIME = 7.0;
+double const TRANSLATIONAL_TOLERANCE = 0.05;
 
 /**
   Figures out the required torso position for a given camera height using magic numbers.
@@ -63,6 +66,8 @@ int main(int argc, char** argv)
         ROS_INFO("Waiting for the point_head action server to come up");
     };
 
+    double current_torso_position = 0.03;
+
     while(ros::ok()) {
         ROS_INFO("retrieving pose candidates");
         race_next_best_view::GetObservationCameraPoses pose_candidates_call;
@@ -90,6 +95,8 @@ int main(int argc, char** argv)
         tf::Pose best_cam_pose; best_cam_pose.setIdentity();
         geometry_msgs::Pose best_base_pose;
         double best_utility = 0;
+        bool move_base_required = false;
+        bool lift_required = false;
         for(unsigned int i = 0; i < candidate_utilities.size(); i++)
         {
             tf::Pose pose_candidate_cam_tf;
@@ -136,12 +143,26 @@ int main(int argc, char** argv)
                 path_len += p1.getOrigin().distance(p2.getOrigin());
                 path_curvature += p1.getRotation().angleShortestPath(p2.getRotation());
             }
-            double exec_time = path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
+            bool would_need_move_base = false;
+            double exec_time = ACQUISITION_TIME;
+            if(base_to_world_tf.getOrigin().distance(pose_candidate_base_tf.getOrigin()) > TRANSLATIONAL_TOLERANCE)
+            {
+                exec_time += path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
+                would_need_move_base = true;
+            }
+            double dlift = std::abs(current_torso_position -
+                                    torso_position_for_cam_height(pose_candidate_cam_tf.getOrigin().getZ()));
+            if(dlift > TRANSLATIONAL_TOLERANCE)
+            {
+                exec_time += dlift * LIFT_SPEED;
+            }
             candidate_utilities[i] = pose_candidates_call.response.information_gain[i] / exec_time;
             if(candidate_utilities[i] > best_utility) {
                 best_cam_pose = pose_candidate_cam_tf;
                 best_utility = candidate_utilities[i];
                 best_base_pose = pose_candidate_base;
+                move_base_required = would_need_move_base;
+                lift_required = dlift > TRANSLATIONAL_TOLERANCE;
             }
         }
 
@@ -151,47 +172,54 @@ int main(int argc, char** argv)
             continue;
         }
 
-        ROS_INFO("Moving base...");
-        move_base_msgs::MoveBaseGoal goal;
-        goal.target_pose.header.frame_id = "/map";
-        goal.target_pose.header.stamp = ros::Time::now();
-        goal.target_pose.pose = best_base_pose;
+        if(move_base_required)
+        {
+            ROS_INFO("Moving base...");
+            move_base_msgs::MoveBaseGoal goal;
+            goal.target_pose.header.frame_id = "/map";
+            goal.target_pose.header.stamp = ros::Time::now();
+            goal.target_pose.pose = best_base_pose;
 
-        visualization_msgs::Marker marker;
-        marker.action = visualization_msgs::Marker::ADD;
-        marker.type = visualization_msgs::Marker::ARROW;
-        marker.lifetime = ros::Duration();
-        marker.scale.x = 1;
-        marker.scale.y = 1;
-        marker.scale.z = 0.2;
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 1.0;
-        marker.color.a = 0.5;
-        marker.pose = goal.target_pose.pose;
-        marker.header = goal.target_pose.header;
-        marker.id = 0;
-        marker.ns = "active_explorer_debug";
-        marker_pub.publish(marker);
+            visualization_msgs::Marker marker;
+            marker.action = visualization_msgs::Marker::ADD;
+            marker.type = visualization_msgs::Marker::ARROW;
+            marker.lifetime = ros::Duration();
+            marker.scale.x = 1;
+            marker.scale.y = 1;
+            marker.scale.z = 0.2;
+            marker.color.r = 1.0;
+            marker.color.g = 1.0;
+            marker.color.b = 1.0;
+            marker.color.a = 0.5;
+            marker.pose = goal.target_pose.pose;
+            marker.header = goal.target_pose.header;
+            marker.id = 0;
+            marker.ns = "active_explorer_debug";
+            marker_pub.publish(marker);
 
-        moveBaseClient.sendGoal(goal);
-        moveBaseClient.waitForResult();
-        if(moveBaseClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-            ROS_INFO("goal reached with success");
-        } else {
-            ROS_INFO("goal approach failed");
+            moveBaseClient.sendGoal(goal);
+            moveBaseClient.waitForResult();
+            if(moveBaseClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+                ROS_INFO("goal reached with success");
+            } else {
+                ROS_INFO("goal approach failed");
+            }
         }
 
-        ROS_INFO("Lifting torso...");
-        pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
-        torso_goal.position = torso_position_for_cam_height(best_cam_pose.getOrigin().getZ());
-        liftTorsoClient.sendGoal(torso_goal);
-        liftTorsoClient.waitForResult(ros::Duration(10.0));
-        if(liftTorsoClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-            ROS_INFO("torso lifted with success");
-        } else {
-            ROS_INFO("torso failed");
-            liftTorsoClient.cancelAllGoals();
+        if(lift_required)
+        {
+            ROS_INFO("Lifting torso...");
+            pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
+            torso_goal.position = torso_position_for_cam_height(best_cam_pose.getOrigin().getZ());
+            liftTorsoClient.sendGoal(torso_goal);
+            liftTorsoClient.waitForResult(ros::Duration(10.0));
+            if(liftTorsoClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+                ROS_INFO("torso lifted with success");
+            } else {
+                ROS_INFO("torso failed");
+                liftTorsoClient.cancelAllGoals();
+            }
+            current_torso_position = torso_goal.position;
         }
 
         ROS_INFO("Pointing head...");

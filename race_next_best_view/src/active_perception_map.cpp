@@ -254,13 +254,14 @@ std::vector<octomap::point3d> ActivePerceptionMap::genBoundaryFringeCenters
   */
 visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
 {
+    double r = m_occupancy_map.getResolution();
     visualization_msgs::Marker marker;
     marker.action = visualization_msgs::Marker::ADD;
     marker.type = visualization_msgs::Marker::CUBE_LIST;
     marker.lifetime = ros::Duration();
-    marker.scale.x = m_occupancy_map.getResolution();
-    marker.scale.y = m_occupancy_map.getResolution();
-    marker.scale.z = m_occupancy_map.getResolution();
+    marker.scale.x = r;
+    marker.scale.y = r;
+    marker.scale.z = r;
     marker.color.r = 0.0;
     marker.color.g = 0.0;
     marker.color.b = 1.0;
@@ -271,7 +272,20 @@ visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
     {
         if(m_occupancy_map.isNodeOccupied(*it))
         {
-            marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+            double size_multiplier = it.getSize() / r;
+            octomap::point3d first_coord = it.getCoordinate()
+                                         - (octomap::point3d(1, 1, 1) * ((it.getSize() - r) / 2.0));
+            for(int i = 0; i < size_multiplier; i++)
+            {
+                for(int j = 0; j < size_multiplier; j++)
+                {
+                    for(int k = 0; k < size_multiplier; k++)
+                    {
+                        octomap::point3d coord = first_coord + octomap::point3d(i*r, j*r, k*r);
+                        marker.points.push_back(octomap::pointOctomapToMsg(coord));
+                    }
+                }
+            }
         }
     }
     return marker;
@@ -286,13 +300,14 @@ visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
   */
 visualization_msgs::Marker ActivePerceptionMap::genFringeMarker() const
 {
+    double r = m_occupancy_map.getResolution();
     visualization_msgs::Marker marker;
     marker.action = visualization_msgs::Marker::ADD;
     marker.type = visualization_msgs::Marker::CUBE_LIST;
     marker.lifetime = ros::Duration();
-    marker.scale.x = m_fringe_map.getResolution();
-    marker.scale.y = m_fringe_map.getResolution();
-    marker.scale.z = m_fringe_map.getResolution();
+    marker.scale.x = r;
+    marker.scale.y = r;
+    marker.scale.z = r;
     marker.color.r = 1.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
@@ -303,7 +318,20 @@ visualization_msgs::Marker ActivePerceptionMap::genFringeMarker() const
     {
         if(m_fringe_map.isNodeOccupied(*it))
         {
-            marker.points.push_back(octomap::pointOctomapToMsg(it.getCoordinate()));
+            double size_multiplier = it.getSize() / r;
+            octomap::point3d first_coord = it.getCoordinate()
+                                         - (octomap::point3d(1, 1, 1) * ((it.getSize() - r) / 2.0));
+            for(int i = 0; i < size_multiplier; i++)
+            {
+                for(int j = 0; j < size_multiplier; j++)
+                {
+                    for(int k = 0; k < size_multiplier; k++)
+                    {
+                        octomap::point3d coord = first_coord + octomap::point3d(i*r, j*r, k*r);
+                        marker.points.push_back(octomap::pointOctomapToMsg(coord));
+                    }
+                }
+            }
         }
     }
     return marker;

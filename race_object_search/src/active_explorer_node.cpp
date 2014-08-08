@@ -47,26 +47,198 @@ geometry_msgs::PoseStamped frame_id_to_pose(std::string const & frame_id)
     return ps;
 }
 
-int main(int argc, char** argv)
+tf::Pose base_pose_for_cam_pose(tf::Pose const & target_cam_pose)
 {
-    ros::init(argc, argv, "active_explorer");
-    ros::NodeHandle nh;
-    tf::TransformListener tf_listener;
-    ros::Publisher marker_pub(nh.advertise<visualization_msgs::Marker>("/exploration_marker", 10));
-    actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> moveBaseClient("move_base", true);
-    actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction>
+    // Calculate the base pose for this camera pose.
+    // For pr2 the xy offset between cam and base is assumed to be 0 although it actually depends on cam orientation.
+    tf::Vector3 base_position = target_cam_pose.getOrigin();
+    base_position.setZ(0);
+    tf::Vector3 xr = tf::Transform(target_cam_pose.getRotation(), tf::Vector3(0,0,0))(tf::Vector3(1,0,0));
+    tf::Quaternion base_rotation;
+    base_rotation.setRPY(0, 0, std::atan2(xr.getY(), xr.getX()));
+
+    return tf::Pose(base_rotation, base_position);
+}
+
+bool is_move_base_required(tf::Pose const & current_cam_pose, tf::Pose const & target_cam_pose)
+{
+    double distance = std::sqrt(std::pow(current_cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2) +
+                                std::pow(current_cam_pose.getOrigin().getY() - target_cam_pose.getOrigin().getY(), 2));
+    return distance > TRANSLATIONAL_TOLERANCE;
+}
+
+double estimate_move_base_time(tf::Pose const & current_base_pose, tf::Pose const & target_base_pose)
+{
+    if(is_move_base_required(current_base_pose, target_base_pose))
+    {
+        // generate path planner request
+        nav_msgs::GetPlan get_plan_call;
+        tf::poseTFToMsg(current_base_pose, get_plan_call.request.start.pose);
+        get_plan_call.request.start.header.frame_id = "/map";
+        get_plan_call.request.start.header.stamp = ros::Time::now();
+        tf::poseTFToMsg(target_base_pose, get_plan_call.request.goal.pose);
+        get_plan_call.request.goal.header = get_plan_call.request.start.header;
+        get_plan_call.request.tolerance = TRANSLATIONAL_TOLERANCE;
+        if(!ros::service::call("/move_base_node/make_plan", get_plan_call))
+        {
+            ROS_WARN("make_plan call failed");
+            return std::numeric_limits<double>::infinity();
+        }
+        std::vector<geometry_msgs::PoseStamped> const & path = get_plan_call.response.plan.poses;
+        if(path.empty())
+        {
+            // no plan found
+            return std::numeric_limits<double>::infinity();
+        }
+        double path_len = 0, path_curvature = 0;
+        for(unsigned int i_path = 1; i_path < path.size(); i_path++)
+        {
+            tf::Pose p1, p2;
+            tf::poseMsgToTF(path[i_path - 1].pose, p1);
+            tf::poseMsgToTF(path[i_path].pose, p2);
+            path_len += p1.getOrigin().distance(p2.getOrigin());
+            path_curvature += p1.getRotation().angleShortestPath(p2.getRotation());
+        }
+        return path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+double estimate_exec_time
+(
+        tf::Pose const & current_base_pose,
+        tf::Pose const & current_cam_pose,
+        tf::Pose const & target_cam_pose)
+{
+    // initialize exec_time with constant data acquisition time
+    double exec_time = ACQUISITION_TIME;
+
+    // calculate the time needed to move_base
+    exec_time += estimate_move_base_time(current_base_pose, base_pose_for_cam_pose(target_cam_pose));
+
+    // calculate time needed to turn the camera (disregards that yaw may be already provided by move_base)
+    exec_time += current_cam_pose.getRotation().angleShortestPath(target_cam_pose.getRotation()) / HEAD_SPEED;
+
+    // calculate time needed to lift the torso
+    double dz = std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ());
+    if(dz > TRANSLATIONAL_TOLERANCE)
+    {
+        exec_time += dz / LIFT_SPEED;
+    }
+
+    return exec_time;
+}
+
+bool achieve_cam_pose
+(
+        tf::Pose const & current_base_pose,
+        tf::Pose const & current_cam_pose,
+        tf::Pose const & target_cam_pose)
+{
+    static ros::NodeHandle nh;
+    static ros::Publisher marker_pub(nh.advertise<visualization_msgs::Marker>("/exploration_marker", 10));
+    static actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> moveBaseClient("move_base", true);
+    static actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction>
             pointHeadClient("/head_traj_controller/point_head_action", true);
-    actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction>
+    static actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction>
             liftTorsoClient("/torso_controller/position_joint_action", true);
-    // wait for the action servers to come up
+
+    /*
     while(!moveBaseClient.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the move_base action server to come up");
     };
     while(!pointHeadClient.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the point_head action server to come up");
     };
+    */
 
-    double current_torso_position = 0.03;
+    // move base if required
+    if(is_move_base_required(current_cam_pose, target_cam_pose))
+    {
+        tf::Pose target_base_pose = base_pose_for_cam_pose(target_cam_pose);
+        ROS_INFO("Moving base...");
+        move_base_msgs::MoveBaseGoal goal;
+        goal.target_pose.header.frame_id = "/map";
+        goal.target_pose.header.stamp = ros::Time::now();
+        tf::poseTFToMsg(target_base_pose, goal.target_pose.pose);
+
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::ARROW;
+        marker.lifetime = ros::Duration();
+        marker.scale.x = 1;
+        marker.scale.y = 1;
+        marker.scale.z = 0.2;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        marker.color.a = 0.5;
+        marker.pose = goal.target_pose.pose;
+        marker.header = goal.target_pose.header;
+        marker.id = 0;
+        marker.ns = "active_explorer_debug";
+        marker_pub.publish(marker);
+
+        double timeout = estimate_move_base_time(current_base_pose, target_base_pose);
+        if(timeout > 9000)
+        {
+            return false;
+        }
+        moveBaseClient.sendGoal(goal);
+        moveBaseClient.waitForResult(ros::Duration(timeout + 5.0));
+        if(moveBaseClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("goal reached with success");
+        } else {
+            ROS_INFO("goal approach failed");
+            moveBaseClient.cancelAllGoals();
+            return false;
+        }
+    }
+
+    if(std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ()) > TRANSLATIONAL_TOLERANCE)
+    {
+        ROS_INFO("Lifting torso...");
+        pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
+        torso_goal.position = torso_position_for_cam_height(target_cam_pose.getOrigin().getZ());
+        liftTorsoClient.sendGoal(torso_goal);
+        liftTorsoClient.waitForResult(ros::Duration(7.0));
+        if(liftTorsoClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("torso lifted with success");
+        } else {
+            ROS_INFO("torso failed");
+            liftTorsoClient.cancelAllGoals();
+            return false;
+        }
+    }
+
+    ROS_INFO("Pointing head...");
+    pr2_controllers_msgs::PointHeadGoal head_goal;
+    head_goal.target.header.frame_id = "/map";
+    head_goal.target.header.stamp = ros::Time::now();
+    tf::pointTFToMsg(target_cam_pose * tf::Point(1,0,0), head_goal.target.point);
+
+    pointHeadClient.sendGoal(head_goal);
+    pointHeadClient.waitForResult(ros::Duration(3.0));
+    if(pointHeadClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("head moved with success");
+    } else {
+        ROS_INFO("head movement failed");
+        pointHeadClient.cancelAllGoals();
+        return false;
+    }
+
+    return true;
+}
+
+int main(int argc, char** argv)
+{
+    ros::init(argc, argv, "active_explorer");
+    ros::NodeHandle nh;
+    tf::TransformListener tf_listener;
+    ros::Publisher marker_pub(nh.advertise<visualization_msgs::Marker>("/exploration_marker", 10));
 
     while(ros::ok()) {
         ROS_INFO("retrieving pose candidates");
@@ -89,154 +261,36 @@ int main(int argc, char** argv)
         tf::StampedTransform cam_to_world_tf, base_to_world_tf;
         tf_listener.lookupTransform("/map", "/head_mount_kinect_ir_link", ros::Time(0), cam_to_world_tf);
         tf_listener.lookupTransform("/map", "/base_footprint", ros::Time(0), base_to_world_tf);
-        tf::Vector3 cam_base_offset = cam_to_world_tf.getOrigin() - base_to_world_tf.getOrigin();
 
         std::vector<double> candidate_utilities(pose_candidates_call.response.camera_poses.size());
         tf::Pose best_cam_pose; best_cam_pose.setIdentity();
-        geometry_msgs::Pose best_base_pose;
         double best_utility = 0;
-        bool move_base_required = false;
-        bool lift_required = false;
         for(unsigned int i = 0; i < candidate_utilities.size(); i++)
         {
             tf::Pose pose_candidate_cam_tf;
             tf::poseMsgToTF(pose_candidates_call.response.camera_poses[i], pose_candidate_cam_tf);
 
-            // calculate the base pose for this camera pose, assuming a static transform between them 
-            tf::Pose pose_candidate_base_tf;
-            geometry_msgs::Pose pose_candidate_base;
-            {
-            pose_candidate_base_tf.setIdentity();
-            pose_candidate_base_tf.setOrigin(pose_candidate_cam_tf.getOrigin() - cam_base_offset);
-            pose_candidate_base_tf.getOrigin().setZ(0);
-            tf::Vector3 xr = tf::Transform(pose_candidate_cam_tf.getRotation(), tf::Vector3(0,0,0))(tf::Vector3(1,0,0));
-            tf::Quaternion q;
-            q.setRPY(0, 0, std::atan2(xr.getY(), xr.getX()));
-            pose_candidate_base_tf.setRotation(q);
-            tf::poseTFToMsg(pose_candidate_base_tf, pose_candidate_base);
-            }
+            candidate_utilities[i] = pose_candidates_call.response.information_gain[i] /
+                                     estimate_exec_time(base_to_world_tf, cam_to_world_tf, pose_candidate_cam_tf);
 
-            // generate path planner request
-            nav_msgs::GetPlan get_plan_call;
-            tf::poseTFToMsg(base_to_world_tf, get_plan_call.request.start.pose);
-            get_plan_call.request.start.header.frame_id = "/map";
-            get_plan_call.request.start.header.stamp = ros::Time::now();
-            get_plan_call.request.goal.pose = pose_candidate_base;
-            get_plan_call.request.goal.header = get_plan_call.request.start.header;
-            get_plan_call.request.tolerance = 0.1;
-            if(!ros::service::call("/move_base_node/make_plan", get_plan_call)) {
-                ROS_ERROR("make_plan call failed");
-                candidate_utilities[i] = 0;
-                continue;
-            }
-            std::vector<geometry_msgs::PoseStamped> const & path = get_plan_call.response.plan.poses;
-            if(path.empty()) {
-                // no plan found
-                candidate_utilities[i] = 0;
-                continue;
-            }
-            double path_len = 0, path_curvature = 0;
-            for(unsigned int i_path = 1; i_path < path.size(); i_path++) {
-                tf::Pose p1, p2;
-                tf::poseMsgToTF(path[i_path - 1].pose, p1);
-                tf::poseMsgToTF(path[i_path].pose, p2);
-                path_len += p1.getOrigin().distance(p2.getOrigin());
-                path_curvature += p1.getRotation().angleShortestPath(p2.getRotation());
-            }
-            bool would_need_move_base = false;
-            double exec_time = ACQUISITION_TIME;
-            if(base_to_world_tf.getOrigin().distance(pose_candidate_base_tf.getOrigin()) > TRANSLATIONAL_TOLERANCE)
+            if(candidate_utilities[i] > best_utility)
             {
-                exec_time += path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
-                would_need_move_base = true;
-            }
-            double dlift = std::abs(current_torso_position -
-                                    torso_position_for_cam_height(pose_candidate_cam_tf.getOrigin().getZ()));
-            if(dlift > TRANSLATIONAL_TOLERANCE)
-            {
-                exec_time += dlift * LIFT_SPEED;
-            }
-            candidate_utilities[i] = pose_candidates_call.response.information_gain[i] / exec_time;
-            if(candidate_utilities[i] > best_utility) {
                 best_cam_pose = pose_candidate_cam_tf;
                 best_utility = candidate_utilities[i];
-                best_base_pose = pose_candidate_base;
-                move_base_required = would_need_move_base;
-                lift_required = dlift > TRANSLATIONAL_TOLERANCE;
             }
         }
 
-        if(best_utility == 0) {
+        if(best_utility == 0)
+        {
             ROS_WARN("no good next best views found");
             ros::Duration(5).sleep();
             continue;
         }
 
-        if(move_base_required)
-        {
-            ROS_INFO("Moving base...");
-            move_base_msgs::MoveBaseGoal goal;
-            goal.target_pose.header.frame_id = "/map";
-            goal.target_pose.header.stamp = ros::Time::now();
-            goal.target_pose.pose = best_base_pose;
+        // do it
+        achieve_cam_pose(base_to_world_tf, cam_to_world_tf, best_cam_pose);
 
-            visualization_msgs::Marker marker;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.type = visualization_msgs::Marker::ARROW;
-            marker.lifetime = ros::Duration();
-            marker.scale.x = 1;
-            marker.scale.y = 1;
-            marker.scale.z = 0.2;
-            marker.color.r = 1.0;
-            marker.color.g = 1.0;
-            marker.color.b = 1.0;
-            marker.color.a = 0.5;
-            marker.pose = goal.target_pose.pose;
-            marker.header = goal.target_pose.header;
-            marker.id = 0;
-            marker.ns = "active_explorer_debug";
-            marker_pub.publish(marker);
-
-            moveBaseClient.sendGoal(goal);
-            moveBaseClient.waitForResult();
-            if(moveBaseClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-                ROS_INFO("goal reached with success");
-            } else {
-                ROS_INFO("goal approach failed");
-            }
-        }
-
-        if(lift_required)
-        {
-            ROS_INFO("Lifting torso...");
-            pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
-            torso_goal.position = torso_position_for_cam_height(best_cam_pose.getOrigin().getZ());
-            liftTorsoClient.sendGoal(torso_goal);
-            liftTorsoClient.waitForResult(ros::Duration(10.0));
-            if(liftTorsoClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-                ROS_INFO("torso lifted with success");
-            } else {
-                ROS_INFO("torso failed");
-                liftTorsoClient.cancelAllGoals();
-            }
-            current_torso_position = torso_goal.position;
-        }
-
-        ROS_INFO("Pointing head...");
-        pr2_controllers_msgs::PointHeadGoal head_goal;
-        head_goal.target.header.frame_id = "/map";
-        head_goal.target.header.stamp = ros::Time::now();
-        tf::pointTFToMsg(best_cam_pose * tf::Point(1,0,0), head_goal.target.point);
-
-        pointHeadClient.sendGoal(head_goal);
-        pointHeadClient.waitForResult(ros::Duration(5.0));
-        if(pointHeadClient.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-            ROS_INFO("head moved with success");
-        } else {
-            ROS_INFO("head movement failed");
-            pointHeadClient.cancelAllGoals();
-        }
-
+        // wait for acquisition
         ros::Duration(7.0).sleep();
     }
 }

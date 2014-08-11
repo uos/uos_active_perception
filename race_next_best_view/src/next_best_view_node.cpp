@@ -236,6 +236,39 @@ std::vector<tf::Transform> NextBestViewNode::sampleObservationSpace
     return samples;
 }
 
+/**
+  ASSUMPTION: Camera constraints are defined in the world frame.
+  */
+std::vector<tf::Transform> NextBestViewNode::sampleObservationSpace
+(
+        octomap::point3d const & observation_position,
+        bool lock_height,
+        int sample_size) const
+{
+    boost::mt19937 rng(std::time(0));
+    boost::uniform_01<> uni_01;
+    std::vector<tf::Transform> samples;
+    for(int i = 0; i < sample_size; ++i)
+    {
+        tf::Vector3 position(observation_position.x(), observation_position.y(), observation_position.z());
+        if(!lock_height)
+        {
+            position.setZ(m_camera_constraints.height_min +
+                          uni_01(rng) * (m_camera_constraints.height_max - m_camera_constraints.height_min));
+        }
+
+        double pitch =  m_camera_constraints.pitch_min +
+                        uni_01(rng) * (m_camera_constraints.pitch_max - m_camera_constraints.pitch_min);
+        double yaw = uni_01(rng) * 2.0 * PI;
+        // We want to do intrinsic YPR which is equivalent to fixed axis RPY
+        tf::Quaternion orientation;
+        orientation.setRPY(m_camera_constraints.roll, -pitch, yaw);
+
+        samples.push_back(tf::Transform(orientation, position));
+    }
+    return samples;
+}
+
 bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request &req,
                                           race_next_best_view::GetBboxOccupancy::Response &res)
 {
@@ -293,57 +326,76 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double angle_increment =
             std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
 
-    // Gather unknown voxel centers
-    // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
-    //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
-    //       all the fringe voxels in the octree.
-    //       [Not really valid anymore, because fringe voxels are additionally generated for roi boundaries.
-    //        Also, this does not seem to be a bottleneck.]
-    std::vector<octomap::point3d> fringe_centers;
-    if(req.roi.empty())
+    std::vector<tf::Transform> samples;
+    if(req.observation_position.header.frame_id.empty())
     {
-        // If the requested roi is empty, use all fringe voxels
-        fringe_centers = m_perception_map.getFringeCenters();
-    }
-    for(unsigned int i_roi = 0; i_roi < req.roi.size(); i_roi++)
-    {
-        octomath::Vector3 roi_min, roi_max;
-        if(getAxisAlignedBounds(req.roi[i_roi], roi_min, roi_max))
+        // Gather unknown voxel centers
+        // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
+        //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
+        //       all the fringe voxels in the octree.
+        //       [Not really valid anymore, because fringe voxels are additionally generated for roi boundaries.
+        //        Also, this does not seem to be a bottleneck.]
+        std::vector<octomap::point3d> fringe_centers;
+        if(req.roi.empty())
         {
-            std::vector<octomap::point3d> roi_fringe_centers;
-            // add fringe voxels within the roi
-            roi_fringe_centers = m_perception_map.getFringeCenters(roi_min, roi_max);
-            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
-            // generate fringe voxels at roi boundary
-            roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(roi_min, roi_max);
-            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+            // If the requested roi is empty, use all fringe voxels
+            fringe_centers = m_perception_map.getFringeCenters();
         }
-    }
-    // publish a marker for active fringe voxels
-    {
-        visualization_msgs::Marker marker;
-        marker.action = visualization_msgs::Marker::ADD;
-        marker.type = visualization_msgs::Marker::CUBE_LIST;
-        marker.lifetime = ros::Duration();
-        marker.scale.x = m_resolution;
-        marker.scale.y = m_resolution;
-        marker.scale.z = m_resolution;
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 1.0;
-        marker.color.a = 1.0;
-        for(unsigned int i = 0; i < fringe_centers.size(); i++)
+        for(unsigned int i_roi = 0; i_roi < req.roi.size(); i_roi++)
         {
-            marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
+            octomath::Vector3 roi_min, roi_max;
+            if(getAxisAlignedBounds(req.roi[i_roi], roi_min, roi_max))
+            {
+                std::vector<octomap::point3d> roi_fringe_centers;
+                // add fringe voxels within the roi
+                roi_fringe_centers = m_perception_map.getFringeCenters(roi_min, roi_max);
+                fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+                // generate fringe voxels at roi boundary
+                roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(roi_min, roi_max);
+                fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+            }
         }
-        marker.ns = "active_fringe";
-        marker.id = 0;
-        marker.header.frame_id = m_world_frame_id;
-        marker.header.stamp = ros::Time::now();
-        m_marker_pub.publish(marker);
+        // publish a marker for active fringe voxels
+        {
+            visualization_msgs::Marker marker;
+            marker.action = visualization_msgs::Marker::ADD;
+            marker.type = visualization_msgs::Marker::CUBE_LIST;
+            marker.lifetime = ros::Duration();
+            marker.scale.x = m_resolution;
+            marker.scale.y = m_resolution;
+            marker.scale.z = m_resolution;
+            marker.color.r = 1.0;
+            marker.color.g = 1.0;
+            marker.color.b = 1.0;
+            marker.color.a = 1.0;
+            for(unsigned int i = 0; i < fringe_centers.size(); i++)
+            {
+                marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
+            }
+            marker.ns = "active_fringe";
+            marker.id = 0;
+            marker.header.frame_id = m_world_frame_id;
+            marker.header.stamp = ros::Time::now();
+            m_marker_pub.publish(marker);
+        }
+        samples = sampleObservationSpace(fringe_centers, req.sample_size);
     }
-
-    std::vector<tf::Transform> samples = sampleObservationSpace(fringe_centers, req.sample_size);
+    else
+    {
+        if(!m_tf_listener.waitForTransform(m_world_frame_id,
+                                           req.observation_position.header.frame_id,
+                                           req.observation_position.header.stamp,
+                                           ros::Duration(1)))
+        {
+            ROS_ERROR_STREAM("next_best_view_node: Timed out while waiting for transform from " <<
+                              req.observation_position.header.frame_id << " to " <<
+                              m_world_frame_id);
+            return false;
+        }
+        geometry_msgs::PointStamped obs_p;
+        m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obs_p);
+        samples = sampleObservationSpace(octomap::pointMsgToOctomap(obs_p.point), req.lock_height, req.sample_size);
+    }
     for(std::vector<tf::Transform>::iterator pose_it = samples.begin(); pose_it != samples.end(); ++pose_it)
     {
         octomap::point3d cam_point = octomap::pointTfToOctomap(pose_it->getOrigin());

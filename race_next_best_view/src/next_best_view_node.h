@@ -47,6 +47,10 @@ private:
     std::vector<tf::Transform> sampleObservationSpace(std::vector<octomap::point3d> const & points_of_interest,
                                                       int sample_size) const;
 
+    std::vector<tf::Transform> sampleObservationSpace(octomap::point3d const & observation_position,
+                                                      bool lock_height,
+                                                      int sample_size) const;
+
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
 

@@ -14,12 +14,12 @@
 #include <algorithm>
 #include <limits>
 
-double const DRIVE_SPEED = 1.0; // [m/s]
-double const TURN_SPEED = 2.0; // [rad/s]
+double const DRIVE_SPEED = 0.5; // [m/s]
+double const TURN_SPEED = 1.0; // [rad/s]
 double const LIFT_SPEED = 0.02; // [m/s]
 double const HEAD_SPEED = 3.14; // [rad/s]
 double const ACQUISITION_TIME = 7.0;
-double const TRANSLATIONAL_TOLERANCE = 0.05;
+double const TRANSLATIONAL_TOLERANCE = 0.1;
 
 /**
   Figures out the required torso position for a given camera height using magic numbers.
@@ -117,7 +117,10 @@ double estimate_exec_time
     double exec_time = ACQUISITION_TIME;
 
     // calculate the time needed to move_base
-    exec_time += estimate_move_base_time(current_base_pose, base_pose_for_cam_pose(target_cam_pose));
+    if(is_move_base_required(current_cam_pose, target_cam_pose))
+    {
+        exec_time += estimate_move_base_time(current_base_pose, base_pose_for_cam_pose(target_cam_pose));
+    }
 
     // calculate time needed to turn the camera (disregards that yaw may be already provided by move_base)
     exec_time += current_cam_pose.getRotation().angleShortestPath(target_cam_pose.getRotation()) / HEAD_SPEED;
@@ -240,19 +243,53 @@ int main(int argc, char** argv)
     tf::TransformListener tf_listener;
     ros::Publisher marker_pub(nh.advertise<visualization_msgs::Marker>("/exploration_marker", 10));
 
-    while(ros::ok()) {
+    while(ros::ok())
+    {
+        std::vector<geometry_msgs::Pose> pose_candidates;
+        std::vector<double> candidate_information_gain;
+
         ROS_INFO("retrieving pose candidates");
-        race_next_best_view::GetObservationCameraPoses pose_candidates_call;
-        pose_candidates_call.request.sample_size = 200;
-        pose_candidates_call.request.ray_skip = 0.98;
-        //pose_candidates_call.request.roi.dimensions.x = 5;
-        //pose_candidates_call.request.roi.dimensions.y = 5;
-        //pose_candidates_call.request.roi.dimensions.z = 2;
-        //pose_candidates_call.request.roi.pose_stamped = frame_id_to_pose("/base_footprint");
-        if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call)) {
-            ROS_ERROR("service call failed");
-            ros::Duration(5).sleep();
-            continue;
+        {
+            race_next_best_view::GetObservationCameraPoses pose_candidates_call;
+            pose_candidates_call.request.sample_size = 200;
+            pose_candidates_call.request.ray_skip = 0.98;
+            //pose_candidates_call.request.roi.dimensions.x = 5;
+            //pose_candidates_call.request.roi.dimensions.y = 5;
+            //pose_candidates_call.request.roi.dimensions.z = 2;
+            //pose_candidates_call.request.roi.pose_stamped = frame_id_to_pose("/base_footprint");
+            if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call)) {
+                ROS_ERROR("service call failed");
+                ros::Duration(5).sleep();
+                continue;
+            }
+            pose_candidates.insert(pose_candidates.end(),
+                                   pose_candidates_call.response.camera_poses.begin(),
+                                   pose_candidates_call.response.camera_poses.end());
+            candidate_information_gain.insert(candidate_information_gain.end(),
+                                              pose_candidates_call.response.information_gain.begin(),
+                                              pose_candidates_call.response.information_gain.end());
+        }
+
+        ROS_INFO("retrieving pose candidates for fixed position");
+        {
+            geometry_msgs::PoseStamped current_head_pose = frame_id_to_pose("/head_mount_kinect_ir_link");
+            race_next_best_view::GetObservationCameraPoses pose_candidates_call;
+            pose_candidates_call.request.sample_size = 100;
+            pose_candidates_call.request.ray_skip = 0.98;
+            pose_candidates_call.request.observation_position.header = current_head_pose.header;
+            pose_candidates_call.request.observation_position.point = current_head_pose.pose.position;
+            pose_candidates_call.request.lock_height = true;
+            if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call)) {
+                ROS_ERROR("service call failed");
+                ros::Duration(5).sleep();
+                continue;
+            }
+            pose_candidates.insert(pose_candidates.end(),
+                                   pose_candidates_call.response.camera_poses.begin(),
+                                   pose_candidates_call.response.camera_poses.end());
+            candidate_information_gain.insert(candidate_information_gain.end(),
+                                              pose_candidates_call.response.information_gain.begin(),
+                                              pose_candidates_call.response.information_gain.end());
         }
 
         ROS_INFO("evaluating pose candidate utility values");
@@ -262,15 +299,15 @@ int main(int argc, char** argv)
         tf_listener.lookupTransform("/map", "/head_mount_kinect_ir_link", ros::Time(0), cam_to_world_tf);
         tf_listener.lookupTransform("/map", "/base_footprint", ros::Time(0), base_to_world_tf);
 
-        std::vector<double> candidate_utilities(pose_candidates_call.response.camera_poses.size());
+        std::vector<double> candidate_utilities(pose_candidates.size());
         tf::Pose best_cam_pose; best_cam_pose.setIdentity();
         double best_utility = 0;
         for(unsigned int i = 0; i < candidate_utilities.size(); i++)
         {
             tf::Pose pose_candidate_cam_tf;
-            tf::poseMsgToTF(pose_candidates_call.response.camera_poses[i], pose_candidate_cam_tf);
+            tf::poseMsgToTF(pose_candidates[i], pose_candidate_cam_tf);
 
-            candidate_utilities[i] = pose_candidates_call.response.information_gain[i] /
+            candidate_utilities[i] = candidate_information_gain[i] /
                                      estimate_exec_time(base_to_world_tf, cam_to_world_tf, pose_candidate_cam_tf);
 
             if(candidate_utilities[i] > best_utility)

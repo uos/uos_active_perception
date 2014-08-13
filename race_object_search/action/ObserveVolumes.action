@@ -1,0 +1,10 @@
+# Goal: A list of bounding boxes to observe, optionally along with probabilities of success for each bounding box.
+race_msgs/BoundingBox[] roi
+float32[] p
+---
+# Result: Amount of ROI space left unobserved [m^3]
+float32 unobserved_space
+---
+# Feedback: Amount of ROI space left unobserved and expected time until completion
+float32 unobserved_space
+float32 eta

@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <limits>
 
-double const DRIVE_SPEED = 0.5; // [m/s]
+double const DRIVE_SPEED = 0.25; // [m/s]
 double const TURN_SPEED = 1.0; // [rad/s]
 double const LIFT_SPEED = 0.02; // [m/s]
 double const HEAD_SPEED = 3.14; // [rad/s]
@@ -221,7 +221,7 @@ bool achieve_cam_pose
     pr2_controllers_msgs::PointHeadGoal head_goal;
     head_goal.target.header.frame_id = "/map";
     head_goal.target.header.stamp = ros::Time::now();
-    tf::pointTFToMsg(target_cam_pose * tf::Point(1,0,0), head_goal.target.point);
+    tf::pointTFToMsg(target_cam_pose * tf::Point(1e10,0,0), head_goal.target.point);
 
     pointHeadClient.sendGoal(head_goal);
     pointHeadClient.waitForResult(ros::Duration(3.0));
@@ -272,13 +272,14 @@ int main(int argc, char** argv)
 
         ROS_INFO("retrieving pose candidates for fixed position");
         {
-            geometry_msgs::PoseStamped current_head_pose = frame_id_to_pose("/head_mount_kinect_ir_link");
+            geometry_msgs::PoseStamped current_head_pose = frame_id_to_pose("/base_footprint");
+            current_head_pose.pose.position.z = 1.5;
             race_next_best_view::GetObservationCameraPoses pose_candidates_call;
             pose_candidates_call.request.sample_size = 100;
             pose_candidates_call.request.ray_skip = 0.98;
             pose_candidates_call.request.observation_position.header = current_head_pose.header;
             pose_candidates_call.request.observation_position.point = current_head_pose.pose.position;
-            pose_candidates_call.request.lock_height = true;
+            pose_candidates_call.request.lock_height = false;
             if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call)) {
                 ROS_ERROR("service call failed");
                 ros::Duration(5).sleep();
@@ -298,6 +299,10 @@ int main(int argc, char** argv)
         tf::StampedTransform cam_to_world_tf, base_to_world_tf;
         tf_listener.lookupTransform("/map", "/head_mount_kinect_ir_link", ros::Time(0), cam_to_world_tf);
         tf_listener.lookupTransform("/map", "/base_footprint", ros::Time(0), base_to_world_tf);
+        // HACK for pr2 head cam
+        cam_to_world_tf.setOrigin(tf::Vector3(base_to_world_tf.getOrigin().getX(),
+                                              base_to_world_tf.getOrigin().getY(),
+                                              1.5));
 
         std::vector<double> candidate_utilities(pose_candidates.size());
         tf::Pose best_cam_pose; best_cam_pose.setIdentity();

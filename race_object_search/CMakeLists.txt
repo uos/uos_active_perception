@@ -34,4 +34,6 @@ rosbuild_genmsg()
 #target_link_libraries(example ${PROJECT_NAME})
 
 rosbuild_add_executable(active_explorer_node src/active_explorer_node.cpp)
-rosbuild_add_executable(object_search_manager src/object_search_manager.cpp)
+rosbuild_add_executable(object_search_manager src/object_search_manager.cpp
+                                              src/pr2_agent.cpp)
+rosbuild_add_executable(object_search_manager_test src/object_search_manager_test.cpp)

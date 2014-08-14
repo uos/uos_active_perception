@@ -153,7 +153,11 @@ double ActivePerceptionMap::fringeSubmergence(octomap::point3d const & camera,
   Traces a ray and returns the sum over all segments of the ray that cross unknown space AFTER seeing free space
   at least once before.
   */
-double ActivePerceptionMap::estimateRayGain(octomap::point3d const & camera, octomap::point3d const & end) const
+double ActivePerceptionMap::estimateRayGain
+(
+        octomap::point3d const & camera,
+        octomap::point3d const & end,
+        OcTreeROI const & roi) const
 {
     octomap::KeyRay ray;
     m_occupancy_map.computeRayKeys(camera, end, ray);
@@ -180,11 +184,20 @@ double ActivePerceptionMap::estimateRayGain(octomap::point3d const & camera, oct
                 break;
             }
         }
-        else if(!gaining && traversing_free)
+        else
         {
             traversing_free = false;
-            gaining = true;
-            gain_onset = m_occupancy_map.keyToCoord(*key_it);
+            octomath::Vector3 coords = m_occupancy_map.keyToCoord(*key_it);
+            if(!gaining && roi.contains(coords))
+            {
+                gaining = true;
+                gain_onset = coords;
+            }
+            if(gaining && !roi.contains(coords))
+            {
+                gain += gain_onset.distance(coords);
+                gaining = false;
+            }
         }
     }
     if(gaining)

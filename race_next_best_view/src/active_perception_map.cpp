@@ -1,5 +1,7 @@
 #include "active_perception_map.h"
 
+#include "octree_ray_iterator.h"
+
 #include <octomap/octomap.h>
 #include <octomap_ros/conversions.h>
 
@@ -159,20 +161,19 @@ double ActivePerceptionMap::estimateRayGain
         octomap::point3d const & end,
         OcTreeROI const & roi) const
 {
-    octomap::KeyRay ray;
-    m_occupancy_map.computeRayKeys(camera, end, ray);
-    // TODO: computeRayKeys for the whole ray is extremely slow. Instead, the implementation of castRay should be
-    //       adapted for this method so that ray traversal is terminated early.
+    octomath::Vector3 direction = end - camera;
+    double length = direction.norm();
+
     double gain = 0.0;
     bool traversing_free = false, gaining = false;
-    octomap::point3d gain_onset;
-    for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
+    double gain_onset;
+    for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
     {
-        if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(*key_it))
+        if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(ray.getKey()))
         {
             if(gaining)
             {
-                gain += gain_onset.distance(m_occupancy_map.keyToCoord(*key_it));
+                gain += ray.distanceFromOrigin() - gain_onset;
                 gaining = false;
             }
             if(!m_occupancy_map.isNodeOccupied(node_ptr))
@@ -187,22 +188,21 @@ double ActivePerceptionMap::estimateRayGain
         else
         {
             traversing_free = false;
-            octomath::Vector3 coords = m_occupancy_map.keyToCoord(*key_it);
-            if(!gaining && roi.contains(coords))
+            if(!gaining && roi.contains(ray.getKey()))
             {
                 gaining = true;
-                gain_onset = coords;
+                gain_onset = ray.distanceFromOrigin();
             }
-            if(gaining && !roi.contains(coords))
+            if(gaining && !roi.contains(ray.getKey()))
             {
-                gain += gain_onset.distance(coords);
+                gain += ray.distanceFromOrigin() - gain_onset;
                 gaining = false;
             }
         }
     }
     if(gaining)
     {
-        gain += gain_onset.distance(end);
+        gain += length - gain_onset;
     }
     return gain;
 }

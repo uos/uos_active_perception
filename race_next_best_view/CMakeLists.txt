@@ -39,6 +39,7 @@ MESSAGE(STATUS "OctoMap paths:" ${OCTOMAP_INCLUDE_DIRS} " " ${OCTOMAP_LIBRARY_DI
 rosbuild_add_executable(next_best_view_node src/active_perception_map.cpp
                                             src/next_best_view_node.cpp
                                             src/camera_constraints.h
-                                            src/octree_regions.h)
+                                            src/octree_regions.h
+                                            src/octree_ray_iterator.h)
 
 rosbuild_add_executable(servicetest src/servicetest.cpp)

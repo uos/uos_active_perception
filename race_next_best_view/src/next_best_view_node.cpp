@@ -322,7 +322,12 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         octomath::Vector3 min, max;
         if(getAxisAlignedBounds(req.roi[i_roi], min, max))
         {
-            roi.elements.push_back(OcTreeBbox(min, max));
+            octomap::OcTreeKey mink, maxk;
+            if(m_perception_map.getOccupancyMap().coordToKeyChecked(min, mink) &&
+               m_perception_map.getOccupancyMap().coordToKeyChecked(max, maxk))
+            {
+                roi.elements.push_back(OcTreeBbox(mink, maxk));
+            }
         }
     }
 
@@ -356,12 +361,14 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
         {
             OcTreeBbox box = roi.elements[i_roi];
+            octomath::Vector3 min = m_perception_map.getFringeMap().keyToCoord(box.min);
+            octomath::Vector3 max = m_perception_map.getFringeMap().keyToCoord(box.max);
             std::vector<octomap::point3d> roi_fringe_centers;
             // add fringe voxels within the roi
-            roi_fringe_centers = m_perception_map.getFringeCenters(box.min, box.max);
+            roi_fringe_centers = m_perception_map.getFringeCenters(min, max);
             fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
             // generate fringe voxels at roi boundary
-            roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(box.min, box.max);
+            roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(min, max);
             fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
         }
         // publish a marker for active fringe voxels

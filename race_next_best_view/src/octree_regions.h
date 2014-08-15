@@ -1,20 +1,23 @@
 #ifndef OCTREE_REGIONS_H
 #define OCTREE_REGIONS_H
 
-#include <octomap/math/Vector3.h>
 #include <vector>
+#include <octomap/OcTreeKey.h>
 
 class OcTreeBbox
 {
 public:
-    octomath::Vector3 min, max;
+    octomap::OcTreeKey min, max;
 
-    OcTreeBbox(octomath::Vector3 const & min, octomath::Vector3 const & max) : min(min), max(max) {}
+    OcTreeBbox(octomap::OcTreeKey const & min, octomap::OcTreeKey const & max) : min(min), max(max) {}
 
-    bool contains(octomath::Vector3 const & p) const
+    bool contains(octomap::OcTreeKey const & p) const
     {
-        return min.x() <= p.x() && min.y() <= p.y() && min.z() <= p.z() &&
-               max.x() >= p.x() && max.y() >= p.y() && max.z() >= p.z();
+        for(unsigned int i = 0; i < 3; ++i)
+        {
+            if(!(min[i] <= p[i] && max[i] >= p[i])) return false;
+        }
+        return true;
     }
 };
 
@@ -23,7 +26,7 @@ class OcTreeROI
 public:
     std::vector<OcTreeBbox> elements;
 
-    bool contains(octomath::Vector3 const & p) const
+    bool contains(octomap::OcTreeKey const & p) const
     {
         for(std::vector<OcTreeBbox>::const_iterator it = elements.begin(); it != elements.end(); ++it)
         {

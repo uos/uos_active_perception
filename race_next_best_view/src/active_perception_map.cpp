@@ -30,6 +30,7 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
     double angle_increment =
             std::acos(1.0 - (std::pow(m_occupancy_map.getResolution(), 2) /
                              (2.0 * std::pow(camera_constraints.range_max, 2))));
+    octomath::Vector3 scan_origin = scan_pose.trans();
     for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
     {
         for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
@@ -37,12 +38,12 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
             tf::Vector3 ray_end_in_cam(camera_constraints.range_max * std::cos(azimuth),
                                        camera_constraints.range_max * std::sin(azimuth),
                                        camera_constraints.range_max * std::sin(inclination));
-            octomap::point3d maxd_ray_end = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam));
-            octomap::KeyRay ray;
-            m_occupancy_map.computeRayKeys(scan_pose.trans(), maxd_ray_end, ray);
-            for(octomap::KeyRay::iterator key_it = ray.begin(); key_it != ray.end(); ++key_it)
+            octomath::Vector3 ray_dir = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam)) - scan_origin;
+            for(RayIterator ray(m_occupancy_map, scan_origin, ray_dir);
+                ray.distanceFromOrigin() < camera_constraints.range_max;
+                ray.next())
             {
-                if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(*key_it))
+                if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(ray.getKey()))
                 {
                     if(m_occupancy_map.isNodeOccupied(node_ptr))
                     {
@@ -51,7 +52,7 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                 }
                 else
                 {
-                    m_occupancy_map.updateNode(*key_it, false, true);
+                    m_occupancy_map.updateNode(ray.getKey(), false, true);
                 }
             }
         }

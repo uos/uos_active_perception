@@ -147,6 +147,7 @@ void ActivePerceptionMap::estimateRayGain
 
     for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
     {
+        if(discovered_keys.count(ray.getKey())) continue; // We have already seen this, so skip ahead
         if(octomap::OcTreeNode * node_ptr = m_occupancy_map.search(ray.getKey()))
         {
             if(m_occupancy_map.isNodeOccupied(node_ptr))

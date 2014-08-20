@@ -22,9 +22,6 @@ public:
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);
-    double fringeSubmergence(octomap::point3d const & camera,
-                             octomap::point3d const & fringe,
-                             double const & max_range);
     void estimateRayGain(octomap::point3d const & camera,
                          octomap::point3d const & end,
                          OcTreeROI const & roi,

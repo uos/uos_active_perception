@@ -135,23 +135,6 @@ void ActivePerceptionMap::setResolution(double const & resolution)
     m_fringe_map.setResolution(resolution);
 }
 
-double ActivePerceptionMap::fringeSubmergence(octomap::point3d const & camera,
-                                              octomap::point3d const & fringe,
-                                              double const & max_range)
-{
-    octomath::Vector3 ray_dir, ray_end;
-    // Find out where the ray ends
-    ray_dir = fringe - camera;
-    if(!m_occupancy_map.castRay(camera, ray_dir, ray_end, true, ray_dir.norm()))
-    {
-        return max_range - camera.distance(fringe);
-    }
-    else
-    {
-        return 0.0;
-    }
-}
-
 void ActivePerceptionMap::estimateRayGain
 (
         octomap::point3d const & camera,

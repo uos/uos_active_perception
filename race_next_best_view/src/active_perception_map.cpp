@@ -152,60 +152,30 @@ double ActivePerceptionMap::fringeSubmergence(octomap::point3d const & camera,
     }
 }
 
-/**
-  Traces a ray and returns the sum over all segments of the ray that cross unknown space AFTER seeing free space
-  at least once before.
-  */
-double ActivePerceptionMap::estimateRayGain
+void ActivePerceptionMap::estimateRayGain
 (
         octomap::point3d const & camera,
         octomap::point3d const & end,
-        OcTreeROI const & roi) const
+        OcTreeROI const & roi,
+        octomap::KeySet & discovered_keys) const
 {
     octomath::Vector3 direction = end - camera;
     double length = direction.norm();
 
-    double gain = 0.0;
-    bool traversing_free = false, gaining = false;
-    double gain_onset;
     for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
     {
-        if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(ray.getKey()))
+        if(octomap::OcTreeNode * node_ptr = m_occupancy_map.search(ray.getKey()))
         {
-            if(gaining)
-            {
-                gain += ray.distanceFromOrigin() - gain_onset;
-                gaining = false;
-            }
-            if(!m_occupancy_map.isNodeOccupied(node_ptr))
-            {
-                traversing_free = true;
-            }
-            else
+            if(m_occupancy_map.isNodeOccupied(node_ptr))
             {
                 break;
             }
         }
-        else
+        else if(roi.elements.empty() || roi.contains(ray.getKey()))
         {
-            traversing_free = false;
-            if(!gaining && roi.contains(ray.getKey()))
-            {
-                gaining = true;
-                gain_onset = ray.distanceFromOrigin();
-            }
-            if(gaining && !roi.contains(ray.getKey()))
-            {
-                gain += ray.distanceFromOrigin() - gain_onset;
-                gaining = false;
-            }
+            discovered_keys.insert(ray.getKey());
         }
     }
-    if(gaining)
-    {
-        gain += length - gain_onset;
-    }
-    return gain;
 }
 
 std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters(octomap::point3d min, octomap::point3d max)

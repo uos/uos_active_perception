@@ -330,9 +330,15 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             }
         }
     }
-
-    std::vector<visualization_msgs::Marker> markers;
-    double max_gain = m_resolution;
+    unsigned int roi_cell_count = roi.cellCount();
+    if(!roi_cell_count)
+    {
+        // If the roi is empty (exploration mode), we estimate the number of cells in the view cone
+        roi_cell_count =
+        ((std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.hfov))) *
+          std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.vfov))) *
+          m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
+    }
 
     // Some derived camera parameters
     double azimuth_min = -m_camera_constraints.hfov / 2.0;
@@ -412,30 +418,13 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obs_p);
         samples = sampleObservationSpace(octomap::pointMsgToOctomap(obs_p.point), req.lock_height, req.sample_size);
     }
+    int marker_id = 0;
     for(std::vector<tf::Transform>::iterator pose_it = samples.begin(); pose_it != samples.end(); ++pose_it)
     {
         octomap::point3d cam_point = octomap::pointTfToOctomap(pose_it->getOrigin());
 
-        // Send a marker
-        visualization_msgs::Marker lines_marker;
-        lines_marker.action = visualization_msgs::Marker::ADD;
-        lines_marker.type = visualization_msgs::Marker::LINE_LIST;
-        lines_marker.lifetime = ros::Duration();
-        lines_marker.scale.x = 0.001;
-        lines_marker.scale.y = 0.001;
-        lines_marker.scale.z = 0.001;
-        lines_marker.color.g = 1.0;
-        lines_marker.color.r = 1.0;
-        lines_marker.color.b = 1.0;
-        lines_marker.color.a = 0.5;
-        lines_marker.header.frame_id = m_world_frame_id;
-        lines_marker.header.stamp = ros::Time::now();
-        static int markerid = 0;
-        lines_marker.id = markerid++;
-        lines_marker.ns = "nbv_viewlines";
-
-        double gain = 0.0;
-        int n_rays = 0;
+        octomap::KeySet discovered_keys;
+        discovered_keys.rehash(roi_cell_count);
         for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
         {
             for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
@@ -444,35 +433,25 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                 {
                     continue;
                 }
-                n_rays++;
                 tf::Vector3 ray_end_in_cam(m_camera_constraints.range_max * std::cos(azimuth),
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap((*pose_it)(ray_end_in_cam));
-                double gaingain = m_perception_map.estimateRayGain(cam_point, ray_end, roi);
-                gain += gaingain;
-                if(gaingain > m_resolution) {
-                    lines_marker.points.push_back(octomap::pointOctomapToMsg(cam_point));
-                    lines_marker.points.push_back(octomap::pointOctomapToMsg(ray_end));
-                }
+                m_perception_map.estimateRayGain(cam_point, ray_end, roi, discovered_keys);
             }
         }
-        gain /= n_rays;
+        unsigned int gain = discovered_keys.size();
+
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
         tf::poseTFToMsg(*pose_it, camera_pose_msg);
-        if(gain > max_gain)
-        {
-            max_gain = gain;
-        }
-        if(gain > m_resolution)
+        if(gain > 0)
         {
             res.camera_poses.push_back(camera_pose_msg);
-            res.information_gain.push_back(gain);
+            res.information_gain.push_back(gain * std::pow(m_resolution, 3));
         }
 
         // Send a marker
-        //markers.push_back(lines_marker);
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;
@@ -480,8 +459,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.scale.x = 1;
         marker.scale.y = 1;
         marker.scale.z = 0.2;
-        if(gain > m_resolution) {
-            marker.color.g = gain;
+        if(gain > 0) {
+            marker.color.g = ((double) gain) / roi_cell_count;
+            marker.color.r = 1.0 - marker.color.g;
         } else {
             marker.color.b = 1.0;
         }
@@ -489,20 +469,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.pose = camera_pose_msg;
         marker.header.frame_id = m_world_frame_id;
         marker.header.stamp = ros::Time::now();
-        marker.id = markerid++;
+        marker.id = marker_id++;
         marker.ns = "nbv_samples";
-        markers.push_back(marker);
-    }
-
-    // Publish markers
-    ROS_INFO_STREAM("Publishing " << markers.size() << " markers");
-    for(std::vector<visualization_msgs::Marker>::iterator it = markers.begin(); it != markers.end(); ++it)
-    {
-        if(it->color.b < 1.0) {
-            it->color.g /= max_gain;
-            it->color.r = 1.0 - it->color.g;
-        }
-        m_marker_pub.publish(*it);
+        m_marker_pub.publish(marker);
     }
 
     return true;

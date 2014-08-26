@@ -2,6 +2,7 @@
 
 #include "active_perception_map.h"
 #include "octree_regions.h"
+#include "observation_pose_sampler.h"
 
 #include <ros/ros.h>
 #include <pcl/ros/conversions.h>
@@ -10,7 +11,6 @@
 #include <octomap_ros/conversions.h>
 #include <octomap/octomap.h>
 #include <visualization_msgs/Marker.h>
-#include <boost/numeric/interval.hpp>
 #include <boost/random.hpp>
 
 #include <ctime>
@@ -148,128 +148,6 @@ bool NextBestViewNode::getAxisAlignedBounds(
     return true;
 }
 
-/**
-  ASSUMPTION: Camera constraints are defined in the world frame.
-  */
-std::vector<tf::Transform> NextBestViewNode::sampleObservationSpace
-(
-        std::vector<octomap::point3d> const & points_of_interest,
-        int sample_size
-) const
-{
-    boost::mt19937 rng(std::time(0));
-    std::vector<tf::Transform> samples;
-    for(int i = 0; i < sample_size; ++i)
-    {
-        // Pick a random poi as center
-        octomap::point3d const & poi = points_of_interest.at(
-                    boost::uniform_int<>(0, points_of_interest.size() - 1)(rng));
-
-        // Find parameter constraints
-        using boost::numeric::intersect;
-        typedef boost::numeric::interval<
-                    double,
-                    boost::numeric::interval_lib::policies<
-                        boost::numeric::interval_lib::save_state<
-                            boost::numeric::interval_lib::rounded_transc_std<double> >,
-                        boost::numeric::interval_lib::checking_base<double> > >
-                Interval;
-        // Hardware constraints
-        Interval r(m_camera_constraints.range_min, m_camera_constraints.range_max);
-        Interval dH(poi.z() - m_camera_constraints.height_max, poi.z() - m_camera_constraints.height_min);
-        Interval p(m_camera_constraints.pitch_min - m_camera_constraints.vfov / 2.0,
-                   m_camera_constraints.pitch_max + m_camera_constraints.vfov / 2.0);
-        Interval sin_p = boost::numeric::sin(p);
-        // Possible view angles according to hardware constraints
-        sin_p = intersect(sin_p, dH / r);
-
-        if(boost::numeric::empty(sin_p))
-        {
-            ROS_WARN_STREAM("Skipped unobservable POI: z=" << poi.z());
-            continue;
-        }
-
-        // Select a distance and height (randomize selection order)
-        double distance, dHeight;
-        if(boost::uniform_01<>()(rng) < 0.5)
-        {
-            // possible ranges that satisfy view distance, height and pitch constraints
-            r = intersect(r, dH / sin_p);
-            distance = r.lower() + boost::uniform_01<>()(rng) * (r.upper() - r.lower());
-            dH = intersect(dH, distance * sin_p);
-            dHeight = dH.lower() + boost::uniform_01<>()(rng) * (dH.upper() - dH.lower());
-        }
-        else
-        {
-            // possible height offsets that satisfy view distance, height and pitch constraints
-            dH = intersect(dH, r * sin_p);
-            dHeight = dH.lower() + boost::uniform_01<>()(rng) * (dH.upper() - dH.lower());
-            r = intersect(r, dHeight / sin_p);
-            distance = r.lower() + boost::uniform_01<>()(rng) * (r.upper() - r.lower());
-        }
-
-        // Create random position within feasible range and height
-        double direction = boost::uniform_01<>()(rng) * 2.0 * PI;
-        double x_offset = distance * std::cos(direction);
-        double y_offset = distance * std::sin(direction);
-        tf::Vector3 position(poi.x() + x_offset,
-                             poi.y() + y_offset,
-                             poi.z() - dHeight);
-
-        // Adjust camera pitch
-        double pitch = std::asin(dHeight / distance);
-        if(pitch > m_camera_constraints.pitch_max)
-        {
-            pitch = m_camera_constraints.pitch_max;
-        }
-        else if(pitch < m_camera_constraints.pitch_min)
-        {
-            pitch = m_camera_constraints.pitch_min;
-        }
-
-        // Point the created pose towards the target voxel
-        // We want to do intrinsic YPR which is equivalent to fixed axis RPY
-        tf::Quaternion orientation;
-        orientation.setRPY(m_camera_constraints.roll, -pitch, PI + direction);
-
-        samples.push_back(tf::Transform(orientation, position));
-    }
-    return samples;
-}
-
-/**
-  ASSUMPTION: Camera constraints are defined in the world frame.
-  */
-std::vector<tf::Transform> NextBestViewNode::sampleObservationSpace
-(
-        octomap::point3d const & observation_position,
-        bool lock_height,
-        int sample_size) const
-{
-    boost::mt19937 rng(std::time(0));
-    boost::uniform_01<> uni_01;
-    std::vector<tf::Transform> samples;
-    for(int i = 0; i < sample_size; ++i)
-    {
-        tf::Vector3 position(observation_position.x(), observation_position.y(), observation_position.z());
-        if(!lock_height)
-        {
-            position.setZ(m_camera_constraints.height_min +
-                          uni_01(rng) * (m_camera_constraints.height_max - m_camera_constraints.height_min));
-        }
-
-        double pitch =  m_camera_constraints.pitch_min +
-                        uni_01(rng) * (m_camera_constraints.pitch_max - m_camera_constraints.pitch_min);
-        double yaw = uni_01(rng) * 2.0 * PI;
-        // We want to do intrinsic YPR which is equivalent to fixed axis RPY
-        tf::Quaternion orientation;
-        orientation.setRPY(m_camera_constraints.roll, -pitch, yaw);
-
-        samples.push_back(tf::Transform(orientation, position));
-    }
-    return samples;
-}
-
 bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request &req,
                                           race_next_best_view::GetBboxOccupancy::Response &res)
 {
@@ -308,6 +186,7 @@ bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy:
 bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request& req,
                                                    race_next_best_view::GetObservationCameraPoses::Response& res)
 {
+    ObservationPoseSampler ops(m_camera_constraints);
     boost::mt19937 rng(std::time(0));
     boost::uniform_01<> rand_u01;
     // TODO: Shrink the ROI to an area that is in principle observable
@@ -349,8 +228,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double angle_increment =
             std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
 
-    std::vector<tf::Transform> samples;
-    if(req.observation_position.header.frame_id.empty())
+    bool observation_position_set = !req.observation_position.header.frame_id.empty();
+    std::vector<octomap::point3d> fringe_centers;
+    octomath::Vector3 observation_position;
+    if(!observation_position_set)
     {
         // Gather unknown voxel centers
         // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
@@ -358,7 +239,6 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         //       all the fringe voxels in the octree.
         //       [Not really valid anymore, because fringe voxels are additionally generated for roi boundaries.
         //        Also, this does not seem to be a bottleneck.]
-        std::vector<octomap::point3d> fringe_centers;
         if(req.roi.empty())
         {
             // If the requested roi is empty, use all fringe voxels
@@ -377,6 +257,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(min, max);
             fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
         }
+        if(fringe_centers.empty()) return true;
         // publish a marker for active fringe voxels
         {
             visualization_msgs::Marker marker;
@@ -400,7 +281,6 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             marker.header.stamp = ros::Time::now();
             m_marker_pub.publish(marker);
         }
-        samples = sampleObservationSpace(fringe_centers, req.sample_size);
     }
     else
     {
@@ -414,14 +294,24 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                               m_world_frame_id);
             return false;
         }
-        geometry_msgs::PointStamped obs_p;
-        m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obs_p);
-        samples = sampleObservationSpace(octomap::pointMsgToOctomap(obs_p.point), req.lock_height, req.sample_size);
+        geometry_msgs::PointStamped obspos_msg;
+        m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obspos_msg);
+        observation_position = octomap::pointMsgToOctomap(obspos_msg.point);
     }
-    int marker_id = 0;
-    for(std::vector<tf::Transform>::iterator pose_it = samples.begin(); pose_it != samples.end(); ++pose_it)
+
+    for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
     {
-        octomap::point3d cam_point = octomap::pointTfToOctomap(pose_it->getOrigin());
+        tf::Transform sample;
+        if(observation_position_set)
+        {
+            sample = ops.genPoseSample(observation_position, req.lock_height);
+        }
+        else
+        {
+            sample = ops.genObservationSample(fringe_centers[boost::uniform_int<>(0, fringe_centers.size() - 1)(rng)]);
+        }
+
+        octomap::point3d cam_point = octomap::pointTfToOctomap(sample.getOrigin());
 
         octomap::KeySet discovered_keys;
         discovered_keys.rehash(roi_cell_count);
@@ -436,7 +326,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                 tf::Vector3 ray_end_in_cam(m_camera_constraints.range_max * std::cos(azimuth),
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
-                octomap::point3d ray_end = octomap::pointTfToOctomap((*pose_it)(ray_end_in_cam));
+                octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
                 m_perception_map.estimateRayGain(cam_point, ray_end, roi, discovered_keys);
             }
         }
@@ -444,7 +334,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
 
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
-        tf::poseTFToMsg(*pose_it, camera_pose_msg);
+        tf::poseTFToMsg(sample, camera_pose_msg);
         if(gain > 0)
         {
             res.camera_poses.push_back(camera_pose_msg);
@@ -469,7 +359,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.pose = camera_pose_msg;
         marker.header.frame_id = m_world_frame_id;
         marker.header.stamp = ros::Time::now();
-        marker.id = marker_id++;
+        marker.id = sample_id;
         marker.ns = "nbv_samples";
         m_marker_pub.publish(marker);
     }

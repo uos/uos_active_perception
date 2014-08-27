@@ -308,7 +308,16 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         }
         else
         {
-            sample = ops.genObservationSample(fringe_centers[boost::uniform_int<>(0, fringe_centers.size() - 1)(rng)]);
+            try
+            {
+                sample = ops.genObservationSample(
+                            fringe_centers[boost::uniform_int<>(0, fringe_centers.size() - 1)(rng)]);
+            }
+            catch (std::runtime_error e)
+            {
+                ROS_WARN("Skipped unobservable fringe voxel");
+            }
+
         }
 
         octomap::point3d cam_point = octomap::pointTfToOctomap(sample.getOrigin());

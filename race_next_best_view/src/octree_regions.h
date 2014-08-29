@@ -31,16 +31,21 @@ class OcTreeBoxSet
 public:
     std::vector<OcTreeBbox> elements;
 
-    bool contains(octomap::OcTreeKey const & p) const
+    /**
+      If the box at elements[i] contains the given key p, this function returns i+1.
+      If no box contains p, 0 is returned.
+      If multiple boxes in elements overlap at p, it is not defined which of the boxes is returned.
+      */
+    unsigned int getContainingBoxId(octomap::OcTreeKey const & p) const
     {
-        for(std::vector<OcTreeBbox>::const_iterator it = elements.begin(); it != elements.end(); ++it)
+        for(unsigned int i = 0; i < elements.size(); ++i)
         {
-            if(it->contains(p))
+            if(elements[i].contains(p))
             {
-                return true;
+                return i+1;
             }
         }
-        return false;
+        return 0;
     }
 
     unsigned int cellCount() const

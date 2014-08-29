@@ -155,7 +155,7 @@ void ActivePerceptionMap::estimateRayGain
                 break;
             }
         }
-        else if(roi.elements.empty() || roi.contains(ray.getKey()))
+        else if(roi.elements.empty() || roi.getContainingBoxId(ray.getKey()))
         {
             discovered_keys.insert(ray.getKey());
         }

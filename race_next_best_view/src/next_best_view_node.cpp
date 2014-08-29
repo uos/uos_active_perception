@@ -322,8 +322,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
 
         octomap::point3d cam_point = octomap::pointTfToOctomap(sample.getOrigin());
 
-        octomap::KeySet discovered_keys;
-        discovered_keys.rehash(roi_cell_count);
+        ActivePerceptionMap::OcTreeKeyMap discovery_field;
+        discovery_field.rehash(roi_cell_count / discovery_field.max_load_factor()); // reserve enough space
+        OcTreeBoxSet objects; // TODO: This is just an empty dummy
         for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
         {
             for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
@@ -336,10 +337,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
-                m_perception_map.estimateRayGain(cam_point, ray_end, roi, discovered_keys);
+                m_perception_map.estimateRayGainObjectAware(cam_point, ray_end, roi, objects, discovery_field);
             }
         }
-        unsigned int gain = discovered_keys.size();
+        unsigned int gain = discovery_field.size();
 
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;

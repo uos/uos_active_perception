@@ -162,6 +162,48 @@ void ActivePerceptionMap::estimateRayGain
     }
 }
 
+void ActivePerceptionMap::estimateRayGainObjectAware
+(
+        octomap::point3d const & camera,
+        octomap::point3d const & end,
+        OcTreeBoxSet const & roi,
+        OcTreeBoxSet const & objects,
+        OcTreeKeyMap & discovery_field) const
+{
+    octomath::Vector3 direction = end - camera;
+    double length = direction.norm();
+    unsigned int condition = 0;
+
+    for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
+    {
+        if(octomap::OcTreeNode * node_ptr = m_occupancy_map.search(ray.getKey()))
+        {
+            if(m_occupancy_map.isNodeOccupied(node_ptr))
+            {
+                unsigned int hit_obj = objects.getContainingBoxId(ray.getKey());
+                if(hit_obj)
+                {
+                    // Set the i-th bit of the condition, i being the boxes index in objects.elements
+                    condition |= (1 << (hit_obj - 1));
+                    continue;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        else if(roi.elements.empty() || roi.getContainingBoxId(ray.getKey()))
+        {
+            discovery_field.insert(OcTreeKeyMap::value_type(ray.getKey(), condition));
+            // It is possible that a cell can be seen with multiple rays that have different conditions
+            // (on object corners). Since we simply overwrite conditions that maybe already exist, the outcome
+            // of corner cases is undefined. This could be changed by always setting the condition involving the
+            // least amount of objects (= condition with the lowest hamming weight).
+        }
+    }
+}
+
 std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters(octomap::point3d min, octomap::point3d max)
 {
     std::vector<octomap::point3d> centers;

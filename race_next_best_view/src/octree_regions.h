@@ -26,7 +26,7 @@ public:
     }
 };
 
-class OcTreeROI
+class OcTreeBoxSet
 {
 public:
     std::vector<OcTreeBbox> elements;

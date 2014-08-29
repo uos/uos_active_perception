@@ -195,7 +195,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     // sampleObservationSpace method and allow to ask for single samples
 
     // translate roi to octomap
-    OcTreeROI roi;
+    OcTreeBoxSet roi;
     for(unsigned int i_roi = 0; i_roi < req.roi.size(); i_roi++)
     {
         octomath::Vector3 min, max;

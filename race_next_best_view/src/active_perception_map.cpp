@@ -139,7 +139,7 @@ void ActivePerceptionMap::estimateRayGain
 (
         octomap::point3d const & camera,
         octomap::point3d const & end,
-        OcTreeROI const & roi,
+        OcTreeBoxSet const & roi,
         octomap::KeySet & discovered_keys) const
 {
     octomath::Vector3 direction = end - camera;

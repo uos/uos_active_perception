@@ -24,7 +24,7 @@ public:
     void setResolution(double const & resolution);
     void estimateRayGain(octomap::point3d const & camera,
                          octomap::point3d const & end,
-                         OcTreeROI const & roi,
+                         OcTreeBoxSet const & roi,
                          octomap::KeySet & discovered_keys) const;
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();

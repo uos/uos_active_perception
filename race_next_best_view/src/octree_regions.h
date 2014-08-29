@@ -22,7 +22,7 @@ public:
 
     unsigned int cellCount() const
     {
-        return max[0] - min[0] + 1 * max[1] - min[1] + 1 * max[2] - min[2] + 1;
+        return (max[0] - min[0] + 1) * (max[1] - min[1] + 1) * (max[2] - min[2] + 1);
     }
 };
 

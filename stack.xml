@@ -1,10 +1,10 @@
 <stack>
-  <description brief="active_semantic_perception">
-    active_semantic_perception
+  <description brief="race_active_perception">
+    race_active_perception
   </description>
   <author>Martin Günther</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/active_semantic_perception</url>
+  <url>http://ros.org/wiki/race_active_perception</url>
   <depend stack="ros" />
 </stack>

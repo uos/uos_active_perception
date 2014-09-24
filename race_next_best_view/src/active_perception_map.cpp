@@ -272,9 +272,6 @@ visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
     marker.scale.x = r;
     marker.scale.y = r;
     marker.scale.z = r;
-    marker.color.r = 0.0;
-    marker.color.g = 0.0;
-    marker.color.b = 1.0;
     marker.color.a = 1.0;
     for(octomap::OcTree::leaf_iterator it = m_occupancy_map.begin_leafs();
         it != m_occupancy_map.end_leafs();
@@ -292,7 +289,15 @@ visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
                     for(int k = 0; k < size_multiplier; k++)
                     {
                         octomap::point3d coord = first_coord + octomap::point3d(i*r, j*r, k*r);
+                        std_msgs::ColorRGBA color;
+                        double grey = 1.0 - ((coord.z()-0.1) / 1.9);
+                        if(grey > 1.0) continue;//grey = 1.0;
+                        if(grey < 0.0) continue;//grey = 0.0;
+                        color.r = grey;
+                        color.g = grey;
+                        color.b = grey;
                         marker.points.push_back(octomap::pointOctomapToMsg(coord));
+                        marker.colors.push_back(color);
                     }
                 }
             }

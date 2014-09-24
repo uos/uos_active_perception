@@ -269,7 +269,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             marker.scale.z = m_resolution;
             marker.color.r = 1.0;
             marker.color.g = 1.0;
-            marker.color.b = 1.0;
+            marker.color.b = 0.0;
             marker.color.a = 1.0;
             for(unsigned int i = 0; i < fringe_centers.size(); i++)
             {

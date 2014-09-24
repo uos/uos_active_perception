@@ -45,7 +45,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         {
             race_next_best_view::GetObservationCameraPoses pose_candidates_call;
             pose_candidates_call.request.sample_size = 100;
-            pose_candidates_call.request.ray_skip = 0.98;
+            pose_candidates_call.request.ray_skip = 0.75;
             pose_candidates_call.request.roi = goal.roi;
             pose_candidates_call.request.observation_position.header.frame_id = m_world_frame_id;
             pose_candidates_call.request.observation_position.header.stamp = ros::Time::now();
@@ -70,7 +70,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         {
             race_next_best_view::GetObservationCameraPoses pose_candidates_call;
             pose_candidates_call.request.sample_size = 200;
-            pose_candidates_call.request.ray_skip = 0.98;
+            pose_candidates_call.request.ray_skip = 0.75;
             pose_candidates_call.request.roi = goal.roi;
             if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
             {

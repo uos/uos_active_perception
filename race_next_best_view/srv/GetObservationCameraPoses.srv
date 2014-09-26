@@ -1,20 +1,28 @@
 # Request:
+# Only roi and sample_size are required. All other fields are either optional or default to legal values.
 # - roi: List of  regions of interest
 # - sample_size: The requested amount of samples (response may contain less).
+# - timeout: Optional: Timeout after which sampling is aborted.
 # - ray_skip: Probability that a ray cast will be skipped (speeds up information gain estimation).
 # - observation_point: Optional: If set, sampling is restricted poses at the given point.
 # - lockt_height: Only relevant when observation_point is set: Whether camera height should
 #                 be locked (true) or free  (false) for sampling.
+# - objects: List of bounding boxes for moveable objects in the scene.
+#
 # Response:
 # - camera_poses: A List of camera poses in the world coordinate frame from which the ROI can be observed,
 # - information_gain: A list of expected information gain for each camera pose.
 #                     Information gain is measured as revealed space [m^3]
+# - cvm: A list containing the conditional visibility map for each camera pose.
 
 race_msgs/BoundingBox[] roi
 int32 sample_size
+duration timeout
 float32 ray_skip
 geometry_msgs/PointStamped observation_position
 bool lock_height
+race_msgs/BoundingBox[] objects
 ---
 geometry_msgs/Pose[] camera_poses
 float32[] information_gain
+ConditionalVisibilityMap[] cvm

@@ -2,6 +2,7 @@
 
 #include <visualization_msgs/Marker.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
+#include <race_msgs/GetAnchoredObjects.h>
 
 ObjectSearchManager::ObjectSearchManager()
 :
@@ -33,6 +34,13 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
             return;
         }
 
+        // get current object knowledge
+        race_msgs::GetAnchoredObjects anchored_objects_call;
+        if(!ros::service::call("/get_anchored_objects", anchored_objects_call))
+        {
+            ROS_WARN("unable to retrieve object knowledge from anchoring");
+        }
+
         // get current robot pose
         tf::StampedTransform robot_pose, cam_pose;
         m_tf_listener.lookupTransform(m_world_frame_id, m_agent.getRobotPoseFrameId(), ros::Time(0), robot_pose);
@@ -47,6 +55,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
             pose_candidates_call.request.sample_size = 100;
             pose_candidates_call.request.ray_skip = 0.75;
             pose_candidates_call.request.roi = goal.roi;
+            pose_candidates_call.request.objects = anchored_objects_call.response.bounding_boxes;
             pose_candidates_call.request.observation_position.header.frame_id = m_world_frame_id;
             pose_candidates_call.request.observation_position.header.stamp = ros::Time::now();
             tf::pointTFToMsg(m_agent.cam_pose_for_robot_pose(robot_pose).getOrigin(),

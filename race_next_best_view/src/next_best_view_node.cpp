@@ -148,6 +148,25 @@ bool NextBestViewNode::getAxisAlignedBounds(
     return true;
 }
 
+OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<race_msgs::BoundingBox> const & bbox_vec) const
+{
+    OcTreeBoxSet boxSet;
+    for(unsigned int i = 0; i < bbox_vec.size(); i++)
+    {
+        octomath::Vector3 min, max;
+        if(getAxisAlignedBounds(bbox_vec[i], min, max))
+        {
+            octomap::OcTreeKey mink, maxk;
+            if(m_perception_map.getOccupancyMap().coordToKeyChecked(min, mink) &&
+               m_perception_map.getOccupancyMap().coordToKeyChecked(max, maxk))
+            {
+                boxSet.elements.push_back(OcTreeBbox(mink, maxk));
+            }
+        }
+    }
+    return boxSet;
+}
+
 bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request &req,
                                           race_next_best_view::GetBboxOccupancy::Response &res)
 {
@@ -195,20 +214,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     // sampleObservationSpace method and allow to ask for single samples
 
     // translate roi to octomap
-    OcTreeBoxSet roi;
-    for(unsigned int i_roi = 0; i_roi < req.roi.size(); i_roi++)
-    {
-        octomath::Vector3 min, max;
-        if(getAxisAlignedBounds(req.roi[i_roi], min, max))
-        {
-            octomap::OcTreeKey mink, maxk;
-            if(m_perception_map.getOccupancyMap().coordToKeyChecked(min, mink) &&
-               m_perception_map.getOccupancyMap().coordToKeyChecked(max, maxk))
-            {
-                roi.elements.push_back(OcTreeBbox(mink, maxk));
-            }
-        }
-    }
+    OcTreeBoxSet roi = boxSetFromMsg(req.roi);
     unsigned int roi_cell_count = roi.cellCount();
     if(!roi_cell_count)
     {
@@ -217,6 +223,14 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         ((std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.hfov))) *
           std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.vfov))) *
           m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
+    }
+    // translate objects to octomap
+    OcTreeBoxSet objects = boxSetFromMsg(req.objects);
+    if(objects.elements.size() > 64) {
+        ROS_WARN("Sorry, no more than 64 szene objects allowed. Ignoring object knowledge.");
+        objects.elements.clear();
+    } else {
+        ROS_INFO_STREAM("NBV sampling with " << objects.elements.size() << " objects.");
     }
 
     // Some derived camera parameters
@@ -324,7 +338,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
 
         ActivePerceptionMap::OcTreeKeyMap discovery_field;
         discovery_field.rehash(roi_cell_count / discovery_field.max_load_factor()); // reserve enough space
-        OcTreeBoxSet objects; // TODO: This is just an empty dummy
+
         for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
         {
             for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)

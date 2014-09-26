@@ -3,6 +3,7 @@
 
 #include "active_perception_map.h"
 #include "camera_constraints.h"
+#include "octree_regions.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
@@ -11,6 +12,7 @@
 #include <race_next_best_view/GetObjectsToRemove.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <race_next_best_view/ResetVolumes.h>
+#include <race_msgs/BoundingBox.h>
 
 #include <string>
 #include <vector>
@@ -43,6 +45,8 @@ private:
     bool getAxisAlignedBounds(race_msgs::BoundingBox const & bbox,
                               octomath::Vector3 & min,
                               octomath::Vector3 & max) const;
+
+    OcTreeBoxSet boxSetFromMsg(std::vector<race_msgs::BoundingBox> const & bbox_vec) const;
 
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);

@@ -167,12 +167,20 @@ void ActivePerceptionMap::estimateRayGainObjectAware
         octomap::point3d const & camera,
         octomap::point3d const & end,
         OcTreeBoxSet const & roi,
-        OcTreeBoxSet const & objects,
-        OcTreeKeyMap & discovery_field) const
+        OcTreeBoxSet const & object_boxes,
+        ObjectSetMap & object_sets,
+        OcTreeKeyMap & visibility_map) const
 {
     octomath::Vector3 direction = end - camera;
     double length = direction.norm();
-    unsigned int condition = 0;
+    boost::unordered_set<unsigned int> condition;
+    unsigned int condition_id;
+    try {
+        condition_id = object_sets.at(condition);
+    } catch(std::out_of_range& e) {
+        condition_id = object_sets.size();
+        object_sets[condition] = condition_id;
+    }
 
     for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
     {
@@ -180,11 +188,16 @@ void ActivePerceptionMap::estimateRayGainObjectAware
         {
             if(m_occupancy_map.isNodeOccupied(node_ptr))
             {
-                unsigned int hit_obj = objects.getContainingBoxId(ray.getKey());
+                unsigned int hit_obj = object_boxes.getContainingBoxId(ray.getKey());
                 if(hit_obj)
                 {
-                    // Set the i-th bit of the condition, i being the boxes index in objects.elements
-                    condition |= (1 << (hit_obj - 1));
+                    condition.insert(hit_obj - 1);
+                    try {
+                        condition_id = object_sets.at(condition);
+                    } catch(std::out_of_range& e) {
+                        condition_id = object_sets.size();
+                        object_sets[condition] = condition_id;
+                    }
                     continue;
                 }
                 else
@@ -195,11 +208,10 @@ void ActivePerceptionMap::estimateRayGainObjectAware
         }
         else if(roi.elements.empty() || roi.getContainingBoxId(ray.getKey()))
         {
-            discovery_field.insert(OcTreeKeyMap::value_type(ray.getKey(), condition));
+            visibility_map.insert(OcTreeKeyMap::value_type(ray.getKey(), condition_id));
             // It is possible that a cell can be seen with multiple rays that have different conditions
             // (on object corners). Since we simply overwrite conditions that maybe already exist, the outcome
-            // of corner cases is undefined. This could be changed by always setting the condition involving the
-            // least amount of objects (= condition with the lowest hamming weight).
+            // of corner cases is undefined.
         }
     }
 }

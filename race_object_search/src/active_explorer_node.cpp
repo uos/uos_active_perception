@@ -266,8 +266,8 @@ int main(int argc, char** argv)
                                    pose_candidates_call.response.camera_poses.begin(),
                                    pose_candidates_call.response.camera_poses.end());
             candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gain.begin(),
-                                              pose_candidates_call.response.information_gain.end());
+                                              pose_candidates_call.response.information_gains.begin(),
+                                              pose_candidates_call.response.information_gains.end());
         }
 
         ROS_INFO("retrieving pose candidates for fixed position");
@@ -289,8 +289,8 @@ int main(int argc, char** argv)
                                    pose_candidates_call.response.camera_poses.begin(),
                                    pose_candidates_call.response.camera_poses.end());
             candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gain.begin(),
-                                              pose_candidates_call.response.information_gain.end());
+                                              pose_candidates_call.response.information_gains.begin(),
+                                              pose_candidates_call.response.information_gains.end());
         }
 
         ROS_INFO("evaluating pose candidate utility values");

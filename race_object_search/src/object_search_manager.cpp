@@ -71,8 +71,8 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                                    pose_candidates_call.response.camera_poses.begin(),
                                    pose_candidates_call.response.camera_poses.end());
             candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gain.begin(),
-                                              pose_candidates_call.response.information_gain.end());
+                                              pose_candidates_call.response.information_gains.begin(),
+                                              pose_candidates_call.response.information_gains.end());
         }
 
         ROS_INFO("retrieving global pose candidates");
@@ -91,15 +91,15 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                                    pose_candidates_call.response.camera_poses.begin(),
                                    pose_candidates_call.response.camera_poses.end());
             candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gain.begin(),
-                                              pose_candidates_call.response.information_gain.end());
+                                              pose_candidates_call.response.information_gains.begin(),
+                                              pose_candidates_call.response.information_gains.end());
         }
 
         ROS_INFO("evaluating pose candidate utility values");
         std::vector<double> candidate_utilities(pose_candidates.size());
         tf::Pose best_cam_pose; best_cam_pose.setIdentity();
         double best_utility = 0;
-        for(unsigned int i = 0; i < candidate_utilities.size(); i++)
+        for(size_t i = 0; i < candidate_utilities.size(); i++)
         {
             tf::Pose pose_candidate_cam_tf;
             tf::poseMsgToTF(pose_candidates[i], pose_candidate_cam_tf);

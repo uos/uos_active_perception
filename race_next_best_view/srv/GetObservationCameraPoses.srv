@@ -24,5 +24,6 @@ bool lock_height
 race_msgs/BoundingBox[] objects
 ---
 geometry_msgs/Pose[] camera_poses
-float32[] information_gain
-ConditionalVisibilityMap[] cvm
+float32[] information_gains
+ConditionalVisibilityMap[] cvms
+ObjectSet[] object_sets

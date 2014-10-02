@@ -1,3 +1,3 @@
-# A conditional visibility map, mapping n condition bit masks to n sets of octomap cell keys.
-int64[] conditions
-CellKeys[] keys
+# A conditional visibility map, mapping n condition object sets to n sets of octomap cell keys.
+uint32[] object_set_ids
+CellIds[] cell_id_sets

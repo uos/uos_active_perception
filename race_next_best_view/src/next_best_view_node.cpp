@@ -12,8 +12,11 @@
 #include <octomap/octomap.h>
 #include <visualization_msgs/Marker.h>
 #include <boost/random.hpp>
+#include <race_next_best_view/ConditionalVisibilityMap.h>
+#include <race_next_best_view/CellIds.h>
 
 #include <ctime>
+#include <list>
 
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
@@ -225,13 +228,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
           m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
     }
     // translate objects to octomap
-    OcTreeBoxSet objects = boxSetFromMsg(req.objects);
-    if(objects.elements.size() > 64) {
-        ROS_WARN("Sorry, no more than 64 szene objects allowed. Ignoring object knowledge.");
-        objects.elements.clear();
-    } else {
-        ROS_INFO_STREAM("NBV sampling with " << objects.elements.size() << " objects.");
-    }
+    OcTreeBoxSet object_boxes = boxSetFromMsg(req.objects);
+    ActivePerceptionMap::ObjectSetMap object_sets;
+    object_sets.rehash(object_boxes.elements.size() / object_sets.max_load_factor());
+    ROS_INFO_STREAM("NBV sampling with " << object_boxes.elements.size() << " objects.");
 
     // Some derived camera parameters
     double azimuth_min = -m_camera_constraints.hfov / 2.0;
@@ -351,7 +351,12 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
-                m_perception_map.estimateRayGainObjectAware(cam_point, ray_end, roi, objects, discovery_field);
+                m_perception_map.estimateRayGainObjectAware(cam_point,
+                                                            ray_end,
+                                                            roi,
+                                                            object_boxes,
+                                                            object_sets,
+                                                            discovery_field);
             }
         }
         unsigned int gain = discovery_field.size();
@@ -362,7 +367,35 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         if(gain > 0)
         {
             res.camera_poses.push_back(camera_pose_msg);
-            res.information_gain.push_back(gain * std::pow(m_resolution, 3));
+            res.information_gains.push_back(gain * std::pow(m_resolution, 3));
+            // Prepare the conditional visibility map for this sample
+            boost::unordered_map<unsigned int, std::list<unsigned long> > cvm_hashed;
+            for(ActivePerceptionMap::OcTreeKeyMap::iterator it = discovery_field.begin();
+                it != discovery_field.end();
+                ++it)
+            {
+                // convert OcTreeKey to single long id and insert it into the hashed cvm
+                unsigned long cell_id = it->first[0];
+                cell_id = cell_id << 8;
+                cell_id += it->first[1];
+                cell_id = cell_id << 8;
+                cell_id += it->first[1];
+                cvm_hashed[it->second].push_back(cell_id);
+            }
+            // Now build a cvm_msg from the hashed cvm
+            // TODO: These types and conversion functions should probably get their own header
+            race_next_best_view::ConditionalVisibilityMap cvm_msg;
+            for(boost::unordered_map<unsigned int, std::list<unsigned long> >::iterator it = cvm_hashed.begin();
+                it != cvm_hashed.end();
+                ++it)
+            {
+                cvm_msg.object_set_ids.push_back(it->first);
+                race_next_best_view::CellIds cell_ids_msg;
+                cell_ids_msg.cell_ids.reserve(it->second.size());
+                cell_ids_msg.cell_ids.insert(cell_ids_msg.cell_ids.begin(), it->second.begin(), it->second.end());
+                cvm_msg.cell_id_sets.push_back(cell_ids_msg);
+            }
+            res.cvms.push_back(cvm_msg);
         }
 
         // Send a marker
@@ -386,6 +419,15 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.id = sample_id;
         marker.ns = "nbv_samples";
         m_marker_pub.publish(marker);
+    }
+
+    // Write object set ids
+    res.object_sets.resize(object_sets.size());
+    for(ActivePerceptionMap::ObjectSetMap::iterator it = object_sets.begin(); it != object_sets.end(); ++it)
+    {
+        res.object_sets[it->second].objects.reserve(it->first.size());
+        res.object_sets[it->second].objects.insert(
+                    res.object_sets[it->second].objects.begin(), it->first.begin(), it->first.end());
     }
 
     return true;

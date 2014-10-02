@@ -9,11 +9,26 @@
 #include <tf/tf.h>
 #include <visualization_msgs/Marker.h>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
+
 
 class ActivePerceptionMap
 {
 public:
     typedef boost::unordered_map<octomap::OcTreeKey, unsigned int, octomap::OcTreeKey::KeyHash> OcTreeKeyMap;
+    typedef boost::unordered_set<unsigned int> ObjectIdSet;
+    struct ObjectIdSetHash
+    {
+        std::size_t operator()(const ObjectIdSet & t) const
+        {
+              std::size_t val = 0;
+              for(ObjectIdSet::iterator it = t.begin(); it != t.end(); ++it) {
+                  val += *it;
+              }
+              return val;
+        }
+    };
+    typedef boost::unordered_map<ObjectIdSet, unsigned int, ObjectIdSetHash> ObjectSetMap;
 
     ActivePerceptionMap(double const & resolution);
 
@@ -32,8 +47,9 @@ public:
     void estimateRayGainObjectAware(octomap::point3d const & camera,
                                     octomap::point3d const & end,
                                     OcTreeBoxSet const & roi,
-                                    OcTreeBoxSet const & objects,
-                                    OcTreeKeyMap & discovery_field) const;
+                                    OcTreeBoxSet const & object_boxes,
+                                    ObjectSetMap & object_sets,
+                                    OcTreeKeyMap & visibility_map) const;
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
     std::vector<octomap::point3d> genBoundaryFringeCenters(octomap::point3d const & min,

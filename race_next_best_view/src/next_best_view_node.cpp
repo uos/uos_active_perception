@@ -208,6 +208,7 @@ bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy:
 bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request& req,
                                                    race_next_best_view::GetObservationCameraPoses::Response& res)
 {
+    ros::Time callback_timeout = ros::Time::now() + req.timeout;
     ObservationPoseSampler ops(m_camera_constraints);
     boost::mt19937 rng(std::time(0));
     boost::uniform_01<> rand_u01;
@@ -315,6 +316,11 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
 
     for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
     {
+        // Abort if there is no time left
+        if(req.timeout > ros::Duration(0,0) && ros::Time::now() > callback_timeout) {
+            break;
+        }
+
         tf::Transform sample;
         if(observation_position_set)
         {

@@ -13,6 +13,7 @@
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <race_next_best_view/ResetVolumes.h>
 #include <race_msgs/BoundingBox.h>
+#include <boost/thread/mutex.hpp>
 
 #include <string>
 #include <vector>
@@ -37,6 +38,7 @@ private:
     ActivePerceptionMap m_perception_map;
     double m_resolution, m_ray_skip;
     std::string m_world_frame_id;
+    boost::mutex m_map_mutex;
 
     static double getIntersectionVolume(const octomath::Vector3 &box1min, const octomath::Vector3 &box1max,
                                         const octomath::Vector3 &box2min, const octomath::Vector3 &box2max);

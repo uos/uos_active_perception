@@ -17,6 +17,7 @@
 
 #include <ctime>
 #include <list>
+#include <memory>
 
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
@@ -173,6 +174,7 @@ OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<race_msgs::BoundingBox>
 bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request &req,
                                           race_next_best_view::GetBboxOccupancy::Response &res)
 {
+    boost::mutex::scoped_lock lock(m_map_mutex);
     octomath::Vector3 min, max;
     getAxisAlignedBounds(req.bbox, min, max);
     double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
@@ -234,6 +236,13 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     object_sets.rehash(object_boxes.elements.size() / object_sets.max_load_factor());
     ROS_INFO_STREAM("NBV sampling with " << object_boxes.elements.size() << " objects.");
 
+    // make local copy of the map, so that sampling and mapping can occur in parallel
+    std::auto_ptr<ActivePerceptionMap> map;
+    {
+        boost::mutex::scoped_lock lock(m_map_mutex);
+        map.reset(new ActivePerceptionMap(m_perception_map));
+    }
+
     // Some derived camera parameters
     double azimuth_min = -m_camera_constraints.hfov / 2.0;
     double azimuth_max =  m_camera_constraints.hfov / 2.0;
@@ -257,19 +266,19 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         if(req.roi.empty())
         {
             // If the requested roi is empty, use all fringe voxels
-            fringe_centers = m_perception_map.getFringeCenters();
+            fringe_centers = map->getFringeCenters();
         }
         for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
         {
             OcTreeBbox box = roi.elements[i_roi];
-            octomath::Vector3 min = m_perception_map.getFringeMap().keyToCoord(box.min);
-            octomath::Vector3 max = m_perception_map.getFringeMap().keyToCoord(box.max);
+            octomath::Vector3 min = map->getFringeMap().keyToCoord(box.min);
+            octomath::Vector3 max = map->getFringeMap().keyToCoord(box.max);
             std::vector<octomap::point3d> roi_fringe_centers;
             // add fringe voxels within the roi
-            roi_fringe_centers = m_perception_map.getFringeCenters(min, max);
+            roi_fringe_centers = map->getFringeCenters(min, max);
             fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
             // generate fringe voxels at roi boundary
-            roi_fringe_centers = m_perception_map.genBoundaryFringeCenters(min, max);
+            roi_fringe_centers = map->genBoundaryFringeCenters(min, max);
             fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
         }
         if(fringe_centers.empty()) return true;
@@ -357,12 +366,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                                            m_camera_constraints.range_max * std::sin(azimuth),
                                            m_camera_constraints.range_max * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
-                m_perception_map.estimateRayGainObjectAware(cam_point,
-                                                            ray_end,
-                                                            roi,
-                                                            object_boxes,
-                                                            object_sets,
-                                                            discovery_field);
+                map->estimateRayGainObjectAware(cam_point, ray_end, roi, object_boxes, object_sets, discovery_field);
             }
         }
         unsigned int gain = discovery_field.size();
@@ -471,7 +475,13 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
 
     // Integrate point cloud
-    m_perception_map.integratePointCloud(octomap_cloud, octomap::poseTfToOctomap(sensor_to_world_tf), camera_to_world_tf, m_camera_constraints);
+    {
+        boost::mutex::scoped_lock lock(m_map_mutex);
+        m_perception_map.integratePointCloud(octomap_cloud,
+                                             octomap::poseTfToOctomap(sensor_to_world_tf),
+                                             camera_to_world_tf,
+                                             m_camera_constraints);
+    }
 
     // Publish rviz map visualization
     visualization_msgs::Marker marker = m_perception_map.genOccupancyMarker();
@@ -493,6 +503,7 @@ bool NextBestViewNode::resetVolumesCb
         race_next_best_view::ResetVolumes::Request & req,
         race_next_best_view::ResetVolumes::Response & resp)
 {
+    boost::mutex::scoped_lock lock(m_map_mutex);
     bool success = true;
     for(std::vector<race_msgs::BoundingBox>::iterator it = req.volumes.begin();
         it < req.volumes.end();
@@ -516,5 +527,5 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "next_best_view_node");
     NextBestViewNode node;
     ROS_INFO("next_best_view_node: Initialized!");
-    ros::spin();
+    ros::MultiThreadedSpinner(4).spin();
 }

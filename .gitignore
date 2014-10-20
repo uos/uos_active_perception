@@ -32,3 +32,5 @@ Makefile.ros
 asp_msgs/src/asp_msgs/__init__.py
 asp_spatial_reasoning/src/asp_spatial_reasoning/__init__.py
 CMakeLists.txt.user
+race_next_best_view/src/race_next_best_view/__init__.py
+race_object_search/src/race_object_search/__init__.py

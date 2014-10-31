@@ -38,17 +38,21 @@ public:
 
     tf::Pose robot_pose_for_cam_pose(tf::Pose const & cam_pose) const;
 
-    double estimate_move_time(tf::Pose const & robot_pose,
-                              tf::Pose const & cam_pose,
-                              tf::Pose const & target_cam_pose,
-                              std::string const & world_frame_id) const;
+    std::vector<double> estimate_move_times(std::vector<tf::Pose> const & cam_poses,
+                                            std::vector<tf::Pose> const & base_poses,
+                                            std::vector<size_t> const & start_pose_idxs,
+                                            std::vector<size_t> const & target_pose_idxs,
+                                            size_t const n_clusters,
+                                            std::string const & world_frame_id) const;
 
     bool is_move_base_required(tf::Pose const & robot_pose,
                                tf::Pose const & target_cam_pose) const;
 
-    double estimate_move_base_time(tf::Pose const & current_robot_pose,
-                                   tf::Pose const & target_robot_pose,
-                                   std::string const & frame_id) const;
+    std::vector<double> estimate_move_base_times(std::vector<tf::Pose> const & poses,
+                                                 std::vector<size_t> const & start_pose_idxs,
+                                                 std::vector<size_t> const & target_pose_idxs,
+                                                 size_t const n_clusters,
+                                                 std::string const & frame_id) const;
 
     bool achieve_cam_pose(tf::Pose const & current_base_pose,
                           tf::Pose const & current_cam_pose,
@@ -59,7 +63,7 @@ private:
     double static const CAM_HEIGHT = 1.5;
 
     // execution speed constants
-    double static const DRIVE_SPEED = 0.25; // [m/s]
+    double static const DRIVE_SPEED = 0.15; // [m/s]
     double static const TURN_SPEED = 0.5; // [rad/s]
     double static const LIFT_SPEED = 0.02; // [m/s]
     double static const HEAD_SPEED = 3.14; // [rad/s]

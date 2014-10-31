@@ -1,5 +1,7 @@
 #include "object_search_manager.h"
 
+#include "observation_pose_collection.h"
+
 #include <visualization_msgs/Marker.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <race_msgs/GetAnchoredObjects.h>
@@ -46,8 +48,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         m_tf_listener.lookupTransform(m_world_frame_id, m_agent.getRobotPoseFrameId(), ros::Time(0), robot_pose);
         m_tf_listener.lookupTransform(m_world_frame_id, m_agent.getRobotCameraFrameId(), ros::Time(0), cam_pose);
 
-        std::vector<geometry_msgs::Pose> pose_candidates;
-        std::vector<double> candidate_information_gain;
+        ObservationPoseCollection opc;
 
         ROS_INFO("retrieving local pose candidates");
         {
@@ -67,12 +68,9 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                 ros::Duration(5).sleep();
                 continue;
             }
-            pose_candidates.insert(pose_candidates.end(),
-                                   pose_candidates_call.response.camera_poses.begin(),
-                                   pose_candidates_call.response.camera_poses.end());
-            candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gains.begin(),
-                                              pose_candidates_call.response.information_gains.end());
+            opc.addPoses(pose_candidates_call.response.camera_poses,
+                         pose_candidates_call.response.cvms,
+                         pose_candidates_call.response.object_sets);
         }
 
         ROS_INFO("retrieving global pose candidates");
@@ -87,32 +85,33 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                 ros::Duration(5).sleep();
                 continue;
             }
-            pose_candidates.insert(pose_candidates.end(),
-                                   pose_candidates_call.response.camera_poses.begin(),
-                                   pose_candidates_call.response.camera_poses.end());
-            candidate_information_gain.insert(candidate_information_gain.end(),
-                                              pose_candidates_call.response.information_gains.begin(),
-                                              pose_candidates_call.response.information_gains.end());
+            opc.addPoses(pose_candidates_call.response.camera_poses,
+                         pose_candidates_call.response.cvms,
+                         pose_candidates_call.response.object_sets);
         }
 
+        ROS_INFO("building travel time lookup tables");
+        ros::Time t0 = ros::Time::now();
+        opc.prepareInitialTravelTimeLut(m_agent, robot_pose, cam_pose, m_world_frame_id);
+        opc.dumpInitialTravelTimeMap();
+        ROS_INFO_STREAM("building initial tt lut took: " << (ros::Time::now()-t0).toSec());
+
+        t0 = ros::Time::now();
+        opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
+        ROS_INFO_STREAM("building mutual tt lut took: " << (ros::Time::now()-t0).toSec());
+
         ROS_INFO("evaluating pose candidate utility values");
-        std::vector<double> candidate_utilities(pose_candidates.size());
-        tf::Pose best_cam_pose; best_cam_pose.setIdentity();
+        std::vector<double> candidate_utilities(opc.getPoses().size());
+        size_t best_pose_idx;
         double best_utility = 0;
         for(size_t i = 0; i < candidate_utilities.size(); i++)
         {
-            tf::Pose pose_candidate_cam_tf;
-            tf::poseMsgToTF(pose_candidates[i], pose_candidate_cam_tf);
-
-            candidate_utilities[i] = candidate_information_gain[i] /
-                                     m_agent.estimate_move_time(robot_pose,
-                                                                cam_pose,
-                                                                pose_candidate_cam_tf,
-                                                                m_world_frame_id);
+            candidate_utilities[i] = opc.getPoses()[i].cell_id_sets[0].size() /
+                                     opc.getInitialTravelTime(i);
 
             if(candidate_utilities[i] > best_utility)
             {
-                best_cam_pose = pose_candidate_cam_tf;
+                best_pose_idx = i;
                 best_utility = candidate_utilities[i];
             }
         }
@@ -124,7 +123,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         }
 
         // do it
-        if(m_agent.achieve_cam_pose(robot_pose, cam_pose, best_cam_pose, m_world_frame_id))
+        if(m_agent.achieve_cam_pose(robot_pose, cam_pose, opc.getPoses()[best_pose_idx].pose, m_world_frame_id))
         {
             // wait for acquisition
             ros::Duration(m_agent.get_acquisition_time()).sleep();

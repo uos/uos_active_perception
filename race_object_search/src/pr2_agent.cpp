@@ -1,6 +1,13 @@
 #include "pr2_agent.h"
 
-#include <nav_msgs/GetPlan.h>
+#include "kmeans.h"
+
+#include <move_base/GetMultiplePlans.h>
+#include <nav_msgs/Path.h>
+
+#include <map>
+#include <sstream>
+#include <fstream>
 
 Pr2Agent::Pr2Agent()
 :
@@ -39,36 +46,42 @@ tf::Pose Pr2Agent::robot_pose_for_cam_pose(tf::Pose const & cam_pose) const
     return tf::Pose(base_rotation, base_position);
 }
 
-double Pr2Agent::estimate_move_time
+std::vector<double> Pr2Agent::estimate_move_times
 (
-        tf::Pose const & current_base_pose,
-        tf::Pose const & current_cam_pose,
-        tf::Pose const & target_cam_pose,
+        std::vector<tf::Pose> const & cam_poses,
+        std::vector<tf::Pose> const & base_poses,
+        std::vector<size_t> const & start_pose_idxs,
+        std::vector<size_t> const & target_pose_idxs,
+        size_t const n_clusters,
         std::string const & world_frame_id) const
 {
-    // initialize exec_time with constant data acquisition time
-    double exec_time = ACQUISITION_TIME;
+    // estimate move_base times
+    std::vector<double> times = estimate_move_base_times(base_poses,
+                                                         start_pose_idxs,
+                                                         target_pose_idxs,
+                                                         n_clusters,
+                                                         world_frame_id);
 
-    // calculate the time needed to move_base
-    if(is_move_base_required(current_base_pose, target_cam_pose))
-    {
-        exec_time += estimate_move_base_time(current_base_pose,
-                                             robot_pose_for_cam_pose(target_cam_pose),
-                                             world_frame_id);
+    for(size_t i = 0; i < times.size(); ++i) {
+        // constant data acquisition time
+        times[i] += ACQUISITION_TIME;
+
+        // calculate time needed to turn the camera
+        // TODO: This gives only a correct result when the base is not rotated
+        // TODO: Also, turning the camera 180 deg to the back does not work
+        times[i] += cam_poses[start_pose_idxs[i]].getRotation().angleShortestPath(
+                        cam_poses[target_pose_idxs[i]].getRotation()) / HEAD_SPEED;
+
+        // calculate time needed to lift the torso
+        double dz = std::abs(cam_poses[start_pose_idxs[i]].getOrigin().getZ() -
+                             cam_poses[target_pose_idxs[i]].getOrigin().getZ());
+        if(dz > TRANSLATIONAL_TOLERANCE)
+        {
+            times[i] += dz / LIFT_SPEED;
+        }
     }
 
-    // calculate time needed to turn the camera
-    // TODO: Split into pitch and yaw
-    exec_time += current_cam_pose.getRotation().angleShortestPath(target_cam_pose.getRotation()) / HEAD_SPEED;
-
-    // calculate time needed to lift the torso
-    double dz = std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ());
-    if(dz > TRANSLATIONAL_TOLERANCE)
-    {
-        exec_time += dz / LIFT_SPEED;
-    }
-
-    return exec_time;
+    return times;
 }
 
 bool Pr2Agent::is_move_base_required
@@ -83,48 +96,130 @@ bool Pr2Agent::is_move_base_required
     return distance > TRANSLATIONAL_TOLERANCE;
 }
 
-double Pr2Agent::estimate_move_base_time
+std::vector<double> Pr2Agent::estimate_move_base_times
 (
-        tf::Pose const & current_base_pose,
-        tf::Pose const & target_base_pose,
+        std::vector<tf::Pose> const & poses,
+        std::vector<size_t> const & start_pose_idxs,
+        std::vector<size_t> const & target_pose_idxs,
+        size_t const n_clusters,
         std::string const & frame_id) const
-{
-    if(is_move_base_required(current_base_pose, cam_pose_for_robot_pose(target_base_pose)))
-    {
-        // generate path planner request
-        nav_msgs::GetPlan get_plan_call;
-        tf::poseTFToMsg(current_base_pose, get_plan_call.request.start.pose);
-        get_plan_call.request.start.header.frame_id = frame_id;
-        get_plan_call.request.start.header.stamp = ros::Time::now();
-        tf::poseTFToMsg(target_base_pose, get_plan_call.request.goal.pose);
-        get_plan_call.request.goal.header = get_plan_call.request.start.header;
-        get_plan_call.request.tolerance = TRANSLATIONAL_TOLERANCE;
-        if(!ros::service::call("/move_base_node/make_plan", get_plan_call))
-        {
-            ROS_WARN("make_plan call failed");
-            return std::numeric_limits<double>::infinity();
-        }
-        std::vector<geometry_msgs::PoseStamped> const & path = get_plan_call.response.plan.poses;
-        if(path.empty())
-        {
-            // no plan found
-            return std::numeric_limits<double>::infinity();
-        }
-        double path_len = 0, path_curvature = 0;
-        for(unsigned int i_path = 1; i_path < path.size(); i_path++)
-        {
-            tf::Pose p1, p2;
-            tf::poseMsgToTF(path[i_path - 1].pose, p1);
-            tf::poseMsgToTF(path[i_path].pose, p2);
-            path_len += p1.getOrigin().distance(p2.getOrigin());
-            path_curvature += p1.getRotation().angleShortestPath(p2.getRotation());
-        }
-        return path_len / DRIVE_SPEED + path_curvature / TURN_SPEED;
+{  
+    assert(start_pose_idxs.size() == target_pose_idxs.size());
+    std::vector<double> times(start_pose_idxs.size(), std::numeric_limits<double>::infinity());
+
+    // Do k-means clustering for all points to minimize actual path planning costs
+    std::vector<Kmeans::Point> points(poses.size());
+    for(size_t i = 0; i < poses.size(); ++i) {
+        points[i].x = poses[i].getOrigin().getX();
+        points[i].y = poses[i].getOrigin().getY();
     }
-    else
-    {
-        return 0;
+    Kmeans km(1, points);
+    for(size_t i = 1; i < n_clusters; ++i) {
+        km.addCluster();
     }
+    ROS_INFO_STREAM("k-means completed with max_remote_distance=" << km.getMaxRemoteDistance());
+    // Uncomment to dump clustering result
+    // km.writeTabFiles();
+
+    // Compile a map of (origin,target):path between clusters
+    typedef std::map<std::pair<size_t, size_t>, std::pair<double, double> > cluster_pathmap_t;
+    cluster_pathmap_t cluster_pathmap;
+    for(size_t i = 0; i < start_pose_idxs.size(); ++i) {
+        size_t origin_cluster = km.getAssignment()[start_pose_idxs[i]];
+        size_t target_cluster = km.getAssignment()[target_pose_idxs[i]];
+        cluster_pathmap[std::pair<size_t, size_t>(origin_cluster, target_cluster)] =
+                std::make_pair(-std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity());
+    }
+
+    // generate path planner request
+    move_base::GetMultiplePlans get_plans_call;
+    get_plans_call.request.start.resize(cluster_pathmap.size());
+    get_plans_call.request.goal.resize(cluster_pathmap.size());
+    {
+        size_t i = 0;
+        for(cluster_pathmap_t::iterator it = cluster_pathmap.begin(); it != cluster_pathmap.end(); ++it) {
+            tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.first]], get_plans_call.request.start[i].pose);
+            get_plans_call.request.start[i].header.frame_id = frame_id;
+            get_plans_call.request.start[i].header.stamp = ros::Time::now();
+            tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.second]], get_plans_call.request.goal[i].pose);
+            get_plans_call.request.goal[i].header = get_plans_call.request.start[i].header;
+            ++i;
+        }
+    }
+    // call move_base
+    if(!ros::service::call("/move_base_node/make_multiple_plans", get_plans_call)) {
+        ROS_WARN("make_multiple_plans call failed");
+        return times;
+    }
+
+    // Uncomment to dump all generated paths to tab files
+    /*
+    for(size_t i = 0; i < get_plans_call.response.plans.size(); ++i) {
+        std::stringstream ss;
+        ss << "path_" << i << ".tab";
+        std::ofstream f;
+        f.open(ss.str().c_str());
+        f << "x\ty\ttype\n";
+        f << "c\tc\td\n";
+        f << "\t\tc\n";
+        f << get_plans_call.request.start[i].pose.position.x << "\t"
+          << get_plans_call.request.start[i].pose.position.y << "\t" << "start" << "\n";
+        for(size_t j = 0; j < get_plans_call.response.plans[i].poses.size(); ++j) {
+            f << get_plans_call.response.plans[i].poses[j].pose.position.x << "\t"
+              << get_plans_call.response.plans[i].poses[j].pose.position.y << "\t" << "path" << "\n";
+        }
+        f << get_plans_call.request.goal[i].pose.position.x << "\t"
+          << get_plans_call.request.goal[i].pose.position.y << "\t" << "goal" << "\n";
+        f.close();
+        ss.str("");
+        ss << "path_" << i << ".txt";
+        f.open(ss.str().c_str());
+        f << get_plans_call.response.plans[i];
+        f.close();
+    }
+    */
+
+    // Fill the cluster_pathmap with (length, curvature) of each path
+    {
+        size_t i = 0;
+        for(cluster_pathmap_t::iterator it = cluster_pathmap.begin(); it != cluster_pathmap.end(); ++it) {
+            double length = 0, curvature = 0;
+            std::vector<geometry_msgs::PoseStamped> const & p = get_plans_call.response.plans[i].poses;
+            if(p.empty()) {
+                length = std::numeric_limits<double>::infinity();
+            } else {
+                double x1 = p[0].pose.position.x;
+                double y1 = p[0].pose.position.y;
+                for(size_t i_path = 1; i_path + 1 < p.size(); i_path++) {
+                    double x2 = p[i_path].pose.position.x;
+                    double y2 = p[i_path].pose.position.y;
+                    length += std::sqrt(std::pow(x1-x2, 2) + std::pow(y1-y2, 2));
+                    // TODO: calculate curvature
+                    x1 = x2;
+                    y1 = y2;
+                }
+            }
+            it->second = std::make_pair(length, curvature);
+            ++i;
+        }
+    }
+
+    for(size_t i = 0; i < times.size(); ++i) {
+        size_t start_pose_idx = start_pose_idxs[i];
+        size_t target_pose_idx = target_pose_idxs[i];
+        // Figure out the correct connecting path
+        size_t origin_cluster = km.getAssignment()[start_pose_idx];
+        size_t target_cluster = km.getAssignment()[target_pose_idx];
+        std::pair<double, double> const & path_length_curvature =
+                cluster_pathmap[std::make_pair(origin_cluster, target_cluster)];
+        // Estimate time
+        times[i] = path_length_curvature.first / DRIVE_SPEED
+                   + path_length_curvature.second / TURN_SPEED
+                   + poses[start_pose_idxs[i]].getRotation().angleShortestPath(
+                     poses[target_pose_idxs[i]].getRotation()) / TURN_SPEED;
+    }
+
+    return times;
 }
 
 bool Pr2Agent::achieve_cam_pose
@@ -144,7 +239,7 @@ bool Pr2Agent::achieve_cam_pose
         goal.target_pose.header.stamp = ros::Time::now();
         tf::poseTFToMsg(target_base_pose, goal.target_pose.pose);
 
-        double timeout = estimate_move_base_time(current_base_pose, target_base_pose, world_frame_id);
+        double timeout = 7;//estimate_move_base_time(current_base_pose, target_base_pose, world_frame_id);
         if(timeout > 9000)
         {
             return false;

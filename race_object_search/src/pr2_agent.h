@@ -63,7 +63,7 @@ private:
     double static const CAM_HEIGHT = 1.5;
 
     // execution speed constants
-    double static const DRIVE_SPEED = 0.15; // [m/s]
+    double static const DRIVE_SPEED = 0.25; // [m/s]
     double static const TURN_SPEED = 0.5; // [rad/s]
     double static const LIFT_SPEED = 0.02; // [m/s]
     double static const HEAD_SPEED = 3.14; // [rad/s]

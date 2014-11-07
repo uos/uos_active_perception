@@ -239,7 +239,14 @@ bool Pr2Agent::achieve_cam_pose
         goal.target_pose.header.stamp = ros::Time::now();
         tf::poseTFToMsg(target_base_pose, goal.target_pose.pose);
 
-        double timeout = 7;//estimate_move_base_time(current_base_pose, target_base_pose, world_frame_id);
+        std::vector<tf::Pose> poses(2);
+        poses[0] = current_base_pose;
+        poses[1] = target_base_pose;
+        double timeout = estimate_move_base_times(poses,
+                                                  std::vector<size_t>(1, 0),
+                                                  std::vector<size_t>(1, 1),
+                                                  2,
+                                                  world_frame_id)[0];
         if(timeout > 9000)
         {
             return false;

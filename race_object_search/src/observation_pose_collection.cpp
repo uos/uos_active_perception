@@ -30,22 +30,22 @@ void ObservationPoseCollection::addPoses
     }
 }
 
-std::vector<ObservationPose> const & ObservationPoseCollection::getPoses()
+std::vector<ObservationPose> const & ObservationPoseCollection::getPoses() const
 {
     return m_observation_poses;
 }
 
-double ObservationPoseCollection::getInitialTravelTime(size_t target_idx)
+double ObservationPoseCollection::getInitialTravelTime(size_t target_idx) const
 {
     return m_initial_travel_time_lut[target_idx];
 }
 
-double ObservationPoseCollection::getTravelTime(size_t start_idx, size_t target_idx)
+double ObservationPoseCollection::getTravelTime(size_t start_idx, size_t target_idx) const
 {
     return m_travel_time_lut[getTtLutIdx(start_idx, target_idx)];
 }
 
-void ObservationPoseCollection::dumpInitialTravelTimeMap()
+void ObservationPoseCollection::dumpInitialTravelTimeMap() const
 {
     std::ofstream f;
     f.open ("initial_travel_times.tab");
@@ -56,4 +56,24 @@ void ObservationPoseCollection::dumpInitialTravelTimeMap()
         f << m_observation_poses[i].pose.getOrigin().getX() << "\t" << m_observation_poses[i].pose.getOrigin().getY() << "\t" << m_initial_travel_time_lut[i] << "\n";
     }
     f.close();
+}
+
+size_t ObservationPoseCollection::pruneUnreachablePoses()
+{
+    size_t n_pruned = 0;
+    std::vector<ObservationPose> pruned_observation_poses;
+    std::vector<double> pruned_initial_travel_time_lut;
+    pruned_observation_poses.reserve(m_observation_poses.size());
+    pruned_initial_travel_time_lut.reserve(m_initial_travel_time_lut.size());
+    for(size_t i = 0; i < m_observation_poses.size(); ++i) {
+        if(m_initial_travel_time_lut[i] < std::numeric_limits<double>::infinity()) {
+            pruned_observation_poses.push_back(m_observation_poses[i]);
+            pruned_initial_travel_time_lut.push_back(m_initial_travel_time_lut[i]);
+        } else {
+            ++n_pruned;
+        }
+    }
+    m_observation_poses = pruned_observation_poses;
+    m_initial_travel_time_lut = pruned_initial_travel_time_lut;
+    return n_pruned;
 }

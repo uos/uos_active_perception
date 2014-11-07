@@ -96,6 +96,9 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         opc.dumpInitialTravelTimeMap();
         ROS_INFO_STREAM("building initial tt lut took: " << (ros::Time::now()-t0).toSec());
 
+        size_t n_pruned = opc.pruneUnreachablePoses();
+        ROS_INFO_STREAM("Pruned " << n_pruned << " unreachable poses");
+
         t0 = ros::Time::now();
         opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
         ROS_INFO_STREAM("building mutual tt lut took: " << (ros::Time::now()-t0).toSec());

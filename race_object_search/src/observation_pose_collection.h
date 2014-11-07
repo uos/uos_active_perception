@@ -25,13 +25,15 @@ public:
                   std::vector<race_next_best_view::ConditionalVisibilityMap> const & new_cvms,
                   std::vector<race_next_best_view::ObjectSet> const & new_object_sets);
 
-    std::vector<ObservationPose> const & getPoses();
+    std::vector<ObservationPose> const & getPoses() const;
 
-    double getInitialTravelTime(size_t target_idx);
+    double getInitialTravelTime(size_t target_idx) const;
 
-    double getTravelTime(size_t start_idx, size_t target_idx);
+    double getTravelTime(size_t start_idx, size_t target_idx) const;
 
-    void dumpInitialTravelTimeMap();
+    void dumpInitialTravelTimeMap() const;
+
+    size_t pruneUnreachablePoses();
 
     template <class Agent>
     void prepareInitialTravelTimeLut

@@ -79,6 +79,7 @@ public:
             std::string const & world_frame_id
     ){
         size_t n = m_observation_poses.size();
+        if(!n) return;
         size_t lut_size = getTtLutIdx(n, 0);
 
         std::vector<tf::Pose> cam_poses;

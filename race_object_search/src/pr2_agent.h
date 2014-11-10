@@ -67,10 +67,10 @@ private:
     double static const TURN_SPEED = 0.5; // [rad/s]
     double static const LIFT_SPEED = 0.02; // [m/s]
     double static const HEAD_SPEED = 3.14; // [rad/s]
-    // ACQUISITION_TIME should include the complete timespan needed to obtain and integrate sensor data once the
-    // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 7.0 here)
-    double static const ACQUISITION_TIME = 1.0; // 7.0;
     double static const TRANSLATIONAL_TOLERANCE = 0.1;
+
+    // read as ros parameter
+    double ACQUISITION_TIME;
 
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> m_move_base_client;
     actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> m_point_head_client;

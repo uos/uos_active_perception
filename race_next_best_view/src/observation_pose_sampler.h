@@ -16,7 +16,7 @@ public:
     /**
       ASSUMPTION: Camera constraints are defined in the world frame.
       */
-    ObservationPoseSampler(CameraConstraints const & cam_constraints, unsigned long seed = std::time(0));
+    ObservationPoseSampler(CameraConstraints const & cam_constraints, double range_tolerance, unsigned long seed = std::time(0));
 
     tf::Transform genObservationSample(octomath::Vector3 const & poi);
 

@@ -3,12 +3,14 @@
 #include <stdexcept>
 
 
-ObservationPoseSampler::ObservationPoseSampler(CameraConstraints const & cam_constraints, unsigned long int seed)
+ObservationPoseSampler::ObservationPoseSampler(CameraConstraints const & cam_constraints, double range_tolerance, unsigned long int seed)
 :
     m_camera_constraints(cam_constraints),
     m_rng(seed),
     m_rand_u01()
-{}
+{
+    m_camera_constraints.range_max -= range_tolerance;
+}
 
 tf::Transform ObservationPoseSampler::genObservationSample(octomath::Vector3 const & poi)
 {

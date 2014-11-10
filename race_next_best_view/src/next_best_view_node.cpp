@@ -49,6 +49,7 @@ NextBestViewNode::NextBestViewNode() :
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("ray_skip"      , m_ray_skip      , 1.00);
+    m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.1);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
     // Set camera constraints from parameters (Defaults: xtion on calvin)
@@ -211,7 +212,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                                                    race_next_best_view::GetObservationCameraPoses::Response& res)
 {
     ros::Time callback_timeout = ros::Time::now() + req.timeout;
-    ObservationPoseSampler ops(m_camera_constraints);
+    ObservationPoseSampler ops(m_camera_constraints, m_camera_range_tolerance);
     boost::mt19937 rng(std::time(0));
     boost::uniform_01<> rand_u01;
     // TODO: Shrink the ROI to an area that is in principle observable
@@ -248,9 +249,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     double azimuth_max =  m_camera_constraints.hfov / 2.0;
     double inclination_min = -m_camera_constraints.vfov / 2.0;
     double inclination_max =  m_camera_constraints.vfov / 2.0;
+    double ray_length = m_camera_constraints.range_max - m_camera_range_tolerance;
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment =
-            std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(m_camera_constraints.range_max, 2))));
+    double angle_increment = std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(ray_length, 2))));
 
     bool observation_position_set = !req.observation_position.header.frame_id.empty();
     std::vector<octomap::point3d> fringe_centers;
@@ -362,9 +363,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                 {
                     continue;
                 }
-                tf::Vector3 ray_end_in_cam(m_camera_constraints.range_max * std::cos(azimuth),
-                                           m_camera_constraints.range_max * std::sin(azimuth),
-                                           m_camera_constraints.range_max * std::sin(inclination));
+                tf::Vector3 ray_end_in_cam(ray_length * std::cos(azimuth),
+                                           ray_length * std::sin(azimuth),
+                                           ray_length * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
                 map->estimateRayGainObjectAware(cam_point, ray_end, roi, object_boxes, object_sets, discovery_field);
             }

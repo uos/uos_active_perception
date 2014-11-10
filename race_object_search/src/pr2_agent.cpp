@@ -17,7 +17,7 @@ Pr2Agent::Pr2Agent()
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
     // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 7.0 here)
-    ros::param::param<double>("acquisition_time", ACQUISITION_TIME, 1.0);
+    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 1.0);
 
     while(!m_move_base_client.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the move_base action server to come up");

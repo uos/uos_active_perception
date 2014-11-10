@@ -9,7 +9,6 @@
     <remap from="cloud_out" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
   </node>
   <node name="next_best_view_node" pkg="race_next_best_view" type="next_best_view_node" output="screen" respawn="true">
-    <param name="ray_skip" type="double" value="5" />
     <!-- camera constraints (fixed kinect on gazebo pr2)-->
     <param name="height_min" type="double" value="1.4876" />
     <param name="height_max" type="double" value="1.591" />

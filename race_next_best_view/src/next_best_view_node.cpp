@@ -48,7 +48,6 @@ NextBestViewNode::NextBestViewNode() :
     m_perception_map(0.01)
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
-    m_node_handle.param("ray_skip"      , m_ray_skip      , 1.00);
     m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.1);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 

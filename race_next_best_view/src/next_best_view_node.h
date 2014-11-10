@@ -36,7 +36,7 @@ private:
     ros::Publisher m_marker_pub;
     CameraConstraints m_camera_constraints;
     ActivePerceptionMap m_perception_map;
-    double m_resolution, m_ray_skip, m_camera_range_tolerance;
+    double m_resolution, m_camera_range_tolerance;
     std::string m_world_frame_id;
     boost::mutex m_map_mutex;
 

@@ -11,10 +11,12 @@
 #include <cassert>
 #include <stdint.h>
 
+typedef boost::unordered_set<uint64_t> detection_t;
+
 struct ObservationPose
 {
     tf::Pose pose;
-    std::vector<boost::unordered_set<uint64_t> > cell_id_sets;
+    std::vector<detection_t> cell_id_sets;
     std::vector<uint32_t> object_set_ids;
 };
 

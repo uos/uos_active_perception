@@ -47,6 +47,7 @@ int main(int argc, char** argv)
     actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("/observe_volumes", true);
     race_object_search::ObserveVolumesGoal goal;
     goal.roi.push_back(box);
+    goal.p = std::vector<float>(goal.roi.size(), 1.0 / goal.roi.size());
     ac.waitForServer();
     ROS_INFO("Sending goal...");
     ac.sendGoal(goal);

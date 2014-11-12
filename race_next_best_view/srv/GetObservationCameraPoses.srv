@@ -10,6 +10,7 @@
 # - objects: List of bounding boxes for moveable objects in the scene.
 #
 # Response:
+# - roi_cell_counts: Number of cells in the requested regions of interest
 # - camera_poses: A List of camera poses in the world coordinate frame from which the ROI can be observed,
 # - information_gain: A list of expected information gain for each camera pose.
 #                     Information gain is measured as revealed space [m^3]
@@ -23,6 +24,7 @@ geometry_msgs/PointStamped observation_position
 bool lock_height
 race_msgs/BoundingBox[] objects
 ---
+uint32[] roi_cell_counts
 geometry_msgs/Pose[] camera_poses
 float32[] information_gains
 ConditionalVisibilityMap[] cvms

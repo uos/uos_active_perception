@@ -230,6 +230,11 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
           std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.vfov))) *
           m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
     }
+    // fill roi_cell_counts of answer
+    res.roi_cell_counts.resize(roi.elements.size());
+    for(size_t i = 0; i < roi.elements.size(); ++i) {
+        res.roi_cell_counts[i] = roi.elements[i].cellCount();
+    }
     // translate objects to octomap
     OcTreeBoxSet object_boxes = boxSetFromMsg(req.objects);
     ActivePerceptionMap::ObjectSetMap object_sets;

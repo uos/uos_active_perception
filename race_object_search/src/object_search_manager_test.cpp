@@ -19,9 +19,9 @@ int main(int argc, char** argv)
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
-    n.param("x", box.pose_stamped.pose.position.x, 5.5);
-    n.param("y", box.pose_stamped.pose.position.y, 10.0);
-    n.param("z", box.pose_stamped.pose.position.z, 1.0);
+    n.param("x", box.pose_stamped.pose.position.x, 10.4);
+    n.param("y", box.pose_stamped.pose.position.y, 11.4);
+    n.param("z", box.pose_stamped.pose.position.z,  1.0);
     n.param("xdim", box.dimensions.x, 1.0);
     n.param("ydim", box.dimensions.y, 1.0);
     n.param("zdim", box.dimensions.z, 1.0);

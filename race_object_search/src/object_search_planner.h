@@ -2,18 +2,30 @@
 #define OBJECT_SEARCH_PLANNER_H
 
 #include "pr2_agent.h"
+#include "observation_pose_collection.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 #include <actionlib/server/simple_action_server.h>
 #include <race_object_search/ObserveVolumesAction.h>
 
+#include <vector>
+
 class ObjectSearchPlanner
 {
 public:
     ObjectSearchPlanner();
 
-private:
+private: 
+    struct EqualProbabilityCellGain
+    {
+         double p;
+         double operator ()(uint64_t const & cell) const
+         {
+             return p;
+         }
+    };
+
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;

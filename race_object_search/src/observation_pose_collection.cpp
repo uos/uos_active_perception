@@ -42,7 +42,13 @@ double ObservationPoseCollection::getInitialTravelTime(size_t target_idx) const
 
 double ObservationPoseCollection::getTravelTime(size_t start_idx, size_t target_idx) const
 {
-    return m_travel_time_lut[getTtLutIdx(start_idx, target_idx)];
+    if(start_idx == (size_t) -1) {
+        return getInitialTravelTime(target_idx);
+    } else if(target_idx == (size_t) -1) {
+        return getInitialTravelTime(start_idx);
+    } else {
+        return m_travel_time_lut[getTtLutIdx(start_idx, target_idx)];
+    }
 }
 
 void ObservationPoseCollection::dumpInitialTravelTimeMap() const

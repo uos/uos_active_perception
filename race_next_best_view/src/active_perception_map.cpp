@@ -119,6 +119,32 @@ void ActivePerceptionMap::resetVolume(octomap::point3d const & min, octomap::poi
     }
 }
 
+/**
+  Marks the whole given area as occupied. Caller must call updateInnerOccupancy when done.
+  */
+void ActivePerceptionMap::setOccupied(octomap::point3d const & min, octomap::point3d const & max)
+{
+    octomap::OcTreeKey min_key = m_occupancy_map.coordToKey(min);
+    octomap::OcTreeKey max_key = m_occupancy_map.coordToKey(max);
+    for(int x = min_key[0]; x <= max_key[0]; x++)
+    {
+        for(int y = min_key[1]; y <= max_key[1]; y++)
+        {
+            for(int z = min_key[2]; z <= max_key[2]; z++)
+            {
+                m_occupancy_map.updateNode(octomap::OcTreeKey(x,y,z), true, true);
+                m_fringe_map.deleteNode(octomap::OcTreeKey(x,y,z));
+            }
+        }
+    }
+}
+
+void ActivePerceptionMap::updateInnerOccupancy()
+{
+    m_occupancy_map.updateInnerOccupancy();
+    m_fringe_map.updateInnerOccupancy();
+}
+
 octomap::OcTree const & ActivePerceptionMap::getOccupancyMap() const
 {
     return m_occupancy_map;

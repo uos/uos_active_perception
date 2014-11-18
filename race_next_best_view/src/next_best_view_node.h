@@ -8,6 +8,7 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <race_next_best_view/GetBboxOccupancy.h>
 #include <race_next_best_view/GetObjectsToRemove.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
@@ -28,6 +29,7 @@ private:
 
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     ros::Subscriber m_point_cloud_subscriber;
+    ros::Subscriber m_static_map_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
     ros::ServiceServer m_get_objects_to_remove_server;
@@ -52,6 +54,8 @@ private:
 
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
+
+    void staticMapCb(nav_msgs::OccupancyGrid const & map);
 
     bool getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request&,
                             race_next_best_view::GetBboxOccupancy::Response&);

@@ -18,6 +18,7 @@
 #include <ctime>
 #include <list>
 #include <memory>
+#include <stdint.h>
 
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
@@ -27,6 +28,11 @@ NextBestViewNode::NextBestViewNode() :
                                  1,
                                  &NextBestViewNode::pointCloudCb,
                                  this)),
+    m_static_map_subscriber(m_node_handle_pub.subscribe(
+                                "/map",
+                                1,
+                                &NextBestViewNode::staticMapCb,
+                                this)),
     m_get_bbox_percent_unseen_server(m_node_handle_pub.advertiseService(
                                          "/get_bbox_occupancy",
                                          &NextBestViewNode::getBboxOccupancyCb,
@@ -501,6 +507,77 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     marker.id = 0;
     marker.ns = "fringe_map";
     m_marker_pub.publish(marker);
+}
+
+void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
+{
+    boost::mutex::scoped_lock lock(m_map_mutex);
+
+    // Find map origin
+    tf::StampedTransform map_to_world_tf;
+    try
+    {
+        m_tf_listener.waitForTransform(m_world_frame_id, map.header.frame_id, map.header.stamp, ros::Duration(60.0));
+        m_tf_listener.lookupTransform(m_world_frame_id, map.header.frame_id, map.header.stamp, map_to_world_tf);
+    }
+    catch(tf::TransformException& ex)
+    {
+        ROS_ERROR_STREAM("next_best_view_node: Transform error of map origin: "
+                         << ex.what()
+                         << ", failed to integrate map data.");
+        return;
+    }
+
+    tf::Transform map_tf;
+    tf::poseMsgToTF(map.info.origin, map_tf);
+
+    for(size_t w = 0; w < map.info.width; ++w) {
+        for(size_t h = 0; h < map.info.height; ++h) {
+            int8_t val = map.data[map.info.width * h + w];
+            if(val > 65) {
+                tf::Point p1, p2;
+                p1.setX(w * map.info.resolution);
+                p1.setY(h * map.info.resolution);
+                p1.setZ(0.0);
+                p2.setX((w + 1) * map.info.resolution);
+                p2.setY((h + 1) * map.info.resolution);
+                p2.setZ(0.0);
+
+                p1 = map_to_world_tf(map_tf(p1));
+                p2 = map_to_world_tf(map_tf(p2));
+
+                // Set walls to a height of 2.5 m.
+                p1.setZ(0.0);
+                p2.setZ(2.5);
+
+                m_perception_map.setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
+            }
+        }
+    }
+
+    // Mark floor as occupied
+    {
+        tf::Point p1, p2;
+        p1.setX(0.0);
+        p1.setY(0.0);
+        p1.setZ(0.0);
+        p2.setX((map.info.width + 1) * map.info.resolution);
+        p2.setY((map.info.height + 1) * map.info.resolution);
+        p2.setZ(0.0);
+
+        p1 = map_to_world_tf(map_tf(p1));
+        p2 = map_to_world_tf(map_tf(p2));
+
+        // Set walls to a height of 3 m.
+        p1.setZ(0.0);
+        p2.setZ(0.0);
+
+        m_perception_map.setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
+    }
+
+    m_perception_map.updateInnerOccupancy();
+
+    ROS_INFO("next_best_view_node: Added 2d map walls to octomap");
 }
 
 bool NextBestViewNode::resetVolumesCb

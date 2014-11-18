@@ -37,6 +37,8 @@ public:
                              tf::Pose const & camera_pose,
                              CameraConstraints const & camera_constraints);
     void resetVolume(octomap::point3d const & min, octomap::point3d const & max);
+    void setOccupied(octomap::point3d const & min, octomap::point3d const & max);
+    void updateInnerOccupancy();
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);

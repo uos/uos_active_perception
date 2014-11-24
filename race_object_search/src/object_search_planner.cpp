@@ -6,6 +6,7 @@
 #include <visualization_msgs/Marker.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <race_msgs/GetAnchoredObjects.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 ObjectSearchPlanner::ObjectSearchPlanner()
 :
@@ -76,15 +77,28 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
     }
 
     SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
+
+    boost::posix_time::ptime tick = boost::posix_time::microsec_clock::local_time();
     sp.greedy(HORIZON);
+    boost::posix_time::ptime now  = boost::posix_time::microsec_clock::local_time();
+    std::cout << "greedy took msec: " << (now-tick).total_milliseconds() << std::endl;
 
-    ROS_INFO_STREAM("Greedy plan has " << sp.time.size() << " steps and a duration of " << sp.time[sp.last_idx]);
-
-    ROS_INFO("Sending marker");
-    sp.sendMarker(m_world_frame_id, m_marker_pub);
-
-    ROS_INFO("Writing file");
+    ROS_INFO_STREAM("Greedy plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
     sp.writeTimeplot("plan_timeplot.tab");
+
+    //ROS_INFO("Sending marker");
+    //sp.sendMarker(m_world_frame_id, m_marker_pub);
+
+    //sp.optimizeLocally();
+    //sp.writeTimeplot("plan_timeplot_LO.tab");
+
+    ROS_INFO("Starting search");
+    boost::posix_time::ptime tick2 = boost::posix_time::microsec_clock::local_time();
+    sp.optimalSequence(5);
+    boost::posix_time::ptime now2  = boost::posix_time::microsec_clock::local_time();
+    std::cout << "search took msec: " << (now2-tick2).total_milliseconds() << std::endl;
+    sp.sendMarker(m_world_frame_id, m_marker_pub);
+    sp.writeTimeplot("plan_timeplot_optimal.tab");
 
     ROS_INFO("Done");
     m_observe_volumes_server.setSucceeded();

@@ -2,6 +2,7 @@
 
 #include "observation_pose_collection.h"
 #include "search_plan.h"
+#include "search_plan2.h"
 
 #include <visualization_msgs/Marker.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
@@ -93,10 +94,15 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
     //sp.writeTimeplot("plan_timeplot_LO.tab");
 
     ROS_INFO("Starting search");
+    SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
     boost::posix_time::ptime tick2 = boost::posix_time::microsec_clock::local_time();
-    sp.optimalSequence(5);
+    std::vector<size_t> result_seq;
+    double result_etime;
+    spl.makePlan(5, result_seq, result_etime);
     boost::posix_time::ptime now2  = boost::posix_time::microsec_clock::local_time();
     std::cout << "search took msec: " << (now2-tick2).total_milliseconds() << std::endl;
+    sp.clear();
+    sp.pushSequence(result_seq, 1, result_seq.size());
     sp.sendMarker(m_world_frame_id, m_marker_pub);
     sp.writeTimeplot("plan_timeplot_optimal.tab");
 

@@ -8,6 +8,7 @@
     <remap from="cloud_in" to="/head_mount_kinect/depth_registered/points" />
     <remap from="cloud_out" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
   </node>
+  <node name="kinect_throttle" type="throttle" pkg="topic_tools" args="messages /head_mount_kinect/depth_registered/motion_filtered/points 2 /head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
   <node name="next_best_view_node" pkg="race_next_best_view" type="next_best_view_node" output="screen" respawn="true">
     <!-- camera constraints (fixed kinect on gazebo pr2)-->
     <param name="height_min" type="double" value="1.4756" />
@@ -22,6 +23,6 @@
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />
     <param name="camera_frame_id" type="string" value="/head_mount_kinect_ir_link" />
-    <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
+    <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
   </node>
 </launch>

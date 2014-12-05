@@ -263,61 +263,54 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
     double angle_increment = std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(ray_length, 2))));
 
-    bool observation_position_set = !req.observation_position.header.frame_id.empty();
+    // Gather fringe voxel centers
     std::vector<octomap::point3d> fringe_centers;
-    octomath::Vector3 observation_position;
-    if(!observation_position_set)
+    if(req.roi.empty())
     {
-        // Gather unknown voxel centers
-        // TODO: This whole method of copying voxel centers into a vector is rather costly for many fringe voxels.
-        //       The sampling procedure could be reformulated in such a way that we only need to iterate once through
-        //       all the fringe voxels in the octree.
-        //       [Not really valid anymore, because fringe voxels are additionally generated for roi boundaries.
-        //        Also, this does not seem to be a bottleneck.]
-        if(req.roi.empty())
-        {
-            // If the requested roi is empty, use all fringe voxels
-            fringe_centers = map->getFringeCenters();
-        }
-        for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
-        {
-            OcTreeBbox box = roi.elements[i_roi];
-            octomath::Vector3 min = map->getFringeMap().keyToCoord(box.min);
-            octomath::Vector3 max = map->getFringeMap().keyToCoord(box.max);
-            std::vector<octomap::point3d> roi_fringe_centers;
-            // add fringe voxels within the roi
-            roi_fringe_centers = map->getFringeCenters(min, max);
-            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
-            // generate fringe voxels at roi boundary
-            roi_fringe_centers = map->genBoundaryFringeCenters(min, max);
-            fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
-        }
-        if(fringe_centers.empty()) return true;
-        // publish a marker for active fringe voxels
-        {
-            visualization_msgs::Marker marker;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.type = visualization_msgs::Marker::CUBE_LIST;
-            marker.lifetime = ros::Duration();
-            marker.scale.x = m_resolution;
-            marker.scale.y = m_resolution;
-            marker.scale.z = m_resolution;
-            marker.color.r = 1.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
-            marker.color.a = 1.0;
-            for(unsigned int i = 0; i < fringe_centers.size(); i++)
-            {
-                marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
-            }
-            marker.ns = "active_fringe";
-            marker.id = 0;
-            marker.header.frame_id = m_world_frame_id;
-            marker.header.stamp = ros::Time::now();
-            m_marker_pub.publish(marker);
-        }
+        // If the requested roi is empty, use all fringe voxels
+        fringe_centers = map->getFringeCenters();
     }
-    else
+    for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
+    {
+        OcTreeBbox box = roi.elements[i_roi];
+        octomath::Vector3 min = map->getFringeMap().keyToCoord(box.min);
+        octomath::Vector3 max = map->getFringeMap().keyToCoord(box.max);
+        std::vector<octomap::point3d> roi_fringe_centers;
+        // add fringe voxels within the roi
+        roi_fringe_centers = map->getFringeCenters(min, max);
+        fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+        // generate fringe voxels at roi boundary
+        roi_fringe_centers = map->genBoundaryFringeCenters(min, max);
+        fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+    }
+    if(fringe_centers.empty()) return true;
+    // publish a marker for active fringe voxels
+    {
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::CUBE_LIST;
+        marker.lifetime = ros::Duration(10.0);
+        marker.scale.x = m_resolution;
+        marker.scale.y = m_resolution;
+        marker.scale.z = m_resolution;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        marker.color.a = 1.0;
+        for(unsigned int i = 0; i < fringe_centers.size(); i++)
+        {
+            marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
+        }
+        marker.ns = "active_fringe";
+        marker.id = 0;
+        marker.header.frame_id = m_world_frame_id;
+        marker.header.stamp = ros::Time::now();
+        m_marker_pub.publish(marker);
+    }
+
+    bool observation_position_set = !req.observation_position.header.frame_id.empty();
+    octomath::Vector3 observation_position;
+    if(observation_position_set)
     {
         if(!m_tf_listener.waitForTransform(m_world_frame_id,
                                            req.observation_position.header.frame_id,

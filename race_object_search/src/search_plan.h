@@ -77,6 +77,7 @@ public:
         }
     }
 
+    // TODO: Replace with better code in search_planner
     bool optimalOrder()
     {
         double old_etime = etime[last_idx];
@@ -89,6 +90,7 @@ public:
         return etime[last_idx] < old_etime;
     }
 
+    // TODO: Replace with better code in search_planner
     bool optimizeSteps()
     {
         double old_etime = etime[last_idx];
@@ -98,17 +100,19 @@ public:
         return etime[last_idx] < old_etime;
     }
 
+    // TODO: Replace with better code in search_planner
     void optimizeLocally()
     {
         bool change;
         do {
             change = optimizeSteps();
             std::cout << "Step-optimized plan has an etime of " << etime[last_idx] << std::endl;
-            //change = optimalOrder();
-            //std::cout << "Reordered plan has an etime of " << etime[last_idx] << std::endl;
+            change = optimalOrder();
+            std::cout << "Reordered plan has an etime of " << etime[last_idx] << std::endl;
         } while(change);
     }
 
+    // TODO: Replace with better code in search_planner
     void greedy(double const horizon)
     {
         double tmax = time[last_idx] + horizon;
@@ -133,19 +137,6 @@ public:
                 push(max_utility_idx);
             }
         }
-    }
-
-    void optimalSequence(size_t max_depth)
-    {
-        double limit = std::numeric_limits<double>::infinity();//etime[last_idx];
-        clear();
-        std::vector<size_t> sequence;
-        std::vector<size_t> pose_subset(opc.getPoses().size());
-        for(size_t i = 0; i < pose_subset.size(); ++i) {
-            pose_subset[i] = i;
-        }
-        optimalSequenceSearch(pose_subset, false, max_depth, sequence, limit);
-        pushSequence(sequence, 1, sequence.size());
     }
 
     void sendMarker(std::string frame_id, ros::Publisher & pub)

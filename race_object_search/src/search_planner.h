@@ -1,5 +1,5 @@
-#ifndef SEARCH_PLAN2_H
-#define SEARCH_PLAN2_H
+#ifndef SEARCH_PLANNER_H
+#define SEARCH_PLANNER_H
 
 #include "observation_pose_collection.h"
 
@@ -45,6 +45,19 @@ public:
         result_sequence = best_sequence;
         result_etime = best_etime;
         return(!best_sequence.empty());
+    }
+
+    void makeGreedy(std::vector<size_t> & result_sequence,
+                    double & result_etime)
+    {
+        // TODO: implement
+    }
+
+    void optimalOrder(std::vector<size_t> const & input_sequence,
+                      std::vector<size_t> & result_sequence,
+                      double & result_etime)
+    {
+        // TODO: implement
     }
 
 private:
@@ -154,7 +167,7 @@ private:
             ++it)
         {
             if(it->first > cutoff) {
-                // Vertical cutoff for branches that just seem too bad
+                // cutoff for branches that just seem too bad
                 break;
             }
             size_t const & pose_idx = it->second.first;
@@ -179,4 +192,4 @@ private:
     }
 };
 
-#endif // SEARCH_PLAN2_H
+#endif // SEARCH_PLANNER_H

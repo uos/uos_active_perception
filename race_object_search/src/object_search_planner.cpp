@@ -2,7 +2,7 @@
 
 #include "observation_pose_collection.h"
 #include "search_plan.h"
-#include "search_plan2.h"
+#include "search_planner.h"
 
 #include <visualization_msgs/Marker.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>

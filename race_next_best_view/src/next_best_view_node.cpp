@@ -334,6 +334,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         observation_position = octomap::pointMsgToOctomap(obspos_msg.point);
     }
 
+    std::vector<visualization_msgs::Marker> markers;
+    markers.reserve(req.sample_size);
+    size_t max_gain = 0;
     for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
     {
         // Abort if there is no time left
@@ -428,8 +431,9 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.scale.y = 1;
         marker.scale.z = 0.2;
         if(gain > 0) {
-            marker.color.g = ((double) gain) / roi_cell_count;
-            marker.color.r = 1.0 - marker.color.g;
+            marker.color.g = 0.5;
+            marker.color.r = 0.5;
+            marker.color.b = 0.5;
         } else {
             marker.color.b = 1.0;
         }
@@ -440,6 +444,23 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         marker.id = sample_id;
         marker.ns = "nbv_samples";
         m_marker_pub.publish(marker);
+
+        // save marker for later color-coding
+        if(gain > 0) {
+            marker.color.g = (double) gain;
+            markers.push_back(marker);
+        }
+        if(gain > max_gain) {
+            max_gain = gain;
+        }
+    }
+
+    // color-code and re-publish markers
+    for(size_t i = 0; i < markers.size(); ++i) {
+        markers[i].color.g /= (double) max_gain;
+        markers[i].color.r = 1.0 - markers[i].color.g;
+        markers[i].color.b = 0.0;
+        m_marker_pub.publish(markers[i]);
     }
 
     // Write object set ids

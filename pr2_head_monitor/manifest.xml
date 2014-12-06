@@ -1,0 +1,16 @@
+<package>
+  <description brief="pr2_head_monitor">
+
+     pr2_head_monitor
+     Takes PointHeadGoal targets and keeps the head pointing towards the target.
+
+  </description>
+  <author>Thorsten Gedicke</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/pr2_head_monitor</url>
+  <depend package="pr2_controllers_msgs"/>
+  <depend package="actionlib"/>
+</package>
+
+

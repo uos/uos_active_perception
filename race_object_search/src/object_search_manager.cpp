@@ -69,6 +69,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                 continue;
             }
             opc.addPoses(pose_candidates_call.response.camera_poses,
+                         pose_candidates_call.response.target_points,
                          pose_candidates_call.response.cvms,
                          pose_candidates_call.response.object_sets);
         }
@@ -86,6 +87,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
                 continue;
             }
             opc.addPoses(pose_candidates_call.response.camera_poses,
+                         pose_candidates_call.response.target_points,
                          pose_candidates_call.response.cvms,
                          pose_candidates_call.response.object_sets);
         }
@@ -126,7 +128,11 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         }
 
         // do it
-        if(m_agent.achieve_cam_pose(robot_pose, cam_pose, opc.getPoses()[best_pose_idx].pose, m_world_frame_id))
+        if(m_agent.achieve_cam_pose(robot_pose,
+                                    cam_pose,
+                                    opc.getPoses()[best_pose_idx].pose,
+                                    opc.getPoses()[best_pose_idx].view_distance,
+                                    m_world_frame_id))
         {
             // wait for acquisition
             ros::Duration(m_agent.get_acquisition_time()).sleep();

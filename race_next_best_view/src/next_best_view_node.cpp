@@ -378,12 +378,21 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
         }
         unsigned int gain = discovery_field.size();
 
+        // Fetch target point
+        octomap::point3d target_point_octomap;
+        map->getOccupancyMap().castRay(cam_point,
+                                       octomap::pointTfToOctomap(sample(tf::Vector3(ray_length, 0.0, 0.0))) - cam_point,
+                                       target_point_octomap,
+                                       true,
+                                       ray_length);
+
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
         tf::poseTFToMsg(sample, camera_pose_msg);
         if(gain > 0)
         {
             res.camera_poses.push_back(camera_pose_msg);
+            res.target_points.push_back(octomap::pointOctomapToMsg(target_point_octomap));
             res.information_gains.push_back(gain * std::pow(m_resolution, 3));
             // Prepare the conditional visibility map for this sample
             boost::unordered_map<unsigned int, std::list<unsigned long> > cvm_hashed;

@@ -18,12 +18,14 @@ struct ObservationPose
     tf::Pose pose;
     std::vector<detection_t> cell_id_sets;
     std::vector<uint32_t> object_set_ids;
+    double view_distance;
 };
 
 class ObservationPoseCollection
 {
 public:
     void addPoses(std::vector<geometry_msgs::Pose> const & new_poses,
+                  std::vector<geometry_msgs::Point> const & new_target_points,
                   std::vector<race_next_best_view::ConditionalVisibilityMap> const & new_cvms,
                   std::vector<race_next_best_view::ObjectSet> const & new_object_sets);
 

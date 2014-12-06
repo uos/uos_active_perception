@@ -12,7 +12,7 @@
 Pr2Agent::Pr2Agent()
 :
     m_move_base_client("move_base", true),
-    m_point_head_client("/head_traj_controller/point_head_action", true),
+    m_point_head_client("/pr2_head_monitor/point_head_action", true),
     m_lift_torso_client("/torso_controller/position_joint_action", true)
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
@@ -67,15 +67,6 @@ std::vector<double> Pr2Agent::estimate_move_times
                                                          world_frame_id);
 
     for(size_t i = 0; i < times.size(); ++i) {
-        // constant data acquisition time
-        times[i] += ACQUISITION_TIME;
-
-        // calculate time needed to turn the camera
-        // TODO: This gives only a correct result when the base is not rotated
-        // TODO: Also, turning the camera 180 deg to the back does not work
-        times[i] += cam_poses[start_pose_idxs[i]].getRotation().angleShortestPath(
-                        cam_poses[target_pose_idxs[i]].getRotation()) / HEAD_SPEED;
-
         // calculate time needed to lift the torso
         double dz = std::abs(cam_poses[start_pose_idxs[i]].getOrigin().getZ() -
                              cam_poses[target_pose_idxs[i]].getOrigin().getZ());
@@ -83,6 +74,16 @@ std::vector<double> Pr2Agent::estimate_move_times
         {
             times[i] += dz / LIFT_SPEED;
         }
+
+        // Calculate time needed to turn the camera if nothing else needs to move.
+        // Otherwise, head movement is parallelized and does not cost extra time.
+        if(times[i] < std::numeric_limits<double>::epsilon()) {
+            times[i] += cam_poses[start_pose_idxs[i]].getRotation().angleShortestPath(
+                            cam_poses[target_pose_idxs[i]].getRotation()) / HEAD_SPEED;
+        }
+
+        // constant data acquisition time
+        times[i] += ACQUISITION_TIME;
     }
 
     return times;
@@ -231,8 +232,22 @@ bool Pr2Agent::achieve_cam_pose
         tf::Pose const & current_base_pose,
         tf::Pose const & current_cam_pose,
         tf::Pose const & target_cam_pose,
+        double const target_distance,
         std::string const & world_frame_id)
-{
+{ 
+    bool success = true;
+
+    // lock head onto target
+    ROS_INFO("Looking towards target...");
+    pr2_controllers_msgs::PointHeadGoal head_goal;
+    head_goal.target.header.frame_id = world_frame_id;
+    head_goal.pointing_frame = "/head_mount_kinect_ir_link";
+    head_goal.pointing_axis.x = 1;
+    head_goal.pointing_axis.y = 0;
+    head_goal.pointing_axis.z = 0;
+    tf::pointTFToMsg(target_cam_pose * tf::Point(target_distance, 0.0, 0.0), head_goal.target.point);
+    m_point_head_client.sendGoal(head_goal);
+
     // move base if required
     if(is_move_base_required(current_base_pose, target_cam_pose))
     {
@@ -262,7 +277,7 @@ bool Pr2Agent::achieve_cam_pose
         } else {
             ROS_INFO("goal approach failed");
             m_move_base_client.cancelAllGoals();
-            return false;
+            success = false;
         }
     }
 
@@ -279,25 +294,12 @@ bool Pr2Agent::achieve_cam_pose
         } else {
             ROS_INFO("torso failed");
             m_lift_torso_client.cancelAllGoals();
-            return false;
+            success = false;
         }
     }
 
-    ROS_INFO("Pointing head...");
-    pr2_controllers_msgs::PointHeadGoal head_goal;
-    head_goal.target.header.frame_id = world_frame_id;
-    head_goal.target.header.stamp = ros::Time::now();
-    tf::pointTFToMsg(target_cam_pose * tf::Point(1e10,0,0), head_goal.target.point);
+    // Unlock head
+    m_point_head_client.cancelGoal();
 
-    m_point_head_client.sendGoal(head_goal);
-    m_point_head_client.waitForResult(ros::Duration(3.0));
-    if(m_point_head_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-        ROS_INFO("head moved with success");
-    } else {
-        ROS_INFO("head movement failed");
-        m_point_head_client.cancelAllGoals();
-        return false;
-    }
-
-    return true;
+    return success;
 }

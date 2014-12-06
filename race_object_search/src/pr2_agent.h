@@ -57,6 +57,7 @@ public:
     bool achieve_cam_pose(tf::Pose const & current_base_pose,
                           tf::Pose const & current_cam_pose,
                           tf::Pose const & target_cam_pose,
+                          double const target_distance,
                           std::string const & world_frame_id);
 
 private:

@@ -5,6 +5,7 @@
 void ObservationPoseCollection::addPoses
 (
     std::vector<geometry_msgs::Pose> const & new_poses,
+    std::vector<geometry_msgs::Point> const & new_target_points,
     std::vector<race_next_best_view::ConditionalVisibilityMap> const & new_cvms,
     std::vector<race_next_best_view::ObjectSet> const & new_object_sets
 ){
@@ -20,6 +21,9 @@ void ObservationPoseCollection::addPoses
     for(size_t i = 0; i < new_poses.size(); ++i) {
         ObservationPose op;
         tf::poseMsgToTF(new_poses[i], op.pose);
+        tf::Point target_point;
+        tf::pointMsgToTF(new_target_points[i], target_point);
+        op.view_distance = op.pose.getOrigin().distance(target_point);
         op.object_set_ids = new_cvms[i].object_set_ids;
         op.cell_id_sets.reserve(new_cvms[i].cell_id_sets.size());
         for(size_t j = 0; j < new_cvms[i].cell_id_sets.size(); ++j) {

@@ -11,7 +11,9 @@
 #
 # Response:
 # - roi_cell_counts: Number of cells in the requested regions of interest
-# - camera_poses: A List of camera poses in the world coordinate frame from which the ROI can be observed,
+# - camera_poses: A List of camera poses in the world coordinate frame from which the ROI can be observed
+# - target_points: A point in the center of the camera viewport at the corresponding camera pose.
+#                  Can be used as target for point_head.
 # - information_gain: A list of expected information gain for each camera pose.
 #                     Information gain is measured as revealed space [m^3]
 # - cvm: A list containing the conditional visibility map for each camera pose.
@@ -26,6 +28,7 @@ race_msgs/BoundingBox[] objects
 ---
 uint32[] roi_cell_counts
 geometry_msgs/Pose[] camera_poses
+geometry_msgs/Point[] target_points
 float32[] information_gains
 ConditionalVisibilityMap[] cvms
 ObjectSet[] object_sets

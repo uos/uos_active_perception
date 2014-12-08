@@ -35,6 +35,6 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_boost_directories()
 
-rosbuild_add_executable(pr2_head_monitor src/pr2_head_monitor.cpp)
+rosbuild_add_executable(point_head_continuous src/point_head_continuous.cpp)
 
 rosbuild_link_boost(${PROJECT_NAME} thread)

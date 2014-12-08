@@ -2,7 +2,7 @@
 \mainpage
 \htmlinclude manifest.html
 
-\b pr2_head_monitor
+\b point_head_continuous
 
 <!-- 
 Provide an overview of your package.

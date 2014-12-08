@@ -20,7 +20,7 @@ public:
       : handle()
       , point_head_client_("/head_traj_controller/point_head_action", true)
       , point_head_server_(handle,
-                           "/pr2_head_monitor/point_head_action",
+                           "/point_head_continuous/point_head_action",
                            boost::bind(&RobotHead::pointHeadCb, this, _1),
                            false)
   {
@@ -47,8 +47,8 @@ public:
 int main(int argc, char** argv)
 {
   //init the ROS node
-  ros::init(argc, argv, "pr2_head_monitor");
+  ros::init(argc, argv, "point_head_continuous");
   RobotHead head;
-  ROS_INFO("pr2_head_monitor: Initialized!");
+  ROS_INFO("point_head_continuous: Initialized!");
   ros::spin();
 }

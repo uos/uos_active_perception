@@ -12,7 +12,7 @@
 Pr2Agent::Pr2Agent()
 :
     m_move_base_client("move_base", true),
-    m_point_head_client("/pr2_head_monitor/point_head_action", true),
+    m_point_head_client("/point_head_continuous/point_head_action", true),
     m_lift_torso_client("/torso_controller/position_joint_action", true)
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the

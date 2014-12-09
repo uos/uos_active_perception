@@ -33,6 +33,7 @@ public:
 
   void pointHeadCb(pr2_controllers_msgs::PointHeadGoalConstPtr const & goal_ptr)
   {
+    ROS_INFO_STREAM("point_head_continuous goal received: stamp=" << goal_ptr.get()->target.header.stamp);
     pr2_controllers_msgs::PointHeadGoal goal(*goal_ptr.get());
     goal.target.header.stamp = ros::Time(); // always use most recent tf
     ros::Rate rate(20);

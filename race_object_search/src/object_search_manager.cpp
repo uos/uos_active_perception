@@ -16,7 +16,7 @@ ObjectSearchManager::ObjectSearchManager()
                              "observe_volumes",
                              boost::bind(&ObjectSearchManager::observeVolumesCb, this, _1),
                              false),
-    m_agent()
+    m_agent(m_tf_listener, m_world_frame_id)
 {
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
@@ -44,9 +44,8 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         }
 
         // get current robot pose
-        tf::StampedTransform robot_pose, cam_pose;
-        m_tf_listener.lookupTransform(m_world_frame_id, m_agent.getRobotPoseFrameId(), ros::Time(0), robot_pose);
-        m_tf_listener.lookupTransform(m_world_frame_id, m_agent.getRobotCameraFrameId(), ros::Time(0), cam_pose);
+        const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
+        const tf::Pose cam_pose = m_agent.getCurrentCamPose();
 
         ObservationPoseCollection opc;
 
@@ -128,11 +127,8 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         }
 
         // do it
-        if(m_agent.achieve_cam_pose(robot_pose,
-                                    cam_pose,
-                                    opc.getPoses()[best_pose_idx].pose,
-                                    opc.getPoses()[best_pose_idx].view_distance,
-                                    m_world_frame_id))
+        if(m_agent.achieve_cam_pose(opc.getPoses()[best_pose_idx].pose,
+                                    opc.getPoses()[best_pose_idx].view_distance))
         {
             // wait for acquisition
             ros::Duration(m_agent.get_acquisition_time()).sleep();

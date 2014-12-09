@@ -72,8 +72,7 @@ public:
                                                               base_poses,
                                                               start_pose_idxs,
                                                               target_pose_idxs,
-                                                              cam_poses.size(),
-                                                              world_frame_id);
+                                                              cam_poses.size());
     }
 
     template <class Agent>
@@ -113,8 +112,7 @@ public:
                                                       base_poses,
                                                       start_pose_idxs,
                                                       target_pose_idxs,
-                                                      50,
-                                                      world_frame_id);
+                                                      50);
     }
 
 

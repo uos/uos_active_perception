@@ -9,14 +9,32 @@
 #include <sstream>
 #include <fstream>
 
-Pr2Agent::Pr2Agent()
+double Pr2Agent::torso_position_for_cam_height(double const & cam_height)
+{
+    // torso high: position=0.32, head_mount_kinect_ir_link z=1.784
+    // torso low : position=0.02, head_mount_kinect_ir_link z=1.484
+    double torso_state = cam_height - 1.464;
+    if(torso_state > 0.32) {
+        return 0.32;
+    }
+    else if(torso_state < 0.02) {
+        return 0.02;
+    }
+    else {
+        return torso_state;
+    }
+}
+
+Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & world_frame_id)
 :
+    m_world_frame_id(world_frame_id),
+    m_tf_listener(tf_listener),
     m_move_base_client("move_base", true),
     m_point_head_client("/point_head_continuous/point_head_action", true),
     m_lift_torso_client("/torso_controller/position_joint_action", true)
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
-    // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 7.0 here)
+    // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 8.0 here)
     ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 1.0);
 
     while(!m_move_base_client.waitForServer(ros::Duration(5.0))) {
@@ -30,24 +48,53 @@ Pr2Agent::Pr2Agent()
     };
 }
 
-
-tf::Pose Pr2Agent::cam_pose_for_robot_pose(tf::Pose const & robot_pose) const
+tf::Pose Pr2Agent::getCurrentRobotPose() const
 {
-    tf::Vector3 cam_position = robot_pose.getOrigin();
-    cam_position.setZ(CAM_HEIGHT);
-    return tf::Pose(robot_pose.getRotation(), cam_position);
+    tf::StampedTransform robot_pose;
+    m_tf_listener.lookupTransform(m_world_frame_id, "/base_footprint", ros::Time(), robot_pose);
+    return robot_pose;
 }
 
+tf::Pose Pr2Agent::getCurrentCamPose() const
+{
+    tf::StampedTransform cam_pose;
+    m_tf_listener.lookupTransform(m_world_frame_id, "/head_pan_link", ros::Time(), cam_pose);
+    cam_pose.getOrigin() += tf::Vector3(0.0, 0.0, 0.292);
+    return cam_pose;
+}
+
+/**
+  Return the pose of the virtual (fixed) camera link for a given robot pose with the current torso height.
+  View direction is set to match base orientation.
+  */
+tf::Pose Pr2Agent::cam_pose_for_robot_pose(tf::Pose const & robot_pose) const
+{
+    try {
+        tf::StampedTransform head_pan_link_tf;
+        m_tf_listener.lookupTransform("/base_footprint", "/head_pan_link", ros::Time(), head_pan_link_tf);
+        return robot_pose * (head_pan_link_tf * tf::Pose(tf::Quaternion::getIdentity(), tf::Point(0.0, 0.0, 0.292)));
+    } catch(tf::TransformException& ex) {
+        ROS_ERROR_STREAM("Pr2Agent: Unable to lookup transform: "
+                         << ex.what()
+                         << ", using minimum camera height instead.");
+        return robot_pose * tf::Pose(tf::Quaternion::getIdentity(), tf::Point(-0.07, 0.0, 1.484));
+    }
+}
+
+/**
+  Return a robot pose for a given virtual (fixed) camera link position that is oriented towards the camera view
+  direction.
+  */
 tf::Pose Pr2Agent::robot_pose_for_cam_pose(tf::Pose const & cam_pose) const
 {
-    // Calculate the base pose for this camera pose.
-    // For pr2 the xy offset between cam and base is assumed to be 0 although it actually depends on cam orientation.
-    tf::Vector3 base_position = cam_pose.getOrigin();
-    base_position.setZ(0);
+    tf::Vector3 projected_position = cam_pose.getOrigin();
+    projected_position.setZ(0);
     tf::Vector3 xr = tf::Transform(cam_pose.getRotation(), tf::Vector3(0,0,0))(tf::Vector3(1,0,0));
     tf::Quaternion base_rotation;
     base_rotation.setRPY(0, 0, std::atan2(xr.getY(), xr.getX()));
-    return tf::Pose(base_rotation, base_position);
+    tf::Pose pan_link_projected(base_rotation, projected_position);
+    tf::Pose base_offset(tf::Quaternion::getIdentity(), tf::Point(0.07, 0.0, 0.0));
+    return pan_link_projected * base_offset;
 }
 
 std::vector<double> Pr2Agent::estimate_move_times
@@ -56,21 +103,19 @@ std::vector<double> Pr2Agent::estimate_move_times
         std::vector<tf::Pose> const & base_poses,
         std::vector<size_t> const & start_pose_idxs,
         std::vector<size_t> const & target_pose_idxs,
-        size_t const n_clusters,
-        std::string const & world_frame_id) const
+        size_t const n_clusters) const
 {
     // estimate move_base times
     std::vector<double> times = estimate_move_base_times(base_poses,
                                                          start_pose_idxs,
                                                          target_pose_idxs,
-                                                         n_clusters,
-                                                         world_frame_id);
+                                                         n_clusters);
 
     for(size_t i = 0; i < times.size(); ++i) {
         // calculate time needed to lift the torso
         double dz = std::abs(cam_poses[start_pose_idxs[i]].getOrigin().getZ() -
                              cam_poses[target_pose_idxs[i]].getOrigin().getZ());
-        if(dz > TRANSLATIONAL_TOLERANCE)
+        if(dz > VERTICAL_TOLERANCE)
         {
             times[i] += dz / LIFT_SPEED;
         }
@@ -89,25 +134,12 @@ std::vector<double> Pr2Agent::estimate_move_times
     return times;
 }
 
-bool Pr2Agent::is_move_base_required
-(
-        tf::Pose const & robot_pose,
-        tf::Pose const & target_cam_pose) const
-{
-    tf::Pose cam_pose = cam_pose_for_robot_pose(robot_pose);
-    // TODO: Check extreme camera yaw (needs base rotation)
-    double distance = std::sqrt(std::pow(cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2) +
-                                std::pow(cam_pose.getOrigin().getY() - target_cam_pose.getOrigin().getY(), 2));
-    return distance > TRANSLATIONAL_TOLERANCE;
-}
-
 std::vector<double> Pr2Agent::estimate_move_base_times
 (
         std::vector<tf::Pose> const & poses,
         std::vector<size_t> const & start_pose_idxs,
         std::vector<size_t> const & target_pose_idxs,
-        size_t const n_clusters,
-        std::string const & frame_id) const
+        size_t const n_clusters) const
 {  
     assert(start_pose_idxs.size() == target_pose_idxs.size());
     std::vector<double> times(start_pose_idxs.size(), std::numeric_limits<double>::infinity());
@@ -144,7 +176,7 @@ std::vector<double> Pr2Agent::estimate_move_base_times
         size_t i = 0;
         for(cluster_pathmap_t::iterator it = cluster_pathmap.begin(); it != cluster_pathmap.end(); ++it) {
             tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.first]], get_plans_call.request.start[i].pose);
-            get_plans_call.request.start[i].header.frame_id = frame_id;
+            get_plans_call.request.start[i].header.frame_id = m_world_frame_id;
             get_plans_call.request.start[i].header.stamp = ros::Time::now();
             tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.second]], get_plans_call.request.goal[i].pose);
             get_plans_call.request.goal[i].header = get_plans_call.request.start[i].header;
@@ -229,33 +261,36 @@ std::vector<double> Pr2Agent::estimate_move_base_times
 
 bool Pr2Agent::achieve_cam_pose
 (
-        tf::Pose const & current_base_pose,
-        tf::Pose const & current_cam_pose,
         tf::Pose const & target_cam_pose,
-        double const target_distance,
-        std::string const & world_frame_id)
+        double const target_distance)
 { 
     bool success = true;
 
+    const tf::Pose current_base_pose = getCurrentRobotPose();
+    const tf::Pose current_cam_pose = getCurrentCamPose();
+
     // lock head onto target
-    ROS_INFO("Looking towards target...");
     pr2_controllers_msgs::PointHeadGoal head_goal;
-    head_goal.target.header.frame_id = world_frame_id;
+    head_goal.target.header.frame_id = m_world_frame_id;
+    head_goal.target.header.stamp = ros::Time::now();
     head_goal.pointing_frame = "/head_mount_kinect_ir_link";
     head_goal.pointing_axis.x = 1;
     head_goal.pointing_axis.y = 0;
     head_goal.pointing_axis.z = 0;
     tf::pointTFToMsg(target_cam_pose * tf::Point(target_distance, 0.0, 0.0), head_goal.target.point);
     m_point_head_client.sendGoal(head_goal);
+    ROS_INFO_STREAM("looking towards target: stamp=" << head_goal.target.header.stamp);
 
     // move base if required
-    if(is_move_base_required(current_base_pose, target_cam_pose))
+    double dh = std::sqrt(std::pow(current_cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2) +
+                          std::pow(current_cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2));
+    if(dh > HORIZONTAL_TOLERANCE)
     {
-        tf::Pose target_base_pose = robot_pose_for_cam_pose(target_cam_pose);
         ROS_INFO("Moving base...");
+        tf::Pose target_base_pose = robot_pose_for_cam_pose(target_cam_pose);
         move_base_msgs::MoveBaseGoal goal;
-        goal.target_pose.header.frame_id = world_frame_id;
-        goal.target_pose.header.stamp = ros::Time::now();
+        goal.target_pose.header.frame_id = m_world_frame_id;
+        //goal.target_pose.header.stamp = ros::Time::now();
         tf::poseTFToMsg(target_base_pose, goal.target_pose.pose);
 
         std::vector<tf::Pose> poses(2);
@@ -264,12 +299,8 @@ bool Pr2Agent::achieve_cam_pose
         double timeout = estimate_move_base_times(poses,
                                                   std::vector<size_t>(1, 0),
                                                   std::vector<size_t>(1, 1),
-                                                  2,
-                                                  world_frame_id)[0];
-        if(timeout > 9000)
-        {
-            return false;
-        }
+                                                  2)[0];
+
         m_move_base_client.sendGoal(goal);
         m_move_base_client.waitForResult(ros::Duration(timeout + 5.0));
         if(m_move_base_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
@@ -282,13 +313,14 @@ bool Pr2Agent::achieve_cam_pose
     }
 
     // lift torso if required
-    if(std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ()) > TRANSLATIONAL_TOLERANCE)
+    double dz = std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ());
+    if(dz > VERTICAL_TOLERANCE)
     {
         ROS_INFO("Lifting torso...");
         pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
         torso_goal.position = torso_position_for_cam_height(target_cam_pose.getOrigin().getZ());
         m_lift_torso_client.sendGoal(torso_goal);
-        m_lift_torso_client.waitForResult(ros::Duration(7.0));
+        m_lift_torso_client.waitForResult(ros::Duration(dz / LIFT_SPEED + 2.0));
         if(m_lift_torso_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("torso lifted with success");
         } else {

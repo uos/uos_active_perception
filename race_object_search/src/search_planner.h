@@ -130,6 +130,7 @@ private:
     {
         if(memory.size() <= stage+1) {
             std::cout << "available memory exceeded. returning to previous stage" << std::endl;
+            return;
         }
 
         // Create a sorted agenda of child states to expand
@@ -141,7 +142,12 @@ private:
                 double duration = opc.getTravelTime(sequence[stage], pose_idx);
                 double greedy_cost = duration / gain;
                 double new_etime = etime + (1.0 - pdone) * duration;
-                memory[stage].expansion_map.insert(std::make_pair(greedy_cost, std::make_pair(pose_idx, new_etime)));
+                // Even if all poses are reachable from the start pose, some pairs of poses may be unconnected.
+                // This is illogical and possibly due to map updates between subsequent calls of make_plan.
+                // The easiest thing is to just filter these cases here.
+                if(duration < std::numeric_limits<double>::infinity()) {
+                    memory[stage].expansion_map.insert(std::make_pair(greedy_cost, std::make_pair(pose_idx, new_etime)));
+                }
             }
         }
 
@@ -161,7 +167,7 @@ private:
         }
 
         // Work through agenda
-        double cutoff = memory[stage].expansion_map.begin()->first * 1.15;
+        double cutoff = memory[stage].expansion_map.begin()->first * 1.5;
         for(expansion_map_t::iterator it = memory[stage].expansion_map.begin();
             it != memory[stage].expansion_map.end();
             ++it)

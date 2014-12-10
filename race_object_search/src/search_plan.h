@@ -139,7 +139,7 @@ public:
         }
     }
 
-    void sendMarker(std::string frame_id, ros::Publisher & pub)
+    void sendMarker(std::string frame_id, ros::Publisher & pub, const std::string & ns)
     {
         for(size_t i = 1; i <= last_idx; ++i) {
             visualization_msgs::Marker marker;
@@ -159,7 +159,7 @@ public:
             marker.header.frame_id = frame_id;
             marker.header.stamp = ros::Time::now();
             marker.id = i;
-            marker.ns = "search_plan";
+            marker.ns = ns;
             pub.publish(marker);
         }
         // Connecting lines
@@ -181,7 +181,7 @@ public:
             marker.header.frame_id = frame_id;
             marker.header.stamp = ros::Time::now();
             marker.id = last_idx + 1 + i;
-            marker.ns = "search_plan";
+            marker.ns = ns;
             pub.publish(marker);
         }
     }

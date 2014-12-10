@@ -83,6 +83,7 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
     sp.greedy(HORIZON);
     boost::posix_time::ptime now  = boost::posix_time::microsec_clock::local_time();
     std::cout << "greedy took msec: " << (now-tick).total_milliseconds() << std::endl;
+    sp.sendMarker(m_world_frame_id, m_marker_pub, "greedy_plan");
 
     ROS_INFO_STREAM("Greedy plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
     sp.writeTimeplot("plan_timeplot.tab");
@@ -103,7 +104,8 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
     std::cout << "search took msec: " << (now2-tick2).total_milliseconds() << std::endl;
     sp.clear();
     sp.pushSequence(result_seq, 1, result_seq.size());
-    sp.sendMarker(m_world_frame_id, m_marker_pub);
+    sp.sendMarker(m_world_frame_id, m_marker_pub, "optimal_plan");
+    ROS_INFO_STREAM("etime " << sp.etime[sp.last_idx]);
     sp.writeTimeplot("plan_timeplot_optimal.tab");
 
     ROS_INFO("Done");

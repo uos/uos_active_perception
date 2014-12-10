@@ -58,7 +58,7 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
             pose_candidates_call.request.objects = anchored_objects_call.response.bounding_boxes;
             pose_candidates_call.request.observation_position.header.frame_id = m_world_frame_id;
             pose_candidates_call.request.observation_position.header.stamp = ros::Time::now();
-            tf::pointTFToMsg(m_agent.cam_pose_for_robot_pose(robot_pose).getOrigin(),
+            tf::pointTFToMsg(m_agent.camPoseForRobotPose(robot_pose).getOrigin(),
                              pose_candidates_call.request.observation_position.point);
             pose_candidates_call.request.lock_height = false;
             if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
@@ -127,11 +127,11 @@ void ObjectSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
         }
 
         // do it
-        if(m_agent.achieve_cam_pose(opc.getPoses()[best_pose_idx].pose,
+        if(m_agent.achieveCamPose(opc.getPoses()[best_pose_idx].pose,
                                     opc.getPoses()[best_pose_idx].view_distance))
         {
             // wait for acquisition
-            ros::Duration(m_agent.get_acquisition_time()).sleep();
+            ros::Duration(m_agent.getAcquisitionTime()).sleep();
         }
     }
 }

@@ -9,7 +9,7 @@
 #include <sstream>
 #include <fstream>
 
-double Pr2Agent::torso_position_for_cam_height(double const & cam_height)
+double Pr2Agent::torsoPositionForCamHeight(double const & cam_height)
 {
     // torso high: position=0.32, head_mount_kinect_ir_link z=1.784
     // torso low : position=0.02, head_mount_kinect_ir_link z=1.484
@@ -67,7 +67,7 @@ tf::Pose Pr2Agent::getCurrentCamPose() const
   Return the pose of the virtual (fixed) camera link for a given robot pose with the current torso height.
   View direction is set to match base orientation.
   */
-tf::Pose Pr2Agent::cam_pose_for_robot_pose(tf::Pose const & robot_pose) const
+tf::Pose Pr2Agent::camPoseForRobotPose(tf::Pose const & robot_pose) const
 {
     try {
         tf::StampedTransform head_pan_link_tf;
@@ -85,7 +85,7 @@ tf::Pose Pr2Agent::cam_pose_for_robot_pose(tf::Pose const & robot_pose) const
   Return a robot pose for a given virtual (fixed) camera link position that is oriented towards the camera view
   direction.
   */
-tf::Pose Pr2Agent::robot_pose_for_cam_pose(tf::Pose const & cam_pose) const
+tf::Pose Pr2Agent::robotPoseForCamPose(tf::Pose const & cam_pose) const
 {
     tf::Vector3 projected_position = cam_pose.getOrigin();
     projected_position.setZ(0);
@@ -97,7 +97,7 @@ tf::Pose Pr2Agent::robot_pose_for_cam_pose(tf::Pose const & cam_pose) const
     return pan_link_projected * base_offset;
 }
 
-std::vector<double> Pr2Agent::estimate_move_times
+std::vector<double> Pr2Agent::estimateMoveTimes
 (
         std::vector<tf::Pose> const & cam_poses,
         std::vector<tf::Pose> const & base_poses,
@@ -106,7 +106,7 @@ std::vector<double> Pr2Agent::estimate_move_times
         size_t const n_clusters) const
 {
     // estimate move_base times
-    std::vector<double> times = estimate_move_base_times(base_poses,
+    std::vector<double> times = estimateMoveBaseTimes(base_poses,
                                                          start_pose_idxs,
                                                          target_pose_idxs,
                                                          n_clusters);
@@ -134,7 +134,7 @@ std::vector<double> Pr2Agent::estimate_move_times
     return times;
 }
 
-std::vector<double> Pr2Agent::estimate_move_base_times
+std::vector<double> Pr2Agent::estimateMoveBaseTimes
 (
         std::vector<tf::Pose> const & poses,
         std::vector<size_t> const & start_pose_idxs,
@@ -259,7 +259,7 @@ std::vector<double> Pr2Agent::estimate_move_base_times
     return times;
 }
 
-bool Pr2Agent::achieve_cam_pose
+bool Pr2Agent::achieveCamPose
 (
         tf::Pose const & target_cam_pose,
         double const target_distance)
@@ -287,7 +287,7 @@ bool Pr2Agent::achieve_cam_pose
     if(dh > HORIZONTAL_TOLERANCE)
     {
         ROS_INFO("Moving base...");
-        tf::Pose target_base_pose = robot_pose_for_cam_pose(target_cam_pose);
+        tf::Pose target_base_pose = robotPoseForCamPose(target_cam_pose);
         move_base_msgs::MoveBaseGoal goal;
         goal.target_pose.header.frame_id = m_world_frame_id;
         //goal.target_pose.header.stamp = ros::Time::now();
@@ -296,7 +296,7 @@ bool Pr2Agent::achieve_cam_pose
         std::vector<tf::Pose> poses(2);
         poses[0] = current_base_pose;
         poses[1] = target_base_pose;
-        double timeout = estimate_move_base_times(poses,
+        double timeout = estimateMoveBaseTimes(poses,
                                                   std::vector<size_t>(1, 0),
                                                   std::vector<size_t>(1, 1),
                                                   2)[0];
@@ -318,7 +318,7 @@ bool Pr2Agent::achieve_cam_pose
     {
         ROS_INFO("Lifting torso...");
         pr2_controllers_msgs::SingleJointPositionGoal torso_goal;
-        torso_goal.position = torso_position_for_cam_height(target_cam_pose.getOrigin().getZ());
+        torso_goal.position = torsoPositionForCamHeight(target_cam_pose.getOrigin().getZ());
         m_lift_torso_client.sendGoal(torso_goal);
         m_lift_torso_client.waitForResult(ros::Duration(dz / LIFT_SPEED + 2.0));
         if(m_lift_torso_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {

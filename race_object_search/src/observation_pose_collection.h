@@ -57,7 +57,7 @@ public:
         std::vector<tf::Pose> base_poses;
         base_poses.reserve(m_observation_poses.size() + 1);
         for(size_t i = 0; i < m_observation_poses.size(); ++i) {
-            base_poses.push_back(agent.robot_pose_for_cam_pose(m_observation_poses[i].pose));
+            base_poses.push_back(agent.robotPoseForCamPose(m_observation_poses[i].pose));
         }
         base_poses.push_back(initial_base_pose);
 
@@ -68,11 +68,11 @@ public:
             target_pose_idxs[i] = i;
         }
 
-        m_initial_travel_time_lut = agent.estimate_move_times(cam_poses,
-                                                              base_poses,
-                                                              start_pose_idxs,
-                                                              target_pose_idxs,
-                                                              cam_poses.size());
+        m_initial_travel_time_lut = agent.estimateMoveTimes(cam_poses,
+                                                            base_poses,
+                                                            start_pose_idxs,
+                                                            target_pose_idxs,
+                                                            cam_poses.size());
     }
 
     template <class Agent>
@@ -94,7 +94,7 @@ public:
         std::vector<tf::Pose> base_poses;
         base_poses.reserve(n);
         for(size_t i = 0; i < n; ++i) {
-            base_poses.push_back(agent.robot_pose_for_cam_pose(m_observation_poses[i].pose));
+            base_poses.push_back(agent.robotPoseForCamPose(m_observation_poses[i].pose));
         }
 
         std::vector<size_t> start_pose_idxs(lut_size);
@@ -108,11 +108,11 @@ public:
             }
         }
 
-        m_travel_time_lut = agent.estimate_move_times(cam_poses,
-                                                      base_poses,
-                                                      start_pose_idxs,
-                                                      target_pose_idxs,
-                                                      50);
+        m_travel_time_lut = agent.estimateMoveTimes(cam_poses,
+                                                    base_poses,
+                                                    start_pose_idxs,
+                                                    target_pose_idxs,
+                                                    50);
     }
 
 

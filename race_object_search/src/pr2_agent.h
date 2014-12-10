@@ -35,11 +35,6 @@ public:
                                           std::vector<size_t> const & target_pose_idxs,
                                           size_t const n_clusters) const;
 
-    std::vector<double> estimateMoveBaseTimes(std::vector<tf::Pose> const & poses,
-                                              std::vector<size_t> const & start_pose_idxs,
-                                              std::vector<size_t> const & target_pose_idxs,
-                                              size_t const n_clusters) const;
-
     bool achieveCamPose(tf::Pose const & target_cam_pose, double const target_distance);
 
 private: 
@@ -61,6 +56,11 @@ private:
     actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction> m_lift_torso_client;
 
     static double torsoPositionForCamHeight(double const & cam_height);
+
+    std::vector<double> estimateMoveBaseTimes(std::vector<tf::Pose> const & poses,
+                                              std::vector<size_t> const & start_pose_idxs,
+                                              std::vector<size_t> const & target_pose_idxs,
+                                              size_t const n_clusters) const;
 };
 
 #endif // PR2_AGENT_H

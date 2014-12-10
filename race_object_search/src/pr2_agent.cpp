@@ -65,7 +65,7 @@ tf::Pose Pr2Agent::getCurrentCamPose() const
 
 /**
   Return the pose of the virtual (fixed) camera link for a given robot pose with the current torso height.
-  View direction is set to match base orientation.
+  View direction is set to match camera pan but not tilt.
   */
 tf::Pose Pr2Agent::camPoseForRobotPose(tf::Pose const & robot_pose) const
 {

@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<launch>
+  <node name="point_head_continuous" pkg="point_head_continuous" type="point_head_continuous" output="screen" respawn="true" />
+  <node name="simple_search_manager" pkg="race_object_search" type="simple_search_manager" output="screen" respawn="true">
+    <param name="world_frame_id" type="string" value="/map" />
+    <param name="acquisition_time"   type="double" value="9.0" />
+  </node>
+</launch>

@@ -33,6 +33,10 @@ rosbuild_genmsg()
 #rosbuild_add_executable(example examples/example.cpp)
 #target_link_libraries(example ${PROJECT_NAME})
 
+rosbuild_add_executable(simple_search_manager src/simple_search_manager.cpp
+                                              src/pr2_agent.cpp
+                                              src/observation_pose_collection.cpp
+                                              src/kmeans.cpp)
 rosbuild_add_executable(object_search_manager src/object_search_manager.cpp
                                               src/pr2_agent.cpp
                                               src/observation_pose_collection.cpp

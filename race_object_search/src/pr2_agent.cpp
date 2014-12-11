@@ -282,6 +282,7 @@ bool Pr2Agent::achieveCamPose
     ROS_INFO_STREAM("looking towards target: stamp=" << head_goal.target.header.stamp);
 
     // move base if required
+    bool base_moved = false;
     double dh = std::sqrt(std::pow(current_cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2) +
                           std::pow(current_cam_pose.getOrigin().getX() - target_cam_pose.getOrigin().getX(), 2));
     if(dh > HORIZONTAL_TOLERANCE)
@@ -305,6 +306,7 @@ bool Pr2Agent::achieveCamPose
         m_move_base_client.waitForResult(ros::Duration(timeout + 5.0));
         if(m_move_base_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("goal reached with success");
+            base_moved = true;
         } else {
             ROS_INFO("goal approach failed");
             m_move_base_client.cancelAllGoals();
@@ -313,6 +315,7 @@ bool Pr2Agent::achieveCamPose
     }
 
     // lift torso if required
+    bool torso_lifted = false;
     double dz = std::abs(current_cam_pose.getOrigin().getZ() - target_cam_pose.getOrigin().getZ());
     if(dz > VERTICAL_TOLERANCE)
     {
@@ -323,6 +326,7 @@ bool Pr2Agent::achieveCamPose
         m_lift_torso_client.waitForResult(ros::Duration(dz / LIFT_SPEED + 2.0));
         if(m_lift_torso_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
             ROS_INFO("torso lifted with success");
+            torso_lifted = true;
         } else {
             ROS_INFO("torso failed");
             m_lift_torso_client.cancelAllGoals();
@@ -331,6 +335,9 @@ bool Pr2Agent::achieveCamPose
     }
 
     // Unlock head
+    if(!base_moved && !torso_lifted) {
+        ros::Duration(2.0).sleep(); // Give the head some time for movement
+    }
     m_point_head_client.cancelGoal();
 
     return success;

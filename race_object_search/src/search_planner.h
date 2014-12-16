@@ -22,6 +22,7 @@ public:
     {}
 
     bool makePlan(size_t const arg_depth_limit,
+                  double const arg_max_rel_branch_cost,
                   std::vector<size_t> & result_sequence,
                   double & result_etime)
     {
@@ -30,10 +31,11 @@ public:
             opc_subset[i] = i;
         }
         depth_limit = arg_depth_limit;
+        max_rel_branch_cost = arg_max_rel_branch_cost;
         if(memory.empty()) {
             memory.resize(1000);
         }
-        memory[0].detec_opts.init(cgl, opc);
+        memory[0].detec_opts.init(cgl, opc, opc_subset);
         sequence.clear();
         sequence.push_back(-1);
         best_sequence.clear();
@@ -47,17 +49,34 @@ public:
         return(!best_sequence.empty());
     }
 
-    void makeGreedy(std::vector<size_t> & result_sequence,
+    bool makeGreedy(std::vector<size_t> & result_sequence,
                     double & result_etime)
     {
-        // TODO: implement
+        return makePlan(0, 2, result_sequence, result_etime);
     }
 
     void optimalOrder(std::vector<size_t> const & input_sequence,
                       std::vector<size_t> & result_sequence,
                       double & result_etime)
     {
-        // TODO: implement
+        opc_subset.clear();
+        opc_subset.insert(opc_subset.end(), input_sequence.begin() + 1, input_sequence.end());
+        depth_limit = input_sequence.size();
+        max_rel_branch_cost = 1.5;
+        if(memory.empty()) {
+            memory.resize(input_sequence.size());
+        }
+        memory[0].detec_opts.init(cgl, opc, opc_subset);
+        sequence.clear();
+        sequence.push_back(-1);
+        best_sequence.clear();
+        best_etime = std::numeric_limits<double>::infinity();
+
+        std::cout << "Starting recursive optimal ordering..." << std::endl;
+        makePlanRecursive(0, 0.0, 0.0);
+
+        result_sequence = best_sequence;
+        result_etime = best_etime;
     }
 
 private:
@@ -67,14 +86,16 @@ private:
         std::vector<detection_t> detectables;
         std::vector<double> gain;
 
-        void init(CELL_GAIN_LOOKUP const & cgl, ObservationPoseCollection const & opc)
+        void init(CELL_GAIN_LOOKUP const & cgl,
+                  ObservationPoseCollection const & opc,
+                  std::vector<size_t> const & opc_subset)
         {
             detectables.clear();
-            detectables.reserve(opc.getPoses().size());
+            detectables.reserve(opc_subset.size());
             gain.clear();
-            gain.reserve(opc.getPoses().size());
-            for(size_t i = 0; i < opc.getPoses().size(); ++i) {
-                detection_t const & d = opc.getPoses()[i].cell_id_sets[0];
+            gain.reserve(opc_subset.size());
+            for(size_t i = 0; i < opc_subset.size(); ++i) {
+                detection_t const & d = opc.getPoses()[opc_subset[i]].cell_id_sets[0];
                 detectables.push_back(d);
                 double g = 0.0;
                 for(detection_t::iterator it = d.begin(); it != d.end(); ++it) {
@@ -123,6 +144,7 @@ private:
     std::vector<size_t> sequence;
     std::vector<size_t> best_sequence;
     double best_etime;
+    double max_rel_branch_cost;
 
     void makePlanRecursive(size_t const stage,
                            double const pdone,
@@ -137,8 +159,8 @@ private:
         memory[stage].expansion_map.clear();
         for(size_t i = 0; i < opc_subset.size(); ++i) {
             size_t const & pose_idx = opc_subset[i];
-            double const & gain = memory[stage].detec_opts.gain[pose_idx];
-            if(!memory[stage].detec_opts.detectables[pose_idx].empty()) {
+            if(!memory[stage].detec_opts.detectables[i].empty()) {
+                double const & gain = memory[stage].detec_opts.gain[i];
                 double duration = opc.getTravelTime(sequence[stage], pose_idx);
                 double greedy_cost = duration / gain;
                 double new_etime = etime + (1.0 - pdone) * duration;
@@ -146,7 +168,7 @@ private:
                 // This is illogical and possibly due to map updates between subsequent calls of make_plan.
                 // The easiest thing is to just filter these cases here.
                 if(duration < std::numeric_limits<double>::infinity()) {
-                    memory[stage].expansion_map.insert(std::make_pair(greedy_cost, std::make_pair(pose_idx, new_etime)));
+                    memory[stage].expansion_map.insert(std::make_pair(greedy_cost, std::make_pair(i, new_etime)));
                 }
             }
         }
@@ -161,13 +183,13 @@ private:
             return;
         }
 
-        // make sure next stage memory is initialized
-        if(memory[stage+1].detec_opts.detectables.empty()) {
+        // make sure next stage memory is properly initialized
+        if(memory[stage].detec_opts.detectables.size() != memory[stage+1].detec_opts.detectables.size()) {
             memory[stage+1].detec_opts = memory[stage].detec_opts;
         }
 
         // Work through agenda
-        double cutoff = memory[stage].expansion_map.begin()->first * 1.5;
+        double cutoff = memory[stage].expansion_map.begin()->first * max_rel_branch_cost;
         for(expansion_map_t::iterator it = memory[stage].expansion_map.begin();
             it != memory[stage].expansion_map.end();
             ++it)
@@ -176,18 +198,18 @@ private:
                 // cutoff for branches that just seem too bad
                 break;
             }
-            size_t const & pose_idx = it->second.first;
+            size_t const & opc_subset_idx = it->second.first;
             double const & new_etime = it->second.second;
             if(new_etime > best_etime) {
                 // new_etime > best_etime => This branch is hopeless and can be skipped
                 continue;
             }
             // Apply view pose and prepare memory for next stage
-            sequence.push_back(pose_idx);
+            sequence.push_back(opc_subset[opc_subset_idx]);
             memory[stage+1].detec_opts.assignEqualSize(memory[stage].detec_opts);
-            memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[pose_idx], cgl);
+            memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[opc_subset_idx], cgl);
             // Explore next stage
-            makePlanRecursive(stage + 1, pdone + memory[stage].detec_opts.gain[pose_idx], new_etime);
+            makePlanRecursive(stage + 1, pdone + memory[stage].detec_opts.gain[opc_subset_idx], new_etime);
             // Remove the explored pose
             sequence.pop_back();
             if(stage >= depth_limit) {

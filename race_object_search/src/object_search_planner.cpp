@@ -77,36 +77,49 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
         epcg.p = 1.0 / sp.detected_cells[sp.last_idx].size();
     }
 
+    SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
     SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
 
-    boost::posix_time::ptime tick = boost::posix_time::microsec_clock::local_time();
-    sp.greedy(HORIZON);
-    boost::posix_time::ptime now  = boost::posix_time::microsec_clock::local_time();
-    std::cout << "greedy took msec: " << (now-tick).total_milliseconds() << std::endl;
-    sp.sendMarker(m_world_frame_id, m_marker_pub, "greedy_plan");
-
-    ROS_INFO_STREAM("Greedy plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
-    sp.writeTimeplot("plan_timeplot.tab");
-
-    //ROS_INFO("Sending marker");
-    //sp.sendMarker(m_world_frame_id, m_marker_pub);
-
-    //sp.optimizeLocally();
-    //sp.writeTimeplot("plan_timeplot_LO.tab");
-
-    ROS_INFO("Starting search");
-    SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
-    boost::posix_time::ptime tick2 = boost::posix_time::microsec_clock::local_time();
     std::vector<size_t> result_seq;
     double result_etime;
-    spl.makePlan(5, result_seq, result_etime);
+    bool success;
+
+    // GREEDY ---
+
+    boost::posix_time::ptime tick = boost::posix_time::microsec_clock::local_time();
+    success = spl.makeGreedy(result_seq, result_etime);
+    boost::posix_time::ptime now  = boost::posix_time::microsec_clock::local_time();
+    std::cout << "greedy took msec: " << (now-tick).total_milliseconds() << std::endl;
+    if(success) {
+        sp.pushSequence(result_seq, 1, result_seq.size());
+        ROS_INFO_STREAM("Greedy plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
+        ROS_INFO_STREAM("Greedy plan has " << result_seq.size() << " steps and an etime of " << result_etime);
+        sp.writeTimeplot("timeplot_greedy.tab");
+    } else {
+        ROS_INFO("Greedy plan failed!");
+    }
+
+    // GREEDY-REORDER ---
+
+    spl.optimalOrder(result_seq, result_seq, result_etime);
+    sp.clear();
+    sp.pushSequence(result_seq, 1, result_seq.size());
+    ROS_INFO_STREAM("Greedy-Reordered plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
+    ROS_INFO_STREAM("Greedy-Reordered plan has " << result_seq.size() << " steps and an etime of " << result_etime);
+    sp.writeTimeplot("timeplot_greedy_reordered.tab");
+
+    // OPTIMAL ---
+
+    ROS_INFO("Starting search");
+    boost::posix_time::ptime tick2 = boost::posix_time::microsec_clock::local_time();
+    spl.makePlan(5, 1.5, result_seq, result_etime);
     boost::posix_time::ptime now2  = boost::posix_time::microsec_clock::local_time();
-    std::cout << "search took msec: " << (now2-tick2).total_milliseconds() << std::endl;
+    ROS_INFO_STREAM("Search took msec: " << (now2-tick2).total_milliseconds());
     sp.clear();
     sp.pushSequence(result_seq, 1, result_seq.size());
     sp.sendMarker(m_world_frame_id, m_marker_pub, "optimal_plan");
     ROS_INFO_STREAM("etime " << sp.etime[sp.last_idx]);
-    sp.writeTimeplot("plan_timeplot_optimal.tab");
+    sp.writeTimeplot("timeplot_optimal.tab");
 
     ROS_INFO("Done");
     m_observe_volumes_server.setSucceeded();

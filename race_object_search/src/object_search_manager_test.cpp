@@ -14,10 +14,10 @@ int main(int argc, char** argv)
     std::string test;
     n.param("test", test, std::string("none"));
 
-    const char * const TESTS[] =
+    const std::string TESTS[] =
     {
-        "race_tables",
-        "race_room"
+        std::string("race_tables"),
+        std::string("race_room")
     };
     const std::size_t NUM_TESTS = sizeof(TESTS) / sizeof(*TESTS);
 
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
         boxes[2].dimensions.y = 1.6;
         boxes[2].dimensions.z = 1.0;
     }
-    if(test == TESTS[1]) // race_room
+    else if(test == TESTS[1]) // race_room
     {
         boxes.push_back(box);
         boxes[0].pose_stamped.pose.position.x = 8.8;

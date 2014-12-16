@@ -1,0 +1,15 @@
+<package>
+  <description brief="active_perception_evaluation">
+
+     active_perception_evaluation
+
+  </description>
+  <author>Thorsten</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/active_perception_evaluation</url>
+  <depend package="tf"/>
+  <depend package="gazebo_msgs"/>
+</package>
+
+

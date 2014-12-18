@@ -36,16 +36,6 @@ Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & worl
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
     // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 8.0 here)
     ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 1.0);
-
-    while(!m_move_base_client.waitForServer(ros::Duration(5.0))) {
-        ROS_INFO("Waiting for the move_base action server to come up");
-    };
-    while(!m_point_head_client.waitForServer(ros::Duration(5.0))) {
-        ROS_INFO("Waiting for the point_head action server to come up");
-    };
-    while(!m_lift_torso_client.waitForServer(ros::Duration(5.0))) {
-        ROS_INFO("Waiting for the lift_torso action server to come up");
-    };
 }
 
 tf::Pose Pr2Agent::getCurrentRobotPose() const
@@ -58,9 +48,13 @@ tf::Pose Pr2Agent::getCurrentRobotPose() const
 tf::Pose Pr2Agent::getCurrentCamPose() const
 {
     tf::StampedTransform cam_pose;
-    m_tf_listener.lookupTransform(m_world_frame_id, "/head_pan_link", ros::Time(), cam_pose);
-    cam_pose.getOrigin() += tf::Vector3(0.0, 0.0, 0.292);
-    return cam_pose;
+    try {
+        m_tf_listener.lookupTransform(m_world_frame_id, "/head_pan_link", ros::Time(), cam_pose);
+        cam_pose.getOrigin() += tf::Vector3(0.0, 0.0, 0.292);
+        return cam_pose;
+    } catch(tf::TransformException& ex) {
+        return camPoseForRobotPose(getCurrentRobotPose());
+    }
 }
 
 /**
@@ -264,6 +258,16 @@ bool Pr2Agent::achieveCamPose
         tf::Pose const & target_cam_pose,
         double const target_distance)
 { 
+    while(!m_move_base_client.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the move_base action server to come up");
+    };
+    while(!m_point_head_client.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the point_head action server to come up");
+    };
+    while(!m_lift_torso_client.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the lift_torso action server to come up");
+    };
+
     bool success = true;
 
     const tf::Pose current_base_pose = getCurrentRobotPose();

@@ -25,6 +25,12 @@ public:
 
     void poseCb(const gazebo_msgs::LinkStates & link_states)
     {
+        ros::Time now = ros::Time::now();
+
+        // broadcast static transforms
+        tf_br.sendTransform(tf::StampedTransform(sim_map_tf, now, "/map", "/odom_combined"));
+        tf_br.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(), now, "/base_footprint", "/base_link"));
+
         size_t pos = std::find(link_states.name.begin(), link_states.name.end(), "floating_kinect::head_plate_frame") -
                      link_states.name.begin();
 
@@ -51,12 +57,11 @@ public:
         tf::Transform base_offset(tf::Quaternion::getIdentity(), tf::Point(0.07, 0.0, 0.0));
         base_footprint = base_footprint * base_offset;
 
-        // broadcast all transforms
-        ros::Time now = ros::Time::now();
-        tf_br.sendTransform(tf::StampedTransform(sim_map_tf, now, "/map", "/odom_combined"));
+        tf::Transform head_pan_link(base_rotation, cam_in_sim.getOrigin() - tf::Vector3(0.0, 0.0, 0.292));
+
         tf_br.sendTransform(tf::StampedTransform(base_footprint, now, "/odom_combined", "/base_footprint"));
         tf_br.sendTransform(tf::StampedTransform(cam_in_sim, now, "/odom_combined", "/head_plate_frame"));
-        tf_br.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(), now, "/base_footprint", "/base_link"));
+        tf_br.sendTransform(tf::StampedTransform(head_pan_link, now, "/odom_combined", "/head_pan_link"));
     }
 };
 

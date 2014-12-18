@@ -14,7 +14,7 @@
 
   <!-- start race world -->
   <node name="gazebo" pkg="gazebo" type="gazebo"
-    args="-uv $(find race_gazebo_worlds)/worlds/race.world" respawn="false" output="screen"/>
+    args="-uv $(find active_perception_evaluation)/worlds/race.world" respawn="false" output="screen"/>
 
   <!-- start gui -->
   <group if="$(arg gui)">

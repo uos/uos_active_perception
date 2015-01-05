@@ -7,6 +7,7 @@
 # - observation_point: Optional: If set, sampling is restricted poses at the given point.
 # - lockt_height: Only relevant when observation_point is set: Whether camera height should
 #                 be locked (true) or free  (false) for sampling.
+# - omit_cvm: If set to true, no conditional visibility maps are included in the response (reduces msg size). 
 # - objects: List of bounding boxes for moveable objects in the scene.
 #
 # Response:
@@ -17,6 +18,7 @@
 # - information_gain: A list of expected information gain for each camera pose.
 #                     Information gain is measured as revealed space [m^3]
 # - cvm: A list containing the conditional visibility map for each camera pose.
+#        Always empty if omit_cvm is set to true.
 
 race_msgs/BoundingBox[] roi
 int32 sample_size
@@ -24,6 +26,7 @@ duration timeout
 float32 ray_skip
 geometry_msgs/PointStamped observation_position
 bool lock_height
+bool omit_cvm
 race_msgs/BoundingBox[] objects
 ---
 uint32[] roi_cell_counts

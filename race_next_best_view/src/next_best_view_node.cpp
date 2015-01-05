@@ -390,34 +390,37 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
             res.camera_poses.push_back(camera_pose_msg);
             res.target_points.push_back(octomap::pointOctomapToMsg(target_point_octomap));
             res.information_gains.push_back(gain * std::pow(m_resolution, 3));
-            // Prepare the conditional visibility map for this sample
-            boost::unordered_map<unsigned int, std::list<unsigned long> > cvm_hashed;
-            for(ActivePerceptionMap::OcTreeKeyMap::iterator it = discovery_field.begin();
-                it != discovery_field.end();
-                ++it)
+            if(!req.omit_cvm)
             {
-                // convert OcTreeKey to single long id and insert it into the hashed cvm
-                unsigned long cell_id = it->first[0];
-                cell_id = cell_id << 8;
-                cell_id += it->first[1];
-                cell_id = cell_id << 8;
-                cell_id += it->first[1];
-                cvm_hashed[it->second].push_back(cell_id);
+                // Prepare the conditional visibility map for this sample
+                boost::unordered_map<unsigned int, std::list<unsigned long> > cvm_hashed;
+                for(ActivePerceptionMap::OcTreeKeyMap::iterator it = discovery_field.begin();
+                    it != discovery_field.end();
+                    ++it)
+                {
+                    // convert OcTreeKey to single long id and insert it into the hashed cvm
+                    unsigned long cell_id = it->first[0];
+                    cell_id = cell_id << 8;
+                    cell_id += it->first[1];
+                    cell_id = cell_id << 8;
+                    cell_id += it->first[1];
+                    cvm_hashed[it->second].push_back(cell_id);
+                }
+                // Now build a cvm_msg from the hashed cvm
+                // TODO: These types and conversion functions should probably get their own header
+                race_next_best_view::ConditionalVisibilityMap cvm_msg;
+                for(boost::unordered_map<unsigned int, std::list<unsigned long> >::iterator it = cvm_hashed.begin();
+                    it != cvm_hashed.end();
+                    ++it)
+                {
+                    cvm_msg.object_set_ids.push_back(it->first);
+                    race_next_best_view::CellIds cell_ids_msg;
+                    cell_ids_msg.cell_ids.reserve(it->second.size());
+                    cell_ids_msg.cell_ids.insert(cell_ids_msg.cell_ids.begin(), it->second.begin(), it->second.end());
+                    cvm_msg.cell_id_sets.push_back(cell_ids_msg);
+                }
+                res.cvms.push_back(cvm_msg);
             }
-            // Now build a cvm_msg from the hashed cvm
-            // TODO: These types and conversion functions should probably get their own header
-            race_next_best_view::ConditionalVisibilityMap cvm_msg;
-            for(boost::unordered_map<unsigned int, std::list<unsigned long> >::iterator it = cvm_hashed.begin();
-                it != cvm_hashed.end();
-                ++it)
-            {
-                cvm_msg.object_set_ids.push_back(it->first);
-                race_next_best_view::CellIds cell_ids_msg;
-                cell_ids_msg.cell_ids.reserve(it->second.size());
-                cell_ids_msg.cell_ids.insert(cell_ids_msg.cell_ids.begin(), it->second.begin(), it->second.end());
-                cvm_msg.cell_id_sets.push_back(cell_ids_msg);
-            }
-            res.cvms.push_back(cvm_msg);
         }
 
         // Send a marker

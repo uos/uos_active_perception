@@ -41,10 +41,6 @@ NextBestViewNode::NextBestViewNode() :
                                               "/get_observation_camera_poses",
                                               &NextBestViewNode::getObservationCameraPosesCb,
                                               this)),
-    m_get_objects_to_remove_server(m_node_handle_pub.advertiseService(
-                                       "/get_objects_to_remove",
-                                       &NextBestViewNode::getObjectsToRemoveCb,
-                                       this)),
     m_reset_volumes_server(m_node_handle_pub.advertiseService(
                                        "/reset_volumes",
                                        &NextBestViewNode::resetVolumesCb,
@@ -477,12 +473,6 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
     return true;
 }
 
-bool NextBestViewNode::getObjectsToRemoveCb(race_next_best_view::GetObjectsToRemove::Request& req,
-                                            race_next_best_view::GetObjectsToRemove::Response& res)
-{
-    // TODO: Implement
-    return false;
-}
 
 void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 {

@@ -10,7 +10,6 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <race_next_best_view/GetBboxOccupancy.h>
-#include <race_next_best_view/GetObjectsToRemove.h>
 #include <race_next_best_view/GetObservationCameraPoses.h>
 #include <race_next_best_view/ResetVolumes.h>
 #include <race_msgs/BoundingBox.h>
@@ -32,7 +31,6 @@ private:
     ros::Subscriber m_static_map_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
-    ros::ServiceServer m_get_objects_to_remove_server;
     ros::ServiceServer m_reset_volumes_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
@@ -62,9 +60,6 @@ private:
 
     bool getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request&,
                                      race_next_best_view::GetObservationCameraPoses::Response&);
-
-    bool getObjectsToRemoveCb(race_next_best_view::GetObjectsToRemove::Request&,
-                              race_next_best_view::GetObjectsToRemove::Response&);
 
     bool resetVolumesCb(race_next_best_view::ResetVolumes::Request&,
                         race_next_best_view::ResetVolumes::Response&);

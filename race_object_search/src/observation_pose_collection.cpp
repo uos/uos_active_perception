@@ -6,8 +6,8 @@ void ObservationPoseCollection::addPoses
 (
     std::vector<geometry_msgs::Pose> const & new_poses,
     std::vector<geometry_msgs::Point> const & new_target_points,
-    std::vector<race_next_best_view::ConditionalVisibilityMap> const & new_cvms,
-    std::vector<race_next_best_view::ObjectSet> const & new_object_sets
+    std::vector<uos_active_perception_msgs::ConditionalVisibilityMap> const & new_cvms,
+    std::vector<uos_active_perception_msgs::ObjectSet> const & new_object_sets
 ){
     // Integrate new object sets
     // TODO: Keep object sets and map new object sets to old ones (not necessary while there are no objects)

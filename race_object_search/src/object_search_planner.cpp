@@ -5,8 +5,7 @@
 #include "search_planner.h"
 
 #include <visualization_msgs/Marker.h>
-#include <race_next_best_view/GetObservationCameraPoses.h>
-#include <race_msgs/GetAnchoredObjects.h>
+#include <uos_active_perception_msgs/GetObservationCameraPoses.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 ObjectSearchPlanner::ObjectSearchPlanner()
@@ -41,7 +40,7 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
     ObservationPoseCollection opc;
     size_t n_cells = 0;
     {
-        race_next_best_view::GetObservationCameraPoses pose_candidates_call;
+        uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
         pose_candidates_call.request.sample_size = 200;
         pose_candidates_call.request.ray_skip = 0.75;
         pose_candidates_call.request.roi = goal.roi;

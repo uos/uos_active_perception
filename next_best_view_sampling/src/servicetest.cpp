@@ -35,11 +35,11 @@
 *********************************************************************/
 
 #include "ros/ros.h"
-#include "race_next_best_view/GetObservationCameraPoses.h"
+#include "uos_active_perception_msgs/GetObservationCameraPoses.h"
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
-#include "race_next_best_view/GetBboxOccupancy.h"
-#include "race_next_best_view/ResetVolumes.h"
+#include "uos_active_perception_msgs/GetBboxOccupancy.h"
+#include "uos_active_perception_msgs/ResetVolumes.h"
 
 
 int main(int argc, char** argv)
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     ros::Duration(1).sleep();
 
     // Create the request
-    race_msgs::BoundingBox box;
+    uos_active_perception_msgs::BoundingBox box;
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     marker_pub.publish(marker);
 
     // Send request
-    race_next_best_view::GetBboxOccupancy get_bbox;
+    uos_active_perception_msgs::GetBboxOccupancy get_bbox;
     get_bbox.request.bbox = box;
     if(ros::service::call("/get_bbox_occupancy", get_bbox))
     {
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
     }
 
     // Send request
-    race_next_best_view::GetObservationCameraPoses get_ocp;
+    uos_active_perception_msgs::GetObservationCameraPoses get_ocp;
     get_ocp.request.roi.push_back(box);
     get_ocp.request.sample_size = 100;
     get_ocp.request.ray_skip = 0.8;
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
     }
     
     // Send request
-    race_next_best_view::ResetVolumes reset_volumes_call;
+    uos_active_perception_msgs::ResetVolumes reset_volumes_call;
     reset_volumes_call.request.volumes.push_back(box);
     if(ros::service::call("/reset_volumes", reset_volumes_call))
     {

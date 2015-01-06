@@ -1,5 +1,5 @@
 # Goal: A list of bounding boxes to observe, optionally along with probabilities of success for each bounding box.
-race_msgs/BoundingBox[] roi
+uos_active_perception_msgs/BoundingBox[] roi
 float32[] p
 ---
 # Result: Amount of ROI space left unobserved [m^3]

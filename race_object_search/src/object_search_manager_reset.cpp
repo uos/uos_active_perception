@@ -2,7 +2,7 @@
 #include "tf/tf.h"
 #include "visualization_msgs/Marker.h"
 #include "actionlib/client/simple_action_client.h"
-#include "race_next_best_view/ResetVolumes.h"
+#include "uos_active_perception_msgs/ResetVolumes.h"
 
 
 int main(int argc, char** argv)
@@ -14,7 +14,7 @@ int main(int argc, char** argv)
     ros::Duration(1).sleep();
 
     // Create the request
-    race_msgs::BoundingBox box;
+    uos_active_perception_msgs::BoundingBox box;
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
@@ -25,8 +25,8 @@ int main(int argc, char** argv)
     n.param("ydim", box.dimensions.y, 1.0);
     n.param("zdim", box.dimensions.z, 1.0);
 
-    ros::ServiceClient c = n.serviceClient<race_next_best_view::ResetVolumes>("/reset_volumes");
-    race_next_best_view::ResetVolumes srv;
+    ros::ServiceClient c = n.serviceClient<uos_active_perception_msgs::ResetVolumes>("/reset_volumes");
+    uos_active_perception_msgs::ResetVolumes srv;
     srv.request.volumes.push_back(box);
     c.waitForExistence();
     ROS_INFO("Sending goal...");

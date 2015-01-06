@@ -25,8 +25,8 @@ int main(int argc, char** argv)
     ros::WallDuration(1.0).sleep();
 
     // Create the request
-    std::vector<race_msgs::BoundingBox> boxes;
-    race_msgs::BoundingBox box;
+    std::vector<uos_active_perception_msgs::BoundingBox> boxes;
+    uos_active_perception_msgs::BoundingBox box;
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);

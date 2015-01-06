@@ -20,14 +20,14 @@
 # - cvm: A list containing the conditional visibility map for each camera pose.
 #        Always empty if omit_cvm is set to true.
 
-race_msgs/BoundingBox[] roi
+BoundingBox[] roi
 int32 sample_size
 duration timeout
 float32 ray_skip
 geometry_msgs/PointStamped observation_position
 bool lock_height
 bool omit_cvm
-race_msgs/BoundingBox[] objects
+BoundingBox[] objects
 ---
 uint32[] roi_cell_counts
 geometry_msgs/Pose[] camera_poses

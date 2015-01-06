@@ -48,8 +48,8 @@
 #include <octomap/octomap.h>
 #include <visualization_msgs/Marker.h>
 #include <boost/random.hpp>
-#include <race_next_best_view/ConditionalVisibilityMap.h>
-#include <race_next_best_view/CellIds.h>
+#include <uos_active_perception_msgs/ConditionalVisibilityMap.h>
+#include <uos_active_perception_msgs/CellIds.h>
 
 #include <ctime>
 #include <list>
@@ -126,7 +126,7 @@ double NextBestViewNode::getIntersectionVolume(
     return (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
 }
 
-std::vector<tf::Vector3> NextBestViewNode::bboxVertices(race_msgs::BoundingBox const & bbox)
+std::vector<tf::Vector3> NextBestViewNode::bboxVertices(uos_active_perception_msgs::BoundingBox const & bbox)
 {
     // Construct a vector of bounding box vertices relative to the bounding box pose
     std::vector<tf::Vector3> bbox_points(8);
@@ -152,7 +152,7 @@ std::vector<tf::Vector3> NextBestViewNode::bboxVertices(race_msgs::BoundingBox c
 }
 
 bool NextBestViewNode::getAxisAlignedBounds(
-        race_msgs::BoundingBox const & bbox,
+        uos_active_perception_msgs::BoundingBox const & bbox,
         octomath::Vector3 & min,
         octomath::Vector3 & max
 ) const
@@ -190,7 +190,7 @@ bool NextBestViewNode::getAxisAlignedBounds(
     return true;
 }
 
-OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<race_msgs::BoundingBox> const & bbox_vec) const
+OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<uos_active_perception_msgs::BoundingBox> const & bbox_vec) const
 {
     OcTreeBoxSet boxSet;
     for(unsigned int i = 0; i < bbox_vec.size(); i++)
@@ -209,8 +209,8 @@ OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<race_msgs::BoundingBox>
     return boxSet;
 }
 
-bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request &req,
-                                          race_next_best_view::GetBboxOccupancy::Response &res)
+bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOccupancy::Request &req,
+                                          uos_active_perception_msgs::GetBboxOccupancy::Response &res)
 {
     boost::mutex::scoped_lock lock(m_map_mutex);
     octomath::Vector3 min, max;
@@ -245,8 +245,8 @@ bool NextBestViewNode::getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy:
     return true;
 }
 
-bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request& req,
-                                                   race_next_best_view::GetObservationCameraPoses::Response& res)
+bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::GetObservationCameraPoses::Request& req,
+                                                   uos_active_perception_msgs::GetObservationCameraPoses::Response& res)
 {
     ros::Time callback_timeout = ros::Time::now() + req.timeout;
     ObservationPoseSampler ops(m_camera_constraints, m_camera_range_tolerance);
@@ -444,13 +444,13 @@ bool NextBestViewNode::getObservationCameraPosesCb(race_next_best_view::GetObser
                 }
                 // Now build a cvm_msg from the hashed cvm
                 // TODO: These types and conversion functions should probably get their own header
-                race_next_best_view::ConditionalVisibilityMap cvm_msg;
+                uos_active_perception_msgs::ConditionalVisibilityMap cvm_msg;
                 for(boost::unordered_map<unsigned int, std::list<unsigned long> >::iterator it = cvm_hashed.begin();
                     it != cvm_hashed.end();
                     ++it)
                 {
                     cvm_msg.object_set_ids.push_back(it->first);
-                    race_next_best_view::CellIds cell_ids_msg;
+                    uos_active_perception_msgs::CellIds cell_ids_msg;
                     cell_ids_msg.cell_ids.reserve(it->second.size());
                     cell_ids_msg.cell_ids.insert(cell_ids_msg.cell_ids.begin(), it->second.begin(), it->second.end());
                     cvm_msg.cell_id_sets.push_back(cell_ids_msg);
@@ -634,12 +634,12 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
 
 bool NextBestViewNode::resetVolumesCb
 (
-        race_next_best_view::ResetVolumes::Request & req,
-        race_next_best_view::ResetVolumes::Response & resp)
+        uos_active_perception_msgs::ResetVolumes::Request & req,
+        uos_active_perception_msgs::ResetVolumes::Response & resp)
 {
     boost::mutex::scoped_lock lock(m_map_mutex);
     bool success = true;
-    for(std::vector<race_msgs::BoundingBox>::iterator it = req.volumes.begin();
+    for(std::vector<uos_active_perception_msgs::BoundingBox>::iterator it = req.volumes.begin();
         it < req.volumes.end();
         ++it)
     {

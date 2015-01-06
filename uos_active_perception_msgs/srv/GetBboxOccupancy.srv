@@ -1,4 +1,4 @@
-race_msgs/BoundingBox bbox
+BoundingBox bbox
 ---
 float32 occupied
 float32 free

@@ -3,8 +3,7 @@
 #include "observation_pose_collection.h"
 
 #include <visualization_msgs/Marker.h>
-#include <race_next_best_view/GetObservationCameraPoses.h>
-#include <race_msgs/GetAnchoredObjects.h>
+#include <uos_active_perception_msgs/GetObservationCameraPoses.h>
 
 SimpleSearchManager::SimpleSearchManager()
 :
@@ -44,7 +43,7 @@ void SimpleSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
 
         ROS_INFO("retrieving local pose candidates");
         {
-            race_next_best_view::GetObservationCameraPoses pose_candidates_call;
+            uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
             pose_candidates_call.request.sample_size = 100;
             pose_candidates_call.request.ray_skip = 0.75;
             pose_candidates_call.request.roi = goal.roi;
@@ -67,7 +66,7 @@ void SimpleSearchManager::observeVolumesCb(race_object_search::ObserveVolumesGoa
 
         ROS_INFO("retrieving global pose candidates");
         {
-            race_next_best_view::GetObservationCameraPoses pose_candidates_call;
+            uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
             pose_candidates_call.request.sample_size = 200;
             pose_candidates_call.request.ray_skip = 0.75;
             pose_candidates_call.request.roi = goal.roi;

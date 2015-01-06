@@ -45,10 +45,10 @@
 #include <tf/transform_listener.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include <race_next_best_view/GetBboxOccupancy.h>
-#include <race_next_best_view/GetObservationCameraPoses.h>
-#include <race_next_best_view/ResetVolumes.h>
-#include <race_msgs/BoundingBox.h>
+#include <uos_active_perception_msgs/GetBboxOccupancy.h>
+#include <uos_active_perception_msgs/GetObservationCameraPoses.h>
+#include <uos_active_perception_msgs/ResetVolumes.h>
+#include <uos_active_perception_msgs/BoundingBox.h>
 #include <boost/thread/mutex.hpp>
 
 #include <string>
@@ -78,27 +78,27 @@ private:
 
     static double getIntersectionVolume(const octomath::Vector3 &box1min, const octomath::Vector3 &box1max,
                                         const octomath::Vector3 &box2min, const octomath::Vector3 &box2max);
-    static std::vector<tf::Vector3> bboxVertices(race_msgs::BoundingBox const & bbox);
+    static std::vector<tf::Vector3> bboxVertices(uos_active_perception_msgs::BoundingBox const & bbox);
 
-    bool getAxisAlignedBounds(race_msgs::BoundingBox const & bbox,
+    bool getAxisAlignedBounds(uos_active_perception_msgs::BoundingBox const & bbox,
                               octomath::Vector3 & min,
                               octomath::Vector3 & max) const;
 
-    OcTreeBoxSet boxSetFromMsg(std::vector<race_msgs::BoundingBox> const & bbox_vec) const;
+    OcTreeBoxSet boxSetFromMsg(std::vector<uos_active_perception_msgs::BoundingBox> const & bbox_vec) const;
 
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
 
     void staticMapCb(nav_msgs::OccupancyGrid const & map);
 
-    bool getBboxOccupancyCb(race_next_best_view::GetBboxOccupancy::Request&,
-                            race_next_best_view::GetBboxOccupancy::Response&);
+    bool getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOccupancy::Request&,
+                            uos_active_perception_msgs::GetBboxOccupancy::Response&);
 
-    bool getObservationCameraPosesCb(race_next_best_view::GetObservationCameraPoses::Request&,
-                                     race_next_best_view::GetObservationCameraPoses::Response&);
+    bool getObservationCameraPosesCb(uos_active_perception_msgs::GetObservationCameraPoses::Request&,
+                                     uos_active_perception_msgs::GetObservationCameraPoses::Response&);
 
-    bool resetVolumesCb(race_next_best_view::ResetVolumes::Request&,
-                        race_next_best_view::ResetVolumes::Response&);
+    bool resetVolumesCb(uos_active_perception_msgs::ResetVolumes::Request&,
+                        uos_active_perception_msgs::ResetVolumes::Response&);
 };
 
 #endif // NEXT_BEST_VIEW_NODE_H

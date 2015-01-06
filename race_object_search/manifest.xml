@@ -3,6 +3,9 @@
 
      race_object_search
 
+     Although this package builds without RACE dependencies, most nodes require the service
+     /move_base_node/make_multiple_plans which is provided by the RACE navigation overlay.
+
   </description>
   <author>Thorsten Gedicke</author>
   <license>BSD</license>

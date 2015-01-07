@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-  <node name="next_best_view_node" pkg="race_next_best_view" type="next_best_view_node" output="screen" respawn="true">
+  <node name="next_best_view_node" pkg="next_best_view_sampling" type="next_best_view_node" output="screen" respawn="true">
     <!-- camera constraints -->
     <param name="height_min" type="double" value="1.5875" />
     <param name="height_max" type="double" value="1.5875" />

@@ -8,7 +8,7 @@ How to launch the system on the real PR2
 ----------------------------------------
 
     roslaunch race_bringup race_prerequisites.launch sim:=false
-    roslaunch race_next_best_view next_best_view_pr2_real.launch
+    roslaunch next_best_view_sampling next_best_view_pr2_real.launch
     rosrun race_object_search object_search_manager _world_frame_id:=/map
     rosrun race_object_search object_search_manager_test
 
@@ -25,7 +25,7 @@ How to launch the system in Gazebo
 
 ### octomap mapping and NBV sampling
 
-    roslaunch race_next_best_view next_best_view_pr2.launch
+    roslaunch next_best_view_sampling next_best_view_pr2.launch
 
 
 ### object search action server

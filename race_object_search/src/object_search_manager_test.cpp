@@ -3,7 +3,102 @@
 #include "visualization_msgs/Marker.h"
 #include "actionlib/client/simple_action_client.h"
 #include "race_object_search/ObserveVolumesAction.h"
+#include "uos_active_perception_msgs/ResetVolumes.h"
 
+#include <cstring>
+
+uos_active_perception_msgs::BoundingBox makeBox()
+{
+    uos_active_perception_msgs::BoundingBox box;
+    box.pose_stamped.header.frame_id = "/map";
+    box.pose_stamped.header.stamp = ros::Time::now();
+    box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeTable1()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 7.7;
+    box.pose_stamped.pose.position.y = 11.5;
+    box.pose_stamped.pose.position.z =  .95;
+    box.dimensions.x = .8;
+    box.dimensions.y = .8;
+    box.dimensions.z = .4;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeTable2()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 10.25;
+    box.pose_stamped.pose.position.y = 11.5;
+    box.pose_stamped.pose.position.z =  .95;
+    box.dimensions.x = .8;
+    box.dimensions.y = .8;
+    box.dimensions.z = .4;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeCounter()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 5.225;
+    box.pose_stamped.pose.position.y = 10.08;
+    box.pose_stamped.pose.position.z =  .95;
+    box.dimensions.x = 0.75;
+    box.dimensions.y = 1.45;
+    box.dimensions.z = 0.4;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeRaceRoom()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 8.8;
+    box.pose_stamped.pose.position.y = 11.5;
+    box.pose_stamped.pose.position.z =  1.0;
+    box.dimensions.x = 10.0;
+    box.dimensions.y = 5.0;
+    box.dimensions.z = 2.0;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeShelf1()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 7.75;
+    box.pose_stamped.pose.position.y = 9.25;
+    box.pose_stamped.pose.position.z = 0.58;
+    box.dimensions.x = 0.8;
+    box.dimensions.y = 0.4;
+    box.dimensions.z = 1.15;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeShelf2()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 3.3;
+    box.pose_stamped.pose.position.y = 11.2;
+    box.pose_stamped.pose.position.z = 0.58;
+    box.dimensions.x = 0.4;
+    box.dimensions.y = 0.8;
+    box.dimensions.z = 1.15;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeShelf3()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = -0.05;
+    box.pose_stamped.pose.position.y = 11.2;
+    box.pose_stamped.pose.position.z = 0.58;
+    box.dimensions.x = 0.4;
+    box.dimensions.y = 0.8;
+    box.dimensions.z = 1.15;
+    return box;
+}
 
 int main(int argc, char** argv)
 {
@@ -11,75 +106,37 @@ int main(int argc, char** argv)
     ros::NodeHandle n("~");
     ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("/race_object_search_manager_test", 10);
 
-    std::string test;
-    n.param("test", test, std::string("none"));
-
-    const std::string TESTS[] =
-    {
-        std::string("race_tables"),
-        std::string("race_room")
-    };
-    const std::size_t NUM_TESTS = sizeof(TESTS) / sizeof(*TESTS);
-
     // Wait for subscribers to connect
     ros::WallDuration(1.0).sleep();
 
     // Create the request
     std::vector<uos_active_perception_msgs::BoundingBox> boxes;
-    uos_active_perception_msgs::BoundingBox box;
-    box.pose_stamped.header.frame_id = "/map";
-    box.pose_stamped.header.stamp = ros::Time::now();
-    box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
+    bool reset = false;
+    bool nosearch = false;
 
-    if(test == TESTS[0]) // race_tables
-    {
-        // table1
-        boxes.push_back(box);
-        boxes[0].pose_stamped.pose.position.x = 7.7;
-        boxes[0].pose_stamped.pose.position.y = 11.4;
-        boxes[0].pose_stamped.pose.position.z =  1.0;
-        boxes[0].dimensions.x = 1.0;
-        boxes[0].dimensions.y = 1.0;
-        boxes[0].dimensions.z = 1.0;
-
-        // table2
-        boxes.push_back(box);
-        boxes[1].pose_stamped.pose.position.x = 10.4;
-        boxes[1].pose_stamped.pose.position.y = 11.4;
-        boxes[1].pose_stamped.pose.position.z =  1.0;
-        boxes[1].dimensions.x = 1.0;
-        boxes[1].dimensions.y = 1.0;
-        boxes[1].dimensions.z = 1.0;
-
-        // counter
-        boxes.push_back(box);
-        boxes[2].pose_stamped.pose.position.x = 5.2;
-        boxes[2].pose_stamped.pose.position.y = 10.0;
-        boxes[2].pose_stamped.pose.position.z =  1.0;
-        boxes[2].dimensions.x = 1.0;
-        boxes[2].dimensions.y = 1.6;
-        boxes[2].dimensions.z = 1.0;
-    }
-    else if(test == TESTS[1]) // race_room
-    {
-        boxes.push_back(box);
-        boxes[0].pose_stamped.pose.position.x = 8.8;
-        boxes[0].pose_stamped.pose.position.y = 11.5;
-        boxes[0].pose_stamped.pose.position.z =  1.0;
-        boxes[0].dimensions.x = 10.0;
-        boxes[0].dimensions.y = 5.0;
-        boxes[0].dimensions.z = 2.0;
-    }
-    else // none
-    {
-        std::cout << "No test specified. Specify with _test:=[TEST]. Available tests are:" << std::endl;
-        for(size_t i = 0; i < NUM_TESTS; ++i) {
-            std::cout << TESTS[i] << std::endl;
+    for(long i = 1; i < argc; ++i) {
+        if(!strcmp(argv[i], "reset")) {
+            reset = true;
+        } else if(!strcmp(argv[i], "nosearch")) {
+            nosearch = true;
+        } else if(!strcmp(argv[i], "table1")) {
+            boxes.push_back(makeTable1());
+        } else if(!strcmp(argv[i], "table2")) {
+            boxes.push_back(makeTable2());
+        } else if(!strcmp(argv[i], "counter")) {
+            boxes.push_back(makeCounter());
+        } else if(!strcmp(argv[i], "raceRoom")) {
+            boxes.push_back(makeRaceRoom());
+        } else if(!strcmp(argv[i], "shelf1")) {
+            boxes.push_back(makeShelf1());
+        } else if(!strcmp(argv[i], "shelf2")) {
+            boxes.push_back(makeShelf2());
+        } else if(!strcmp(argv[i], "shelf3")) {
+            boxes.push_back(makeShelf3());
+        } else {
+            ROS_ERROR_STREAM("UNKNOWN BOX: " << argv[i]);
         }
-        std::exit(0);
     }
-
-    ROS_INFO_STREAM("Sending test request " << test);
 
     // Send a marker
     for(size_t i = 0; i < boxes.size(); ++i) {
@@ -97,25 +154,36 @@ int main(int argc, char** argv)
         marker.pose = boxes[i].pose_stamped.pose;
         marker.header = boxes[i].pose_stamped.header;
         marker.id = i;
-        marker.ns = test;
+        marker.ns = "observe_volumes";
         marker_pub.publish(marker);
     }
 
-    actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("/observe_volumes", true);
-    ac.waitForServer();
-    race_object_search::ObserveVolumesGoal goal;
-    goal.roi.insert(goal.roi.end(), boxes.begin(), boxes.end());
-    goal.p = std::vector<float>(goal.roi.size(), 1.0 / goal.roi.size());
-    ROS_INFO("Sending goal...");
-    ac.sendGoal(goal);
-    ac.waitForResult();
-    if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-    {
-        ROS_INFO_STREAM(test << " completed!");
+    // reset regions if commanded to
+    if(reset) {
+        ros::ServiceClient c = n.serviceClient<uos_active_perception_msgs::ResetVolumes>("/reset_volumes");
+        uos_active_perception_msgs::ResetVolumes srv;
+        srv.request.volumes.insert(srv.request.volumes.end(), boxes.begin(), boxes.end());
+        c.waitForExistence();
+        c.call(srv);
     }
-    else
-    {
-        ROS_INFO_STREAM(test << " failed!");
+
+    if(!nosearch) {
+        actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("/observe_volumes", true);
+        ac.waitForServer();
+        race_object_search::ObserveVolumesGoal goal;
+        goal.roi.insert(goal.roi.end(), boxes.begin(), boxes.end());
+        goal.p = std::vector<float>(goal.roi.size(), 1.0 / goal.roi.size());
+        ROS_INFO("Sending goal...");
+        ac.sendGoal(goal);
+        ac.waitForResult();
+        if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            ROS_INFO("... completed!");
+        }
+        else
+        {
+            ROS_ERROR("... failed!");
+        }
     }
 
     ros::spinOnce();

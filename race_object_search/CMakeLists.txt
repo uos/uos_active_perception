@@ -50,6 +50,5 @@ rosbuild_add_executable(object_search_planner src/object_search_planner.cpp
                                               src/observation_pose_collection.cpp
                                               src/kmeans.cpp)
 rosbuild_add_executable(object_search_manager_test src/object_search_manager_test.cpp)
-rosbuild_add_executable(object_search_manager_reset src/object_search_manager_reset.cpp)
 rosbuild_add_executable(kmeans-test src/kmeans.cpp
                                     src/kmeans-test.cpp)

@@ -4,8 +4,6 @@
   <arg name="use_sim_time" default="true"/>
   <!--Start up the Gazebo GUI-->
   <arg name="gui" default="true"/>
-  <!--Environment furniture-->
-  <arg name="furniture" default="true" />
 
   <!-- set use_sim_time flag -->
   <group if="$(arg use_sim_time)">
@@ -20,9 +18,5 @@
   <group if="$(arg gui)">
     <node name="gazebo_gui" pkg="gazebo" type="gui" respawn="true" output="screen"/>
   </group>
-
-  <include file="$(find race_gazebo_worlds)/launch/spawn_scenario_items.launch">
-    <arg name="furniture" value="$(arg furniture)" />
-  </include>
 
 </launch>

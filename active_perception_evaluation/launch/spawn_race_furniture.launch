@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find race_gazebo_worlds)/launch/spawn_scenario_items.launch">
+    <arg name="furniture" value="true" />
+  </include>
+
+  <!-- MODELS -->
+  <param name="model_bookshelf" textfile="$(find gazebo)/gazebo/share/gazebo-1.0.2/models/bookshelf.model" />
+  
+  <!-- SPAWN SHELF 1 -->
+  <node name="spawn_bookshelf_321" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_321
+              -x -4.47
+              -y -1.19
+              -z 0
+              -R 0
+              -P 0
+              -Y 3.14" />
+              
+  <!-- SPAWN SHELF 2 -->
+  <node name="spawn_bookshelf_322" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_322
+              -x -12.59
+              -y 1
+              -z 0
+              -R 0
+              -P 0
+              -Y 1.57" />
+              
+  <!-- SPAWN SHELF 2 -->
+  <node name="spawn_bookshelf_323" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_323
+              -x -8.78
+              -y 1
+              -z 0
+              -R 0
+              -P 0
+              -Y 4.71" />
+    
+</launch>

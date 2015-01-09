@@ -21,10 +21,10 @@ uos_active_perception_msgs::BoundingBox makeTable1()
     uos_active_perception_msgs::BoundingBox box = makeBox();
     box.pose_stamped.pose.position.x = 7.7;
     box.pose_stamped.pose.position.y = 11.5;
-    box.pose_stamped.pose.position.z =  .95;
+    box.pose_stamped.pose.position.z = 1.0;
     box.dimensions.x = .8;
     box.dimensions.y = .8;
-    box.dimensions.z = .4;
+    box.dimensions.z = .5;
     return box;
 }
 
@@ -33,10 +33,10 @@ uos_active_perception_msgs::BoundingBox makeTable2()
     uos_active_perception_msgs::BoundingBox box = makeBox();
     box.pose_stamped.pose.position.x = 10.25;
     box.pose_stamped.pose.position.y = 11.5;
-    box.pose_stamped.pose.position.z =  .95;
+    box.pose_stamped.pose.position.z = 1.0;
     box.dimensions.x = .8;
     box.dimensions.y = .8;
-    box.dimensions.z = .4;
+    box.dimensions.z = .5;
     return box;
 }
 
@@ -45,10 +45,10 @@ uos_active_perception_msgs::BoundingBox makeCounter()
     uos_active_perception_msgs::BoundingBox box = makeBox();
     box.pose_stamped.pose.position.x = 5.225;
     box.pose_stamped.pose.position.y = 10.08;
-    box.pose_stamped.pose.position.z =  .95;
+    box.pose_stamped.pose.position.z = 1.0;
     box.dimensions.x = 0.75;
     box.dimensions.y = 1.45;
-    box.dimensions.z = 0.4;
+    box.dimensions.z = 0.5;
     return box;
 }
 

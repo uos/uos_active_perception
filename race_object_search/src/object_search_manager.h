@@ -9,7 +9,6 @@
 #include <race_object_search/ObserveVolumesAction.h>
 #include <visualization_msgs/Marker.h>
 #include <uos_active_perception_msgs/GetObservationCameraPoses.h>
-//#include <race_msgs/GetAnchoredObjects.h>
 
 template<class TAgent>
 class ObjectSearchManager
@@ -55,13 +54,6 @@ private:
                 return;
             }
 
-            // get current object knowledge
-//            race_msgs::GetAnchoredObjects anchored_objects_call;
-//            if(!ros::service::call("/get_anchored_objects", anchored_objects_call))
-//            {
-//                ROS_WARN("unable to retrieve object knowledge from anchoring");
-//            }
-
             // get current robot pose
             const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
             const tf::Pose cam_pose = m_agent.getCurrentCamPose();
@@ -74,7 +66,6 @@ private:
                 pose_candidates_call.request.sample_size = 100;
                 pose_candidates_call.request.ray_skip = 0.75;
                 pose_candidates_call.request.roi = goal.roi;
-                //pose_candidates_call.request.objects = anchored_objects_call.response.bounding_boxes;
                 pose_candidates_call.request.observation_position.header.frame_id = m_world_frame_id;
                 pose_candidates_call.request.observation_position.header.stamp = ros::Time::now();
                 tf::pointTFToMsg(m_agent.camPoseForRobotPose(robot_pose).getOrigin(),

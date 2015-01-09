@@ -35,7 +35,7 @@ public:
 
     double getTravelTime(size_t start_idx, size_t target_idx) const;
 
-    void dumpInitialTravelTimeMap() const;
+    void dumpInitialTravelTimeMap(const std::string & fname) const;
 
     size_t pruneUnreachablePoses();
 

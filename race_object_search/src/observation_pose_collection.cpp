@@ -55,10 +55,10 @@ double ObservationPoseCollection::getTravelTime(size_t start_idx, size_t target_
     }
 }
 
-void ObservationPoseCollection::dumpInitialTravelTimeMap() const
+void ObservationPoseCollection::dumpInitialTravelTimeMap(const std::string & fname) const
 {
     std::ofstream f;
-    f.open ("initial_travel_times.tab");
+    f.open(fname.c_str());
     f << "x\ty\ttime\n";
     f << "c\tc\tc\n";
     f << "\t\tc\n";

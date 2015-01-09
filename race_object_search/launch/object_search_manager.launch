@@ -1,9 +1,12 @@
 <?xml version="1.0" ?>
 <launch>
+  <arg name="log_dir" default="" />
+
   <node name="point_head_continuous" pkg="point_head_continuous" type="point_head_continuous" output="screen" respawn="true" />
   <node name="object_search_manager" pkg="race_object_search" type="object_search_manager" output="screen" respawn="true">
     <param name="world_frame_id" type="string" value="/map" />
     <param name="acquisition_time"   type="double" value="9.0" />
     <param name="robot" type="string" value="pr2" />
+    <param name="log_dir" type="string" value="$(arg log_dir)" />
   </node>
 </launch>

@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+    <include file="$(find active_perception_evaluation)/launch/spawn_race_furniture.launch" />
+
     <!-- TABLE 2 -->
     <!-- SPAWN BOWL 1 -->
     <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
@@ -99,49 +101,15 @@
         <arg name="yaw" value="0"/>
     </include>
     
-    <!-- SPAWN OCCLUDING OBJECT(S) -->
+    <!-- SPAWN MENU CARD -->
     <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
-        <arg name="model" value="race_book_c"/>
-        <arg name="model_name" value="book_321"/>
-        <arg name="x" value="-2.25"/>
-        <arg name="y" value="1.37"/>
-        <arg name="z" value="0.75"/>
+        <arg name="model" value="race_menucard"/>
+        <arg name="model_name" value="menucard_321"/>
+        <arg name="x" value="-2.05"/>
+        <arg name="y" value="1.35"/>
+        <arg name="z" value="0.85"/>
         <arg name="roll" value="0"/>
-        <arg name="pitch" value="0"/>
-        <arg name="yaw" value="0"/>
-    </include>
-    <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
-        <arg name="model" value="race_book_java"/>
-        <arg name="model_name" value="book_322"/>
-        <arg name="x" value="-2.13"/>
-        <arg name="y" value="1.37"/>
-        <arg name="z" value="0.75"/>
-        <arg name="roll" value="0"/>
-        <arg name="pitch" value="0"/>
-        <arg name="yaw" value="0"/>
-    </include>
-
-    <!-- SPAWN SUGAR AND MILK POT -->
-    <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
-        <arg name="urdf" value="true"/>
-        <arg name="model" value="coffee_cup_model"/>
-        <arg name="model_name" value="sugarpot_321"/>
-        <arg name="x" value="-1.93"/>
-        <arg name="y" value="1.36"/>
-        <arg name="z" value="0.75"/>
-        <arg name="roll" value="0"/>
-        <arg name="pitch" value="0"/>
-        <arg name="yaw" value="0"/>
-    </include>
-    <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
-        <arg name="urdf" value="true"/>
-        <arg name="model" value="coffee_cup_model"/>
-        <arg name="model_name" value="milkpot_321"/>
-        <arg name="x" value="-1.72"/>
-        <arg name="y" value="1.3"/>
-        <arg name="z" value="0.75"/>
-        <arg name="roll" value="0"/>
-        <arg name="pitch" value="0"/>
+        <arg name="pitch" value="4.71"/>
         <arg name="yaw" value="0"/>
     </include>
     
@@ -226,6 +194,26 @@
         <arg name="z" value="0.75"/>
         <arg name="roll" value="0"/>
         <arg name="pitch" value="0"/>
+        <arg name="yaw" value="0"/>
+    </include>
+    <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
+        <arg name="model" value="race_menucard"/>
+        <arg name="model_name" value="menucard_322"/>
+        <arg name="x" value="-6.85"/>
+        <arg name="y" value="-0.35"/>
+        <arg name="z" value="0.87"/>
+        <arg name="roll" value="0"/>
+        <arg name="pitch" value="4.71"/>
+        <arg name="yaw" value="0"/>
+    </include>
+    <include file="$(find race_gazebo_worlds)/launch/spawn_object_at_xyz.launch">
+        <arg name="model" value="race_menucard"/>
+        <arg name="model_name" value="menucard_323"/>
+        <arg name="x" value="-6.85"/>
+        <arg name="y" value="0.2"/>
+        <arg name="z" value="0.87"/>
+        <arg name="roll" value="0"/>
+        <arg name="pitch" value="4.71"/>
         <arg name="yaw" value="0"/>
     </include>
     

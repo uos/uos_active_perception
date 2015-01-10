@@ -2,6 +2,8 @@
 #define OBJECT_SEARCH_MANAGER_H
 
 #include "observation_pose_collection.h"
+#include "search_plan.h"
+#include "search_planner.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
@@ -30,9 +32,15 @@ public:
     {
         m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
         m_node_handle.param("log_dir", m_log_dir, std::string(""));
+        // sampling params
         m_node_handle.param("local_sample_size", m_local_sample_size, 100);
         m_node_handle.param("global_sample_size", m_global_sample_size, 200);
         m_node_handle.param("ray_skip", m_ray_skip, 0.75);
+        // planning params
+        m_node_handle.param("planning_mode", m_planning_mode, std::string("simple"));
+        m_node_handle.param("depth_limit", m_depth_limit, -1);
+        m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.0);
+        m_node_handle.param("planning_timeout", m_planning_timeout, 0.0);
 
         // open logging and evaluation data files
         if(!m_log_dir.empty()) {
@@ -56,14 +64,29 @@ private:
     actionlib::SimpleActionServer<race_object_search::ObserveVolumesAction> m_observe_volumes_server;
     TAgent m_agent;
     std::string m_world_frame_id;
+    // sampling params
     int m_local_sample_size;
     int m_global_sample_size;
     double m_ray_skip;
+    // planning params
+    std::string m_planning_mode;
+    int m_depth_limit;
+    double m_max_rel_branch_cost;
+    double m_planning_timeout;
 
     // logging and evaluation data files
     std::string m_log_dir;
     std::ofstream m_file_events;
     std::ofstream m_file_vals;
+
+    struct EqualProbabilityCellGain
+    {
+         double p;
+         double operator ()(uint64_t const & cell) const
+         {
+             return p;
+         }
+    };
 
     void logerror(const std::string & str)
     {
@@ -98,6 +121,23 @@ private:
         }
     }
 
+    std::vector<size_t> makePlanSimple(const ObservationPoseCollection & opc)
+    {
+        size_t best_pose_idx;
+        double best_utility = 0;
+        for(size_t i = 0; i < opc.getPoses().size(); i++)
+        {
+            double utility = opc.getPoses()[i].cell_id_sets[0].size() / opc.getInitialTravelTime(i);
+            if(utility > best_utility)
+            {
+                best_pose_idx = i;
+                best_utility = utility;
+            }
+        }
+        // The first value in a plan sequence is always the initial value and will be ignored, so insert 2 elements
+        return std::vector<size_t>(2, best_pose_idx);
+    }
+
     // Callbacks
     void observeVolumesCb(race_object_search::ObserveVolumesGoalConstPtr const & goal_ptr)
     {
@@ -124,6 +164,7 @@ private:
             const tf::Pose cam_pose = m_agent.getCurrentCamPose();
 
             ObservationPoseCollection opc;
+            size_t n_cells = 0;
 
             ROS_INFO("retrieving local pose candidates");
             {
@@ -146,6 +187,9 @@ private:
                              pose_candidates_call.response.target_points,
                              pose_candidates_call.response.cvms,
                              pose_candidates_call.response.object_sets);
+                for(size_t i = 0; i < pose_candidates_call.response.roi_cell_counts.size(); ++i) {
+                    n_cells += pose_candidates_call.response.roi_cell_counts[i];
+                }
             }
 
             ROS_INFO("retrieving global pose candidates");
@@ -184,32 +228,57 @@ private:
             opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
             logtime("mutual_tt_lut_time", t0);
 
+            // HACK:
+            // Find the number of discoverable cells as the nr. of cells seen by the greedy strategy and
+            // assign equal probability to all cells with a sum of 1.
+            // THIS IGNORES ALL PROBABILITIES IN THE REQUEST AND SHOULD BE REPLACED
+            EqualProbabilityCellGain epcg;
+            {
+                epcg.p = 1.0 / n_cells;
+                SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
+                sp.greedy(9000);
+                epcg.p = 1.0 / sp.detected_cells[sp.last_idx].size();
+            }
+
             ROS_INFO("entering planning phase");
             t0 = ros::WallTime::now();
-            std::vector<double> candidate_utilities(opc.getPoses().size());
-            size_t best_pose_idx;
-            double best_utility = 0;
-            for(size_t i = 0; i < candidate_utilities.size(); i++)
+            std::vector<size_t> plan;
+            if(m_planning_mode == "simple")
             {
-                candidate_utilities[i] = opc.getPoses()[i].cell_id_sets[0].size() /
-                                         opc.getInitialTravelTime(i);
-
-                if(candidate_utilities[i] > best_utility)
-                {
-                    best_pose_idx = i;
-                    best_utility = candidate_utilities[i];
-                }
+                plan = makePlanSimple(opc);
+            }
+            else if(m_planning_mode == "search")
+            {
+                SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
+                double etime;
+                spl.makePlan(m_depth_limit, m_max_rel_branch_cost, m_planning_timeout * 1000, plan, etime);
+            }
+            else
+            {
+                ROS_ERROR_STREAM("unknown planning mode: " << m_planning_mode);
             }
             logtime("planning_time", t0);
 
             // termination criterion
-            if(best_utility == 0)
+            if(plan.empty())
             {
                 loginfo("termination criterion reached");
                 m_observe_volumes_server.setSucceeded();
                 return;
             }
 
+            // log and publish some plan details
+            SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
+            sp.pushSequence(plan, 1, plan.size());
+            sp.sendMarker(m_world_frame_id, m_marker_pub, "plan");
+            if(!m_log_dir.empty()) {
+                fname.str("");
+                fname.clear();
+                fname << m_log_dir << "/plan-timeplot-" << iteration_counter << ".tab";
+                sp.writeTimeplot(fname.str());
+            }
+
+            size_t best_pose_idx = plan[1];
             logval("expected_move_time", opc.getInitialTravelTime(best_pose_idx));
 
             // move the robot

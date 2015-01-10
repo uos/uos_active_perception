@@ -4,6 +4,7 @@
 #include "observation_pose_collection.h"
 
 #include <visualization_msgs/Marker.h>
+#include <boost/date_time/posix_time/ptime.hpp>
 
 #include <vector>
 #include <fstream>
@@ -23,6 +24,7 @@ public:
 
     bool makePlan(size_t const arg_depth_limit,
                   double const arg_max_rel_branch_cost,
+                  long const timeout_msecs,
                   std::vector<size_t> & result_sequence,
                   double & result_etime)
     {
@@ -32,6 +34,11 @@ public:
         }
         depth_limit = arg_depth_limit;
         max_rel_branch_cost = arg_max_rel_branch_cost;
+        if(timeout_msecs > 0) {
+            timeout = boost::posix_time::microsec_clock::local_time() + boost::posix_time::milliseconds(timeout_msecs);
+        } else {
+            timeout = boost::date_time::not_a_date_time;
+        }
         if(memory.empty()) {
             memory.resize(1000);
         }
@@ -52,7 +59,7 @@ public:
     bool makeGreedy(std::vector<size_t> & result_sequence,
                     double & result_etime)
     {
-        return makePlan(0, 2, result_sequence, result_etime);
+        return makePlan(0, 2, 0, result_sequence, result_etime);
     }
 
     void optimalOrder(std::vector<size_t> const & input_sequence,
@@ -63,6 +70,7 @@ public:
         opc_subset.insert(opc_subset.end(), input_sequence.begin() + 1, input_sequence.end());
         depth_limit = input_sequence.size();
         max_rel_branch_cost = 1.5;
+        timeout = boost::date_time::not_a_date_time;
         if(memory.empty()) {
             memory.resize(input_sequence.size());
         }
@@ -145,6 +153,7 @@ private:
     std::vector<size_t> best_sequence;
     double best_etime;
     double max_rel_branch_cost;
+    boost::posix_time::ptime timeout;
 
     void makePlanRecursive(size_t const stage,
                            double const pdone,
@@ -214,6 +223,11 @@ private:
             sequence.pop_back();
             if(stage >= depth_limit) {
                 // Beyond depth_limit, we are only interested in greedy solutions and therefore cut all alternatives.
+                break;
+            }
+            if(timeout != boost::date_time::not_a_date_time &&
+               boost::posix_time::microsec_clock::local_time() > timeout) {
+                // We ran out of time
                 break;
             }
         }

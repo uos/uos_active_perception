@@ -4,6 +4,7 @@
 #include "observation_pose_collection.h"
 
 #include <visualization_msgs/Marker.h>
+#include <ros/publisher.h>
 
 #include <vector>
 #include <fstream>
@@ -77,7 +78,7 @@ public:
         }
     }
 
-    // TODO: Replace with better code in search_planner
+    // Replaced by better code in search_planner
     bool optimalOrder()
     {
         double old_etime = etime[last_idx];
@@ -112,7 +113,7 @@ public:
         } while(change);
     }
 
-    // TODO: Replace with better code in search_planner
+    // Replaced by better code in search_planner
     void greedy(double const horizon)
     {
         double tmax = time[last_idx] + horizon;

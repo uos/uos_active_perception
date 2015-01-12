@@ -38,9 +38,9 @@ public:
         m_node_handle.param("ray_skip", m_ray_skip, 0.75);
         // planning params
         m_node_handle.param("planning_mode", m_planning_mode, std::string("simple"));
-        m_node_handle.param("depth_limit", m_depth_limit, -1);
-        m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.0);
-        m_node_handle.param("planning_timeout", m_planning_timeout, 0.0);
+        m_node_handle.param("depth_limit", m_depth_limit, 5);
+        m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
+        m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
 
         // open logging and evaluation data files
         if(!m_log_dir.empty()) {
@@ -92,7 +92,7 @@ private:
     {
         ROS_ERROR_STREAM(str.c_str());
         if(m_file_events.is_open()) {
-            m_file_events << ros::WallTime::now() << " ERROR: " << str << std::endl;
+            m_file_events << ros::WallTime::now() << "\t" << str << std::endl;
         }
     }
 
@@ -100,7 +100,7 @@ private:
     {
         ROS_INFO_STREAM(str.c_str());
         if(m_file_events.is_open()) {
-            m_file_events << ros::WallTime::now() << " -----: " << str << std::endl;
+            m_file_events << ros::WallTime::now() << "\t" << str << std::endl;
         }
     }
 
@@ -251,7 +251,14 @@ private:
             {
                 SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
                 double etime;
-                spl.makePlan(m_depth_limit, m_max_rel_branch_cost, m_planning_timeout * 1000, plan, etime);
+                bool finished = spl.makePlan(m_depth_limit,
+                                             m_max_rel_branch_cost,
+                                             m_planning_timeout * 1000,
+                                             plan, etime);
+                if(!finished)
+                {
+                    logerror("planning timed out");
+                }
             }
             else
             {
@@ -260,7 +267,7 @@ private:
             logtime("planning_time", t0);
 
             // termination criterion
-            if(plan.empty())
+            if(plan.size() < 2)
             {
                 loginfo("termination criterion reached");
                 m_observe_volumes_server.setSucceeded();

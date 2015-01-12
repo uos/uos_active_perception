@@ -49,11 +49,11 @@ public:
         best_etime = std::numeric_limits<double>::infinity();
 
         std::cout << "Starting recursive search..." << std::endl;
-        makePlanRecursive(0, 0.0, 0.0);
+        bool finished = makePlanRecursive(0, 0.0, 0.0);
 
         result_sequence = best_sequence;
         result_etime = best_etime;
-        return(!best_sequence.empty());
+        return finished;
     }
 
     bool makeGreedy(std::vector<size_t> & result_sequence,
@@ -155,13 +155,13 @@ private:
     double max_rel_branch_cost;
     boost::posix_time::ptime timeout;
 
-    void makePlanRecursive(size_t const stage,
+    bool makePlanRecursive(size_t const stage,
                            double const pdone,
                            double const etime)
     {
         if(memory.size() <= stage+1) {
             std::cout << "available memory exceeded. returning to previous stage" << std::endl;
-            return;
+            return true;
         }
 
         // Create a sorted agenda of child states to expand
@@ -189,7 +189,7 @@ private:
             best_sequence = sequence;
             best_etime = etime;
             std::cout << "found new optimum with etime " << etime << std::endl;
-            return;
+            return true;
         }
 
         // make sure next stage memory is properly initialized
@@ -219,18 +219,19 @@ private:
             memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[opc_subset_idx], cgl);
             // Explore next stage
             makePlanRecursive(stage + 1, pdone + memory[stage].detec_opts.gain[opc_subset_idx], new_etime);
+            if(timeout != boost::date_time::not_a_date_time &&
+               boost::posix_time::microsec_clock::local_time() > timeout) {
+                return false;
+            }
             // Remove the explored pose
             sequence.pop_back();
             if(stage >= depth_limit) {
                 // Beyond depth_limit, we are only interested in greedy solutions and therefore cut all alternatives.
                 break;
             }
-            if(timeout != boost::date_time::not_a_date_time &&
-               boost::posix_time::microsec_clock::local_time() > timeout) {
-                // We ran out of time
-                break;
-            }
         }
+
+        return true;
     }
 };
 

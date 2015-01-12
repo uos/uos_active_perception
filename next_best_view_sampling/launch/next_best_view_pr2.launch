@@ -1,6 +1,8 @@
 <?xml version="1.0" ?>
 <launch>
-  <node name="point_cloud_2_motion_filter" pkg="sensor_motion_filter" type="point_cloud_2_motion_filter" output="screen" respawn="true">
+  <arg name="sim" default="false" />
+  
+  <node if="$(arg sim)" name="point_cloud_2_motion_filter" pkg="sensor_motion_filter" type="point_cloud_2_motion_filter" output="screen" respawn="true">
     <param name="static_frame" type="string" value="/map" />
     <param name="block_time"   type="double" value="2.0" />
     <param name="max_distance" type="double" value="0.01" />
@@ -8,7 +10,10 @@
     <remap from="cloud_in" to="/head_mount_kinect/depth_registered/points" />
     <remap from="cloud_out" to="/head_mount_kinect/depth_registered/motion_filtered/points" />
   </node>
-  <node name="kinect_throttle" type="throttle" pkg="topic_tools" args="messages /head_mount_kinect/depth_registered/motion_filtered/points 2 /head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
+  
+  <node     if="$(arg sim)" name="kinect_throttle" type="throttle" pkg="topic_tools" args="messages /head_mount_kinect/depth_registered/motion_filtered/points 2 /head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
+  <node unless="$(arg sim)" name="kinect_throttle" type="throttle" pkg="topic_tools" args="messages /head_mount_kinect/depth_registered/points 2 /head_mount_kinect/depth_registered/throttled/points" />
+
   <node name="next_best_view_node" pkg="next_best_view_sampling" type="next_best_view_node" output="screen" respawn="true">
     <!-- camera constraints (fixed kinect on gazebo pr2)-->
     <param name="height_min" type="double" value="1.484" />
@@ -22,7 +27,8 @@
     <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
     <!-- frames / topics -->
     <param name="world_frame_id" type="string" value="/map" />
-    <param name="camera_frame_id" type="string" value="/head_mount_kinect_ir_link" />
-    <remap from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
+    <param name="camera_frame_id" type="string" value="/head_mount_kinect_rgb_link" />
+    <remap if="$(arg sim)" from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/throttled/points" />
+    <remap unless="$(arg sim)" from="cloud_in" to="/head_mount_kinect/depth_registered/throttled/points" />
   </node>
 </launch>

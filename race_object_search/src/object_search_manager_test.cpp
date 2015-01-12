@@ -6,6 +6,7 @@
 #include "uos_active_perception_msgs/ResetVolumes.h"
 
 #include <cstring>
+#include <cstdlib>
 
 uos_active_perception_msgs::BoundingBox makeBox()
 {
@@ -113,12 +114,15 @@ int main(int argc, char** argv)
     std::vector<uos_active_perception_msgs::BoundingBox> boxes;
     bool reset = false;
     bool nosearch = false;
+    double min_observable_volume = 0.0;
 
     for(long i = 1; i < argc; ++i) {
         if(!strcmp(argv[i], "reset")) {
             reset = true;
         } else if(!strcmp(argv[i], "nosearch")) {
             nosearch = true;
+        } else if(!strcmp(argv[i], "min_observable_volume")) {
+            min_observable_volume = std::atof(argv[++i]);
         } else if(!strcmp(argv[i], "table1")) {
             boxes.push_back(makeTable1());
         } else if(!strcmp(argv[i], "table2")) {
@@ -163,16 +167,23 @@ int main(int argc, char** argv)
         ros::ServiceClient c = n.serviceClient<uos_active_perception_msgs::ResetVolumes>("/reset_volumes");
         uos_active_perception_msgs::ResetVolumes srv;
         srv.request.volumes.insert(srv.request.volumes.end(), boxes.begin(), boxes.end());
-        c.waitForExistence();
+        if(!c.exists()) {
+            ROS_INFO("waiting for /reset_volumes");
+            c.waitForExistence();
+        }
         c.call(srv);
     }
 
     if(!nosearch) {
         actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("/observe_volumes", true);
-        ac.waitForServer();
+        if(!ac.isServerConnected()) {
+            ROS_INFO("waiting for /observe_volumes");
+            ac.waitForServer();
+        }
         race_object_search::ObserveVolumesGoal goal;
         goal.roi.insert(goal.roi.end(), boxes.begin(), boxes.end());
         goal.p = std::vector<float>(goal.roi.size(), 1.0 / goal.roi.size());
+        goal.min_observable_volume = min_observable_volume;
         ROS_INFO("Sending goal...");
         ac.sendGoal(goal);
         ac.waitForResult();

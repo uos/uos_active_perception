@@ -1,6 +1,8 @@
 # Goal: A list of bounding boxes to observe, optionally along with probabilities of success for each bounding box.
+# Aborts if less then min_observable_volume can be observed in total.
 uos_active_perception_msgs/BoundingBox[] roi
 float32[] p
+float32 min_observable_volume # [m^3]
 ---
 # Result: Amount of ROI space left unobserved [m^3]
 float32 unobserved_space

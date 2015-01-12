@@ -165,6 +165,7 @@ private:
 
             ObservationPoseCollection opc;
             size_t n_cells = 0;
+            double cell_volume = 0.0;
 
             ROS_INFO("retrieving local pose candidates");
             {
@@ -190,6 +191,8 @@ private:
                 for(size_t i = 0; i < pose_candidates_call.response.roi_cell_counts.size(); ++i) {
                     n_cells += pose_candidates_call.response.roi_cell_counts[i];
                 }
+                cell_volume = (goal.roi[0].dimensions.x * goal.roi[0].dimensions.y * goal.roi[0].dimensions.z)
+                              / pose_candidates_call.response.roi_cell_counts[0];
             }
 
             ROS_INFO("retrieving global pose candidates");
@@ -238,6 +241,14 @@ private:
                 SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
                 sp.greedy(9000);
                 epcg.p = 1.0 / sp.detected_cells[sp.last_idx].size();
+
+                // Termination criterion:
+                if(sp.detected_cells[sp.last_idx].size() * cell_volume < goal.min_observable_volume)
+                {
+                    loginfo("termination criterion: min_observable_volume");
+                    m_observe_volumes_server.setSucceeded();
+                    return;
+                }
             }
 
             ROS_INFO("entering planning phase");
@@ -269,7 +280,7 @@ private:
             // termination criterion
             if(plan.size() < 2)
             {
-                loginfo("termination criterion reached");
+                loginfo("termination criterion: no plan");
                 m_observe_volumes_server.setSucceeded();
                 return;
             }

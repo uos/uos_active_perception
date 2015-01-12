@@ -151,12 +151,9 @@ public:
             marker.scale.x = 1;
             marker.scale.y = 1;
             marker.scale.z = 0.2;
-            if(i > 1) {
-                marker.color.g = pdone[i] - pdone[i-1];
-                marker.color.r = 1.0 - marker.color.g;
-            } else {
-                marker.color.b = 1.0;
-            }
+            marker.color.g = 1.0;
+            marker.color.r = 1.0;
+            marker.color.b = 1.0;
             marker.color.a = 0.5;
             tf::poseTFToMsg(opc.getPoses()[cam_pose_idx[i]].pose, marker.pose);
             marker.header.frame_id = frame_id;

@@ -75,6 +75,7 @@ private:
     double m_resolution, m_camera_range_tolerance;
     std::string m_world_frame_id;
     boost::mutex m_map_mutex;
+    OcTreeBoxSet last_roi;
 
     static double getIntersectionVolume(const octomath::Vector3 &box1min, const octomath::Vector3 &box1max,
                                         const octomath::Vector3 &box2min, const octomath::Vector3 &box2max);
@@ -85,6 +86,9 @@ private:
                               octomath::Vector3 & max) const;
 
     OcTreeBoxSet boxSetFromMsg(std::vector<uos_active_perception_msgs::BoundingBox> const & bbox_vec) const;
+
+    std::vector<octomap::point3d> getActiveFringe(const OcTreeBoxSet & roi,  ActivePerceptionMap & map);
+    void pubActiveFringe(const std::vector<octomap::point3d> & active_fringe);
 
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);

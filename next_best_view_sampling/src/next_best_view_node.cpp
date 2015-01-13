@@ -209,6 +209,55 @@ OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<uos_active_perception_m
     return boxSet;
 }
 
+std::vector<octomap::point3d> NextBestViewNode::getActiveFringe(
+        const OcTreeBoxSet & roi,
+        ActivePerceptionMap & map)
+{
+    std::vector<octomap::point3d> active_fringe;
+    if(roi.elements.empty())
+    {
+        // If the requested roi is empty, use all fringe voxels
+        active_fringe = map.getFringeCenters();
+    }
+    for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
+    {
+        OcTreeBbox box = roi.elements[i_roi];
+        octomath::Vector3 min = map.getFringeMap().keyToCoord(box.min);
+        octomath::Vector3 max = map.getFringeMap().keyToCoord(box.max);
+        std::vector<octomap::point3d> roi_fringe_centers;
+        // add fringe voxels within the roi
+        roi_fringe_centers = map.getFringeCenters(min, max);
+        active_fringe.insert(active_fringe.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+        // generate fringe voxels at roi boundary
+        roi_fringe_centers = map.genBoundaryFringeCenters(min, max);
+        active_fringe.insert(active_fringe.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
+    }
+    return active_fringe;
+}
+
+void NextBestViewNode::pubActiveFringe(const std::vector<octomap::point3d> & active_fringe)
+{
+    visualization_msgs::Marker marker;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::CUBE_LIST;
+    marker.scale.x = m_resolution;
+    marker.scale.y = m_resolution;
+    marker.scale.z = m_resolution;
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 0.0;
+    marker.color.a = 1.0;
+    for(unsigned int i = 0; i < active_fringe.size(); i++)
+    {
+        marker.points.push_back(octomap::pointOctomapToMsg(active_fringe[i]));
+    }
+    marker.ns = "active_fringe";
+    marker.id = 0;
+    marker.header.frame_id = m_world_frame_id;
+    marker.header.stamp = ros::Time::now();
+    m_marker_pub.publish(marker);
+}
+
 bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOccupancy::Request &req,
                                           uos_active_perception_msgs::GetBboxOccupancy::Response &res)
 {
@@ -296,49 +345,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
     double angle_increment = std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(ray_length, 2))));
 
     // Gather fringe voxel centers
-    std::vector<octomap::point3d> fringe_centers;
-    if(req.roi.empty())
-    {
-        // If the requested roi is empty, use all fringe voxels
-        fringe_centers = map->getFringeCenters();
-    }
-    for(unsigned int i_roi = 0; i_roi < roi.elements.size(); i_roi++)
-    {
-        OcTreeBbox box = roi.elements[i_roi];
-        octomath::Vector3 min = map->getFringeMap().keyToCoord(box.min);
-        octomath::Vector3 max = map->getFringeMap().keyToCoord(box.max);
-        std::vector<octomap::point3d> roi_fringe_centers;
-        // add fringe voxels within the roi
-        roi_fringe_centers = map->getFringeCenters(min, max);
-        fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
-        // generate fringe voxels at roi boundary
-        roi_fringe_centers = map->genBoundaryFringeCenters(min, max);
-        fringe_centers.insert(fringe_centers.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
-    }
-    if(fringe_centers.empty()) return true;
-    // publish a marker for active fringe voxels
-    {
-        visualization_msgs::Marker marker;
-        marker.action = visualization_msgs::Marker::ADD;
-        marker.type = visualization_msgs::Marker::CUBE_LIST;
-        marker.lifetime = ros::Duration(10.0);
-        marker.scale.x = m_resolution;
-        marker.scale.y = m_resolution;
-        marker.scale.z = m_resolution;
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-        marker.color.a = 1.0;
-        for(unsigned int i = 0; i < fringe_centers.size(); i++)
-        {
-            marker.points.push_back(octomap::pointOctomapToMsg(fringe_centers[i]));
-        }
-        marker.ns = "active_fringe";
-        marker.id = 0;
-        marker.header.frame_id = m_world_frame_id;
-        marker.header.stamp = ros::Time::now();
-        m_marker_pub.publish(marker);
-    }
+    std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
+    pubActiveFringe(active_fringe);
+    last_roi = roi;
+    if(active_fringe.empty()) return true;
 
     bool observation_position_set = !req.observation_position.header.frame_id.empty();
     octomath::Vector3 observation_position;
@@ -379,7 +389,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
             try
             {
                 sample = ops.genObservationSample(
-                            fringe_centers[boost::uniform_int<>(0, fringe_centers.size() - 1)(rng)]);
+                            active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)]);
             }
             catch (std::runtime_error e)
             {
@@ -538,13 +548,11 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
 
     // Integrate point cloud
-    {
-        boost::mutex::scoped_lock lock(m_map_mutex);
-        m_perception_map.integratePointCloud(octomap_cloud,
-                                             octomap::poseTfToOctomap(sensor_to_world_tf),
-                                             camera_to_world_tf,
-                                             m_camera_constraints);
-    }
+    boost::mutex::scoped_lock lock(m_map_mutex);
+    m_perception_map.integratePointCloud(octomap_cloud,
+                                         octomap::poseTfToOctomap(sensor_to_world_tf),
+                                         camera_to_world_tf,
+                                         m_camera_constraints);
 
     // Publish rviz map visualization
     visualization_msgs::Marker marker = m_perception_map.genOccupancyMarker();
@@ -559,6 +567,9 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     marker.id = 0;
     marker.ns = "fringe_map";
     m_marker_pub.publish(marker);
+
+    // Publish updated active fringe
+    pubActiveFringe(getActiveFringe(last_roi, m_perception_map));
 }
 
 void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)

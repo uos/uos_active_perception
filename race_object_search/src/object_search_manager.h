@@ -11,6 +11,7 @@
 #include <race_object_search/ObserveVolumesAction.h>
 #include <visualization_msgs/Marker.h>
 #include <uos_active_perception_msgs/GetObservationCameraPoses.h>
+#include <uos_active_perception_msgs/GetBboxOccupancy.h>
 
 #include <fstream>
 
@@ -146,6 +147,14 @@ private:
         std::stringstream fname;
         ros::WallTime t0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
+        std::vector<double> unknown_roi_space(goal.roi.size());
+
+//        std::vector<double> gain_by_volume(goal.roi.size());
+//        for(size_t i = 0; i < goal.roi.size(); ++i)
+//        {
+//            gain_by_volume
+//        }
+
         while(ros::ok())
         {
             if(m_observe_volumes_server.isPreemptRequested())
@@ -153,6 +162,21 @@ private:
                 ROS_INFO("Preempted!");
                 m_observe_volumes_server.setPreempted();
                 return;
+            }
+
+            // evaluate actual information gain between iterations
+            double gain = 0.0;
+            for(size_t i = 0; i < goal.roi.size(); ++i)
+            {
+                uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
+                get_bbox_occupancy.request.bbox = goal.roi[i];
+                while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+                {
+                    logerror("get_bbox_occupancy service call failed, will try again");
+                    ros::WallDuration(5).sleep();
+                }
+                gain +=
+                unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
             }
 
             iteration_counter++;
@@ -167,6 +191,7 @@ private:
             size_t n_cells = 0;
             double cell_volume = 0.0;
 
+            t0 = ros::WallTime::now();
             ROS_INFO("retrieving local pose candidates");
             {
                 uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
@@ -212,6 +237,8 @@ private:
                              pose_candidates_call.response.cvms,
                              pose_candidates_call.response.object_sets);
             }
+            logtime("nbv_sampling_time", t0);
+            logval("nbv_sample_count", opc.getPoses().size());
 
             ROS_INFO("building travel time lookup tables");
             t0 = ros::WallTime::now();
@@ -312,6 +339,9 @@ private:
                 logerror("failed to achieve target pose");
             }
             logval("actual_move_time", (ros::Time::now() - st0).toSec());
+
+            m_file_events.flush();
+            m_file_vals.flush();
         }
     }
 };

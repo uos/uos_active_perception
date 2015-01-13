@@ -303,36 +303,52 @@ private:
                 ROS_ERROR_STREAM("unknown planning mode: " << m_planning_mode);
             }
             logtime("planning_time", t0);
+            ROS_INFO("CHECKPOINT 1");
 
             // termination criterion
             if(plan.size() < 2)
             {
                 loginfo("termination criterion: no plan");
+                ROS_INFO("CHECKPOINT 2");
                 m_observe_volumes_server.setSucceeded();
                 return;
             }
+            ROS_INFO("CHECKPOINT 3");
 
             // log and publish some plan details
             SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
+            ROS_INFO("CHECKPOINT 4");
             sp.pushSequence(plan, 1, plan.size());
+            ROS_INFO("CHECKPOINT 5");
             sp.sendMarker(m_world_frame_id, m_marker_pub, "plan");
+            ROS_INFO("CHECKPOINT 6");
             if(!m_log_dir.empty()) {
+                ROS_INFO("CHECKPOINT 7");
                 fname.str("");
+                ROS_INFO("CHECKPOINT 7.1");
                 fname.clear();
+                ROS_INFO("CHECKPOINT 7.2");
                 fname << m_log_dir << "/plan-timeplot-" << iteration_counter << ".tab";
+                ROS_INFO("CHECKPOINT 7.3");
                 sp.writeTimeplot(fname.str());
             }
 
+            ROS_INFO("CHECKPOINT 8");
             size_t best_pose_idx = plan[1];
+            ROS_INFO("CHECKPOINT 9");
             logval("expected_move_time", opc.getInitialTravelTime(best_pose_idx));
+            ROS_INFO("CHECKPOINT 10");
 
             // move the robot
             ros::Time st0 = ros::Time::now();
+            ROS_INFO("CHECKPOINT 11");
             if(m_agent.achieveCamPose(opc.getPoses()[best_pose_idx].pose,
                                         opc.getPoses()[best_pose_idx].view_distance))
             {
                 // wait for acquisition
+                ROS_INFO("CHECKPOINT 12");
                 ros::Duration(m_agent.getAcquisitionTime()).sleep();
+                ROS_INFO("CHECKPOINT 13");
             }
             else
             {

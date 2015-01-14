@@ -288,9 +288,11 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
             free_volume += v;
         }
     }
-    res.free = free_volume / total_volume;
-    res.occupied = occupied_volume / total_volume;
-    res.unknown = 1.0 - res.free - res.occupied;
+    res.free = free_volume;
+    res.occupied = occupied_volume;
+    res.unknown = total_volume - res.free - res.occupied;
+    res.total = total_volume;
+    res.cell_volume = std::pow(m_resolution, 3);
     return true;
 }
 

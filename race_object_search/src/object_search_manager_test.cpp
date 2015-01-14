@@ -182,7 +182,15 @@ int main(int argc, char** argv)
         }
         race_object_search::ObserveVolumesGoal goal;
         goal.roi.insert(goal.roi.end(), boxes.begin(), boxes.end());
-        goal.p = std::vector<float>(goal.roi.size(), 1.0 / goal.roi.size());
+        // Set probabilities to equal distribution
+        goal.p.resize(goal.roi.size());
+        double total_volume = 0.0;
+        for(size_t i = 0; i < goal.roi.size(); ++i) {
+            total_volume += goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z;
+        }
+        for(size_t i = 0; i < goal.roi.size(); ++i) {
+            goal.p[i] = (goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z) / total_volume;
+        }
         goal.min_observable_volume = min_observable_volume;
         ROS_INFO("Sending goal...");
         ac.sendGoal(goal);

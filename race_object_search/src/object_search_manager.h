@@ -159,7 +159,7 @@ private:
         std::vector<double> roi_probability_density(goal.roi.size());
         for(size_t i = 0; i < goal.roi.size(); ++i)
         {
-            roi_probability_density[i] = 0.5/*goal.p[0]*/ / (goal.roi[i].dimensions.x *
+            roi_probability_density[i] = goal.p[i] / (goal.roi[i].dimensions.x *
                                                       goal.roi[i].dimensions.y *
                                                       goal.roi[i].dimensions.z);
         }

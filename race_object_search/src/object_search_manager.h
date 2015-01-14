@@ -147,13 +147,15 @@ private:
         std::stringstream fname;
         ros::WallTime t0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
-        std::vector<double> unknown_roi_space(goal.roi.size());
 
-//        std::vector<double> gain_by_volume(goal.roi.size());
-//        for(size_t i = 0; i < goal.roi.size(); ++i)
-//        {
-//            gain_by_volume
-//        }
+        std::vector<double> unknown_roi_space(goal.roi.size(), 0.0);
+        std::vector<double> roi_probability_density(goal.roi.size());
+        for(size_t i = 0; i < goal.roi.size(); ++i)
+        {
+            roi_probability_density[i] = 0.5/*goal.p[0]*/ / (goal.roi[i].dimensions.x *
+                                                      goal.roi[i].dimensions.y *
+                                                      goal.roi[i].dimensions.z);
+        }
 
         while(ros::ok())
         {
@@ -166,6 +168,7 @@ private:
 
             // evaluate actual information gain between iterations
             double gain = 0.0;
+            double cell_volume = 0.0;
             for(size_t i = 0; i < goal.roi.size(); ++i)
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
@@ -175,8 +178,13 @@ private:
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
                 }
-                gain +=
+                cell_volume = get_bbox_occupancy.response.cell_volume;
+                gain += (unknown_roi_space[i] - get_bbox_occupancy.response.unknown) * roi_probability_density[i];
                 unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
+            }
+            if(iteration_counter > 0)
+            {
+                logval("gain", gain);
             }
 
             iteration_counter++;
@@ -189,7 +197,6 @@ private:
 
             ObservationPoseCollection opc;
             size_t n_cells = 0;
-            double cell_volume = 0.0;
 
             t0 = ros::WallTime::now();
             ROS_INFO("retrieving local pose candidates");
@@ -216,8 +223,6 @@ private:
                 for(size_t i = 0; i < pose_candidates_call.response.roi_cell_counts.size(); ++i) {
                     n_cells += pose_candidates_call.response.roi_cell_counts[i];
                 }
-                cell_volume = (goal.roi[0].dimensions.x * goal.roi[0].dimensions.y * goal.roi[0].dimensions.z)
-                              / pose_candidates_call.response.roi_cell_counts[0];
             }
 
             ROS_INFO("retrieving global pose candidates");

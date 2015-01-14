@@ -135,8 +135,15 @@ private:
                 best_utility = utility;
             }
         }
-        // The first value in a plan sequence is always the initial value and will be ignored, so insert 2 elements
-        return std::vector<size_t>(2, best_pose_idx);
+        if(best_utility > std::numeric_limits<double>::epsilon())
+        {
+            // The first value in a plan sequence is always the initial value and will be ignored, so insert 2 elements
+            return std::vector<size_t>(2, best_pose_idx);
+        }
+        else
+        {
+            return std::vector<size_t>();
+        }
     }
 
     // Callbacks

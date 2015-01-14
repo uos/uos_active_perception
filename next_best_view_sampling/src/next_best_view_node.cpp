@@ -348,7 +348,10 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
 
     // Gather fringe voxel centers
     std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
-    pubActiveFringe(active_fringe);
+    if(!roi.elements.empty())
+    {
+        pubActiveFringe(active_fringe);
+    }
     last_roi = roi;
     if(active_fringe.empty()) return true;
 
@@ -571,7 +574,10 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     m_marker_pub.publish(marker);
 
     // Publish updated active fringe
-    pubActiveFringe(getActiveFringe(last_roi, m_perception_map));
+    if(!last_roi.elements.empty())
+    {
+        pubActiveFringe(getActiveFringe(last_roi, m_perception_map));
+    }
 }
 
 void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)

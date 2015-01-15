@@ -31,7 +31,6 @@ public:
         , detected_cells(std::vector<detection_t>(1))
         , cgl(cgl)
         , opc(opc)
-        , marker_count(0)
     {}
 
     void clear()
@@ -141,9 +140,8 @@ public:
         }
     }
 
-    void sendMarker(std::string frame_id, ros::Publisher & pub, const std::string & ns)
+    size_t sendMarker(std::string frame_id, ros::Publisher & pub, const std::string & ns)
     {
-        deleteMarker(frame_id, pub, ns);
         // Publish current markers
         for(size_t i = 1; i <= last_idx; ++i) {
             visualization_msgs::Marker marker;
@@ -183,17 +181,17 @@ public:
             marker.ns = ns;
             pub.publish(marker);
         }
-        marker_count = 2 *last_idx;
+        return 2 * last_idx;
     }
 
-    void deleteMarker(std::string frame_id, ros::Publisher & pub, const std::string & ns)
+    void deleteMarker(const std::string & frame_id, ros::Publisher & pub, const std::string & ns, const size_t n)
     {
         visualization_msgs::Marker marker;
         marker.action = visualization_msgs::Marker::DELETE;
         marker.type = visualization_msgs::Marker::ARROW;
         marker.ns = ns;
         marker.header.frame_id = frame_id;
-        for(size_t i = 1; i <= marker_count; ++i) {
+        for(size_t i = 1; i <= n; ++i) {
             marker.id = i;
             pub.publish(marker);
         }
@@ -214,7 +212,6 @@ public:
 private:
     CELL_GAIN_LOOKUP const & cgl;
     ObservationPoseCollection const & opc;
-    size_t marker_count;
 
     double calcGain(detection_t const & a, detection_t const & b)
     {

@@ -153,6 +153,7 @@ private:
         size_t iteration_counter = 0;
         std::stringstream fname;
         ros::WallTime t0;
+        size_t marker_count = 0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
 
         std::vector<double> unknown_roi_space(goal.roi.size(), 0.0);
@@ -327,7 +328,8 @@ private:
             // log and publish some plan details
             SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
             sp.pushSequence(plan, 1, plan.size());
-            sp.sendMarker(m_world_frame_id, m_marker_pub, "plan");
+            sp.deleteMarker(m_world_frame_id, m_marker_pub, "plan", marker_count);
+            marker_count = sp.sendMarker(m_world_frame_id, m_marker_pub, "plan");
             if(!m_log_dir.empty()) {
                 fname.str("");
                 fname.clear();

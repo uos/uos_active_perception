@@ -31,6 +31,7 @@ public:
         , detected_cells(std::vector<detection_t>(1))
         , cgl(cgl)
         , opc(opc)
+        , marker_count(0)
     {}
 
     void clear()

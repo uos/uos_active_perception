@@ -277,7 +277,7 @@ bool Pr2Agent::achieveCamPose
     pr2_controllers_msgs::PointHeadGoal head_goal;
     head_goal.target.header.frame_id = m_world_frame_id;
     head_goal.target.header.stamp = ros::Time::now();
-    head_goal.pointing_frame = "/head_mount_kinect_ir_link";
+    head_goal.pointing_frame = "/head_mount_kinect_rgb_link";
     head_goal.pointing_axis.x = 1;
     head_goal.pointing_axis.y = 0;
     head_goal.pointing_axis.z = 0;
@@ -295,7 +295,6 @@ bool Pr2Agent::achieveCamPose
         tf::Pose target_base_pose = robotPoseForCamPose(target_cam_pose);
         move_base_msgs::MoveBaseGoal goal;
         goal.target_pose.header.frame_id = m_world_frame_id;
-        //goal.target_pose.header.stamp = ros::Time::now();
         tf::poseTFToMsg(target_base_pose, goal.target_pose.pose);
 
         std::vector<tf::Pose> poses(2);

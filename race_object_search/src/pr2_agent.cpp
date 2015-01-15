@@ -29,7 +29,7 @@ Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & worl
 :
     m_world_frame_id(world_frame_id),
     m_tf_listener(tf_listener),
-    m_move_base_client("move_base", true),
+    m_move_base_client("/move_base", true),
     m_point_head_client("/point_head_continuous/point_head_action", true),
     m_lift_torso_client("/torso_controller/position_joint_action", true)
 {
@@ -178,7 +178,7 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         }
     }
     // call move_base
-    if(!ros::service::call("/move_base_node/make_multiple_plans", get_plans_call)) {
+    if(!ros::service::call("/move_base_planner_node/make_multiple_plans", get_plans_call)) {
         ROS_WARN("make_multiple_plans call failed");
         return times;
     }

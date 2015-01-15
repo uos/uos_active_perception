@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="sim" default="false" />
+  <arg name="fk" default="false" />
+  <arg name="map" default="race_inflated" />
+  
+  <!-- (inflated) obstacle map for path planning -->
+  <node name="obstacle_map_server" pkg="map_server" type="map_server" args="$(find race_object_search)/config/maps/$(arg map).pgm 0.05" respawn="true" output="screen">
+    <remap from="map" to="/obstacle_map"/>
+  </node>
+  <!-- move_base using obstacle map -->
+  <node pkg="move_base" type="move_base" name="move_base_planner_node" respawn="true" output="screen">
+    <remap from="map" to="/obstacle_map"/>
+    <remap from="/move_base" to="/move_base_planner_node/do_not_use_this/move_base"/>
+    <!-- Use the dwa local planner for the PR2 -->
+    <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" />
+    <!-- Load common configuration files -->
+    <rosparam file="$(find pr2_navigation_config)/move_base/move_base_params.yaml" command="load" />
+    <rosparam file="$(find race_object_search)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find race_object_search)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find pr2_navigation_config)/move_base/dwa_local_planner.yaml" command="load" ns="DWAPlannerROS" />
+    <rosparam file="$(find pr2_navigation_config)/move_base/recovery_behaviors.yaml" command="load" />
+    <!-- Load global navigation specific parameters -->
+    <rosparam file="$(find pr2_navigation_global)/config/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find pr2_navigation_global)/config/global_costmap_params.yaml" command="load" />
+  </node>
+  <!-- nbv sampling -->
+  <include file="$(find next_best_view_sampling)/launch/next_best_view_pr2.launch">
+    <arg name="sim" value="$(arg sim)" />
+  </include>
+  <!-- point head continuous -->
+  <node unless="$(arg fk)" name="point_head_continuous" pkg="point_head_continuous" type="point_head_continuous" output="screen" respawn="true" />
+</launch>

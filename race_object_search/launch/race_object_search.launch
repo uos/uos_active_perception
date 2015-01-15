@@ -3,9 +3,10 @@
   <arg name="sim" default="false" />
   <arg name="log_dir" default="" />
 
-  <include file="$(find race_object_search)/launch/object_search_prerequisites.launch">
+  <include file="$(find race_object_search)/launch/object_search_prerequisites_pr2.launch">
     <arg name="sim" value="$(arg sim)" />
-    <arg name="robot_pr2" value="true" />
+    <arg name="fk" value="false" />
+    <arg name="map" value="race_inflated" />
   </include>
   <node name="object_search_manager" pkg="race_object_search" type="object_search_manager" output="screen" respawn="true">
     <param name="world_frame_id" type="string" value="/map" />

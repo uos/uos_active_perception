@@ -64,11 +64,7 @@ NextBestViewNode::NextBestViewNode() :
                                  1,
                                  &NextBestViewNode::pointCloudCb,
                                  this)),
-    m_static_map_subscriber(m_node_handle_pub.subscribe(
-                                "/map",
-                                1,
-                                &NextBestViewNode::staticMapCb,
-                                this)),
+    m_static_map_subscriber(),
     m_get_bbox_percent_unseen_server(m_node_handle_pub.advertiseService(
                                          "/get_bbox_occupancy",
                                          &NextBestViewNode::getBboxOccupancyCb,
@@ -102,6 +98,13 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("roll"          , m_camera_constraints.roll      , PI);
 
     m_perception_map.setResolution(m_resolution);
+
+    std::string wallmap_topic;
+    m_node_handle.param("wallmap_topic", wallmap_topic, std::string(""));
+    if(!wallmap_topic.empty())
+    {
+        m_static_map_subscriber = m_node_handle_pub.subscribe(wallmap_topic, 1, &NextBestViewNode::staticMapCb, this);
+    }
 }
 
 double NextBestViewNode::getIntersectionVolume(

@@ -5,7 +5,7 @@
   <!-- regular map for bootstrapping of octomap -->
   <node name="map_server" pkg="map_server" type="map_server" args="$(find race_navigation)/config/map_sim.pgm 0.05" respawn="true" output="screen" />
   <!-- obstacle map for navigation -->
-  <node name="nav_map_server" pkg="map_server" type="map_server" args="$(find active_perception_evaluation)/config/obstacle_map_race.pgm 0.05" respawn="true" output="screen">
+  <node name="nav_map_server" pkg="map_server" type="map_server" args="$(find active_perception_evaluation)/config/obstacle_map_race_extended.pgm 0.05" respawn="true" output="screen">
     <remap from="map" to="/obstacle_map"/>
   </node>
   <!-- move_base using obstacle map -->

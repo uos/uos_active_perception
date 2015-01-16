@@ -26,7 +26,7 @@
     <param name="vfov"       type="double" value="0.715584993" /> <!-- [41 deg] -->
     <param name="roll"       type="double" value="0.0" /> <!-- [0 deg] -->
     <!-- frames / topics -->
-    <param if="$(arg sim)" name="wallmap_topic" type="string" value="/map" />
+    <param if="$(arg sim)" name="load_2dmap" type="bool" value="true" />
     <param name="world_frame_id" type="string" value="/map" />
     <param name="camera_frame_id" type="string" value="/head_mount_kinect_rgb_link" />
     <remap if="$(arg sim)" from="cloud_in" to="/head_mount_kinect/depth_registered/motion_filtered/throttled/points" />

@@ -99,11 +99,11 @@ NextBestViewNode::NextBestViewNode() :
 
     m_perception_map.setResolution(m_resolution);
 
-    std::string wallmap_topic;
-    m_node_handle.param("wallmap_topic", wallmap_topic, std::string(""));
-    if(!wallmap_topic.empty())
+    bool load_2dmap;
+    m_node_handle.param("load_2dmap", load_2dmap, false);
+    if(load_2dmap)
     {
-        m_static_map_subscriber = m_node_handle_pub.subscribe(wallmap_topic, 1, &NextBestViewNode::staticMapCb, this);
+        m_static_map_subscriber = m_node_handle_pub.subscribe("/map", 1, &NextBestViewNode::staticMapCb, this);
     }
 }
 

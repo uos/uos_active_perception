@@ -43,15 +43,40 @@ public:
         m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
         m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
 
-        // open logging and evaluation data files
         if(!m_log_dir.empty()) {
             std::stringstream fname;
-            fname << m_log_dir << "/events.log";
-            m_file_events.open(fname.str().c_str(), std::ofstream::trunc);
-            fname.str("");
-            fname.clear();
             fname << m_log_dir << "/vals.log";
-            m_file_vals.open(fname.str().c_str(), std::ofstream::trunc);
+            std::ifstream fvalsin(fname.str().c_str(), std::ios::binary);
+            fvalsin.seekg(0, std::ios::end);
+            if(fvalsin.good() && fvalsin.tellg() > 0) {
+                fvalsin.close();
+                ROS_ERROR_STREAM("File " << fname.str() << " exists and is not empty. Will not write any logs!");
+                m_log_dir = "";
+            } else {
+                fvalsin.close();
+                // open logging and evaluation data files
+                fname.str("");
+                fname.clear();
+                fname << m_log_dir << "/vals.log";
+                m_file_vals.open(fname.str().c_str(), std::ofstream::trunc);
+                fname.str("");
+                fname.clear();
+                fname << m_log_dir << "/events.log";
+                m_file_events.open(fname.str().c_str(), std::ofstream::trunc);
+
+                // dump node params
+                fname.str("");
+                fname.clear();
+                fname << m_log_dir << "/params.log";
+                std::ofstream fparams(fname.str().c_str(), std::ofstream::trunc);
+                fparams << "local_sample_size\t" << m_local_sample_size << std::endl;
+                fparams << "global_sample_size\t" << m_global_sample_size << std::endl;
+                fparams << "ray_skip\t" << m_ray_skip << std::endl;
+                fparams << "planning_mode\t" << m_planning_mode << std::endl;
+                fparams << "depth_limit\t" << m_depth_limit << std::endl;
+                fparams << "max_rel_branch_cost\t" << m_max_rel_branch_cost << std::endl;
+                fparams << "planning_timeout\t" << m_planning_timeout << std::endl;
+            }
         }
 
         m_observe_volumes_server.start();

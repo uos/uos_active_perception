@@ -457,7 +457,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                     cell_id = cell_id << 8;
                     cell_id += it->first[1];
                     cell_id = cell_id << 8;
-                    cell_id += it->first[1];
+                    cell_id += it->first[2];
                     cvm_hashed[it->second].push_back(cell_id);
                 }
                 // Now build a cvm_msg from the hashed cvm

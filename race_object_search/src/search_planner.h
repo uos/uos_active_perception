@@ -62,15 +62,22 @@ public:
         return makePlan(0, 2, 0, result_sequence, result_etime);
     }
 
-    void optimalOrder(std::vector<size_t> const & input_sequence,
+    bool optimalOrder(size_t const arg_depth_limit,
+                      double const arg_max_rel_branch_cost,
+                      long const timeout_msecs,
+                      std::vector<size_t> const & input_sequence,
                       std::vector<size_t> & result_sequence,
                       double & result_etime)
     {
         opc_subset.clear();
         opc_subset.insert(opc_subset.end(), input_sequence.begin() + 1, input_sequence.end());
-        depth_limit = input_sequence.size();
-        max_rel_branch_cost = 1.5;
-        timeout = boost::date_time::not_a_date_time;
+        depth_limit = arg_depth_limit;
+        max_rel_branch_cost = arg_max_rel_branch_cost;
+        if(timeout_msecs > 0) {
+            timeout = boost::posix_time::microsec_clock::local_time() + boost::posix_time::milliseconds(timeout_msecs);
+        } else {
+            timeout = boost::date_time::not_a_date_time;
+        }
         if(memory.empty()) {
             memory.resize(input_sequence.size());
         }
@@ -81,10 +88,11 @@ public:
         best_etime = std::numeric_limits<double>::infinity();
 
         std::cout << "Starting recursive optimal ordering..." << std::endl;
-        makePlanRecursive(0, 0.0, 0.0);
+        bool finished = makePlanRecursive(0, 0.0, 0.0);
 
         result_sequence = best_sequence;
         result_etime = best_etime;
+        return finished;
     }
 
 private:

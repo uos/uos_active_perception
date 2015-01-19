@@ -100,7 +100,7 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
 
     // GREEDY-REORDER ---
 
-    spl.optimalOrder(result_seq, result_seq, result_etime);
+    spl.optimalOrder(result_seq.size(), std::numeric_limits<double>::infinity(), 0, result_seq, result_seq, result_etime);
     sp.clear();
     sp.pushSequence(result_seq, 1, result_seq.size());
     ROS_INFO_STREAM("Greedy-Reordered plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);

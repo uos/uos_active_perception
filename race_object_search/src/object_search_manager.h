@@ -311,6 +311,20 @@ private:
                     logerror("planning timed out");
                 }
             }
+            else if(m_planning_mode == "greedy-reorder")
+            {
+                SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
+                double etime;
+                spl.makeGreedy(plan, etime);
+                bool finished = spl.optimalOrder(m_depth_limit,
+                                                 m_max_rel_branch_cost,
+                                                 m_planning_timeout * 1000,
+                                                 plan, plan, etime);
+                if(!finished)
+                {
+                    logerror("planning timed out");
+                }
+            }
             else
             {
                 ROS_ERROR_STREAM("unknown planning mode: " << m_planning_mode);

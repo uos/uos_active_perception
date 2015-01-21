@@ -100,7 +100,7 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
 
     // GREEDY-REORDER ---
 
-    spl.optimalOrder(result_seq.size(), std::numeric_limits<double>::infinity(), 0, result_seq, result_seq, result_etime);
+    spl.optimalOrder(result_seq.size(), 1.0, std::numeric_limits<double>::infinity(), 0, result_seq, result_seq, result_etime);
     sp.clear();
     sp.pushSequence(result_seq, 1, result_seq.size());
     ROS_INFO_STREAM("Greedy-Reordered plan has " << sp.time.size() << " steps and an etime of " << sp.etime[sp.last_idx]);
@@ -111,7 +111,7 @@ void ObjectSearchPlanner::observeVolumesCb(race_object_search::ObserveVolumesGoa
 
     ROS_INFO("Starting search");
     boost::posix_time::ptime tick2 = boost::posix_time::microsec_clock::local_time();
-    spl.makePlan(5, 1.5, 0, result_seq, result_etime);
+    spl.makePlan(5, 1.0, 1.5, 0, result_seq, result_etime);
     boost::posix_time::ptime now2  = boost::posix_time::microsec_clock::local_time();
     ROS_INFO_STREAM("Search took msec: " << (now2-tick2).total_milliseconds());
     sp.clear();

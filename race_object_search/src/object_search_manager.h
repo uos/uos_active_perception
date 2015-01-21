@@ -40,6 +40,7 @@ public:
         // planning params
         m_node_handle.param("planning_mode", m_planning_mode, std::string("simple"));
         m_node_handle.param("depth_limit", m_depth_limit, 5);
+        m_node_handle.param("relative_lookahead", m_relative_lookahead, 1.0);
         m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
         m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
 
@@ -74,6 +75,7 @@ public:
                 fparams << "ray_skip\t" << m_ray_skip << std::endl;
                 fparams << "planning_mode\t" << m_planning_mode << std::endl;
                 fparams << "depth_limit\t" << m_depth_limit << std::endl;
+                fparams << "relative_lookahead\t" << m_relative_lookahead << std::endl;
                 fparams << "max_rel_branch_cost\t" << m_max_rel_branch_cost << std::endl;
                 fparams << "planning_timeout\t" << m_planning_timeout << std::endl;
             }
@@ -97,6 +99,7 @@ private:
     // planning params
     std::string m_planning_mode;
     int m_depth_limit;
+    double m_relative_lookahead;
     double m_max_rel_branch_cost;
     double m_planning_timeout;
 
@@ -300,6 +303,7 @@ private:
             // Find the number of discoverable cells as the nr. of cells seen by the greedy strategy and
             // assign equal probability to all cells with a sum of 1.
             // THIS IGNORES ALL PROBABILITIES IN THE REQUEST AND SHOULD BE REPLACED
+            double success_probability = 1.0;
             EqualProbabilityCellGain epcg;
             {
                 epcg.p = 1.0 / n_cells;
@@ -328,6 +332,7 @@ private:
                 SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
                 double etime;
                 bool finished = spl.makePlan(m_depth_limit,
+                                             success_probability * m_relative_lookahead,
                                              m_max_rel_branch_cost,
                                              m_planning_timeout * 1000,
                                              plan, etime);
@@ -342,6 +347,7 @@ private:
                 double etime;
                 spl.makeGreedy(plan, etime);
                 bool finished = spl.optimalOrder(m_depth_limit,
+                                                 success_probability * m_relative_lookahead,
                                                  m_max_rel_branch_cost,
                                                  m_planning_timeout * 1000,
                                                  plan, plan, etime);

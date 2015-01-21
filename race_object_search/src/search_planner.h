@@ -23,6 +23,7 @@ public:
     {}
 
     bool makePlan(size_t const arg_depth_limit,
+                  double const arg_pdone_goal,
                   double const arg_max_rel_branch_cost,
                   long const timeout_msecs,
                   std::vector<size_t> & result_sequence,
@@ -33,6 +34,7 @@ public:
             opc_subset[i] = i;
         }
         depth_limit = arg_depth_limit;
+        pdone_goal = arg_pdone_goal;
         max_rel_branch_cost = arg_max_rel_branch_cost;
         if(timeout_msecs > 0) {
             timeout = boost::posix_time::microsec_clock::local_time() + boost::posix_time::milliseconds(timeout_msecs);
@@ -59,10 +61,11 @@ public:
     bool makeGreedy(std::vector<size_t> & result_sequence,
                     double & result_etime)
     {
-        return makePlan(0, 2, 0, result_sequence, result_etime);
+        return makePlan(0, 1.0, 2.0, 0, result_sequence, result_etime);
     }
 
     bool optimalOrder(size_t const arg_depth_limit,
+                      double const arg_pdone_goal,
                       double const arg_max_rel_branch_cost,
                       long const timeout_msecs,
                       std::vector<size_t> const & input_sequence,
@@ -72,6 +75,7 @@ public:
         opc_subset.clear();
         opc_subset.insert(opc_subset.end(), input_sequence.begin() + 1, input_sequence.end());
         depth_limit = arg_depth_limit;
+        pdone_goal = arg_pdone_goal;
         max_rel_branch_cost = arg_max_rel_branch_cost;
         if(timeout_msecs > 0) {
             timeout = boost::posix_time::microsec_clock::local_time() + boost::posix_time::milliseconds(timeout_msecs);
@@ -156,6 +160,7 @@ private:
     ObservationPoseCollection const & opc;
     std::vector<size_t> opc_subset;
     size_t depth_limit;
+    double pdone_goal;
     std::vector<SearchStateMemory> memory;
     std::vector<size_t> sequence;
     std::vector<size_t> best_sequence;
@@ -169,6 +174,14 @@ private:
     {
         if(memory.size() <= stage+1) {
             std::cout << "available memory exceeded. returning to previous stage" << std::endl;
+            return true;
+        }
+
+        // Test for goal state (pdone_goal condition)
+        if(pdone >= pdone_goal) {
+            best_sequence = sequence;
+            best_etime = etime;
+            std::cout << "found new optimum with etime " << etime << std::endl;
             return true;
         }
 
@@ -190,10 +203,8 @@ private:
             }
         }
 
-        // Test for goal state
+        // Test for goal state (nothing left to explore condition)
         if(memory[stage].expansion_map.empty()) {
-            // This state has no children and is therefore a goal state.
-            // Since we got here, this is the best goal state known yet.
             best_sequence = sequence;
             best_etime = etime;
             std::cout << "found new optimum with etime " << etime << std::endl;

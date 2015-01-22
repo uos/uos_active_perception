@@ -296,6 +296,14 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     res.unknown = total_volume - res.free - res.occupied;
     res.total = total_volume;
     res.cell_volume = std::pow(m_resolution, 3);
+    octomap::OcTreeKey min_key = m_perception_map.getOccupancyMap().coordToKey(min);
+    res.bbox_min.x = min_key[0];
+    res.bbox_min.y = min_key[1];
+    res.bbox_min.z = min_key[2];
+    octomap::OcTreeKey max_key = m_perception_map.getOccupancyMap().coordToKey(max);
+    res.bbox_max.x = max_key[0];
+    res.bbox_max.y = max_key[1];
+    res.bbox_max.z = max_key[2];
     return true;
 }
 

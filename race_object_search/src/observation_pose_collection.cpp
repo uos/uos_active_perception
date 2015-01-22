@@ -27,8 +27,15 @@ void ObservationPoseCollection::addPoses
         op.object_set_ids = new_cvms[i].object_set_ids;
         op.cell_id_sets.reserve(new_cvms[i].cell_id_sets.size());
         for(size_t j = 0; j < new_cvms[i].cell_id_sets.size(); ++j) {
-            op.cell_id_sets.push_back(boost::unordered_set<uint64_t>(new_cvms[i].cell_id_sets[j].cell_ids.begin(),
-                                                                     new_cvms[i].cell_id_sets[j].cell_ids.end()));
+            boost::unordered_set<uint64_t> cell_keys;
+            for(std::vector<uos_active_perception_msgs::CellId>::const_iterator cell_id_it =
+                    new_cvms[i].cell_id_sets[j].cell_ids.begin();
+                cell_id_it != new_cvms[i].cell_id_sets[j].cell_ids.end();
+                ++cell_id_it)
+            {
+                cell_keys.insert(cellIdMsgToInt(*cell_id_it));
+            }
+            op.cell_id_sets.push_back(cell_keys);
         }
         m_observation_poses.push_back(op);
     }

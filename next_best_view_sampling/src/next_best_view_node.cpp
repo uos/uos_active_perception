@@ -447,30 +447,33 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
             if(!req.omit_cvm)
             {
                 // Prepare the conditional visibility map for this sample
-                boost::unordered_map<unsigned int, std::list<unsigned long> > cvm_hashed;
+                boost::unordered_map<unsigned int, std::list<octomap::OcTreeKey> > cvm_hashed;
                 for(ActivePerceptionMap::OcTreeKeyMap::iterator it = discovery_field.begin();
                     it != discovery_field.end();
                     ++it)
                 {
-                    // convert OcTreeKey to single long id and insert it into the hashed cvm
-                    unsigned long cell_id = it->first[0];
-                    cell_id = cell_id << 8;
-                    cell_id += it->first[1];
-                    cell_id = cell_id << 8;
-                    cell_id += it->first[2];
-                    cvm_hashed[it->second].push_back(cell_id);
+                    cvm_hashed[it->second].push_back(it->first);
                 }
                 // Now build a cvm_msg from the hashed cvm
                 // TODO: These types and conversion functions should probably get their own header
                 uos_active_perception_msgs::ConditionalVisibilityMap cvm_msg;
-                for(boost::unordered_map<unsigned int, std::list<unsigned long> >::iterator it = cvm_hashed.begin();
+                for(boost::unordered_map<unsigned int, std::list<octomap::OcTreeKey> >::iterator it = cvm_hashed.begin();
                     it != cvm_hashed.end();
                     ++it)
                 {
                     cvm_msg.object_set_ids.push_back(it->first);
                     uos_active_perception_msgs::CellIds cell_ids_msg;
                     cell_ids_msg.cell_ids.reserve(it->second.size());
-                    cell_ids_msg.cell_ids.insert(cell_ids_msg.cell_ids.begin(), it->second.begin(), it->second.end());
+                    for(std::list<octomap::OcTreeKey>::iterator key_it = it->second.begin();
+                        key_it != it->second.end();
+                        ++key_it)
+                    {
+                        uos_active_perception_msgs::CellId cell_id_msg;
+                        cell_id_msg.x = (*key_it)[0];
+                        cell_id_msg.y = (*key_it)[1];
+                        cell_id_msg.z = (*key_it)[2];
+                        cell_ids_msg.cell_ids.push_back(cell_id_msg);
+                    }
                     cvm_msg.cell_id_sets.push_back(cell_ids_msg);
                 }
                 res.cvms.push_back(cvm_msg);

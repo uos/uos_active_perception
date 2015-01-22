@@ -115,6 +115,28 @@ public:
                                                     50);
     }
 
+    static uint64_t cellIdMsgToInt(const uos_active_perception_msgs::CellId & msg)
+    {
+        uint64_t id = 0;
+        id |= msg.x;
+        id <<= 16;
+        id |= msg.y;
+        id <<= 16;
+        id |= msg.z;
+        return id;
+    }
+
+    static uos_active_perception_msgs::CellId cellIdIntToMsg(uint64_t id)
+    {
+        uos_active_perception_msgs::CellId msg;
+        msg.z = id;
+        id >>= 16;
+        msg.y = id;
+        id >>= 16;
+        msg.x = id;
+        return msg;
+    }
+
 
 private:
     std::vector<std::vector<unsigned int> > m_object_sets;

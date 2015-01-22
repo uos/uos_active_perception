@@ -117,6 +117,60 @@ private:
          }
     };
 
+    struct MapRegion
+    {
+        uos_active_perception_msgs::CellId min, max;
+        bool contains(uos_active_perception_msgs::CellId cell) const
+        {
+            return min.x <= cell.x && cell.x <= max.x &&
+                   min.y <= cell.y && cell.y <= max.y &&
+                   min.z <= cell.z && cell.z <= max.z;
+        }
+        size_t cellCount()
+        {
+            return (max.x - min.x + 1) * (max.y - min.y + 1) * (max.z - min.z + 1);
+        }
+    };
+
+    struct MapRegionCollection
+    {
+        std::vector<MapRegion> regions;
+        size_t findRegion(uos_active_perception_msgs::CellId cell) const
+        {
+            for(size_t i = 0; i < regions.size(); ++i)
+            {
+                if(regions[i].contains(cell)) return i;
+            }
+            return -1;
+        }
+    };
+
+    struct RegionalProbabilityCellGain
+    {
+         const MapRegionCollection & map_region_collection;
+         const std::vector<double> & cell_gains;
+
+         RegionalProbabilityCellGain
+         (
+                 const MapRegionCollection & map_region_collection,
+                 const std::vector<double> & cell_gains
+         ):
+             map_region_collection(map_region_collection),
+             cell_gains(cell_gains)
+         {}
+
+         double operator ()(uint64_t const & cell) const
+         {
+             size_t idx = map_region_collection.findRegion(ObservationPoseCollection::cellIdIntToMsg(cell));
+             if(idx > cell_gains.size())
+             {
+                 ROS_WARN("Encountered cell that does not belong to any region");
+                 return 0.0;
+             }
+             return cell_gains[idx];
+         }
+    };
+
     void logerror(const std::string & str)
     {
         ROS_ERROR_STREAM(str.c_str());
@@ -184,14 +238,31 @@ private:
         size_t marker_count = 0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
 
+        double cell_volume = 0.0;
+        MapRegionCollection region_collection;
+        region_collection.regions.resize(goal.roi.size());
         std::vector<double> unknown_roi_space(goal.roi.size(), 0.0);
         std::vector<double> roi_probability_density(goal.roi.size());
+        std::vector<double> roi_cell_gain(goal.roi.size());
         for(size_t i = 0; i < goal.roi.size(); ++i)
         {
             roi_probability_density[i] = goal.p[i] / (goal.roi[i].dimensions.x *
                                                       goal.roi[i].dimensions.y *
                                                       goal.roi[i].dimensions.z);
+
+            uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
+            get_bbox_occupancy.request.bbox = goal.roi[i];
+            while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+            {
+                logerror("get_bbox_occupancy service call failed, will try again");
+                ros::WallDuration(5).sleep();
+            }
+            cell_volume = get_bbox_occupancy.response.cell_volume;
+            region_collection.regions[i].min = get_bbox_occupancy.response.bbox_min;
+            region_collection.regions[i].max = get_bbox_occupancy.response.bbox_max;
+            roi_cell_gain[i] = goal.p[i] / region_collection.regions[i].cellCount();
         }
+        RegionalProbabilityCellGain rpcg(region_collection, roi_cell_gain);
 
         while(ros::ok())
         {
@@ -203,8 +274,7 @@ private:
             }
 
             // evaluate actual information gain between iterations
-            double gain = 0.0;
-            double cell_volume = 0.0;
+            double gain = 0.0, probability_sum = 0.0;
             for(size_t i = 0; i < goal.roi.size(); ++i)
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
@@ -214,7 +284,7 @@ private:
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
                 }
-                cell_volume = get_bbox_occupancy.response.cell_volume;
+                probability_sum += get_bbox_occupancy.response.unknown * roi_probability_density[i];
                 gain += (unknown_roi_space[i] - get_bbox_occupancy.response.unknown) * roi_probability_density[i];
                 unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
             }
@@ -226,6 +296,8 @@ private:
             iteration_counter++;
             m_file_events << iteration_counter << std::endl;
             m_file_vals << iteration_counter << std::endl;
+
+            logval("probability_sum", probability_sum);
 
             // get current robot pose
             const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
@@ -299,26 +371,38 @@ private:
             opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
             logtime("mutual_tt_lut_time", t0);
 
-            // HACK:
-            // Find the number of discoverable cells as the nr. of cells seen by the greedy strategy and
-            // assign equal probability to all cells with a sum of 1.
-            // THIS IGNORES ALL PROBABILITIES IN THE REQUEST AND SHOULD BE REPLACED
-            double success_probability = 1.0;
-            EqualProbabilityCellGain epcg;
+            // Find the number and total gain of discoverable cells using a greedy strategy
+            double success_probability = 0.0;
             {
-                epcg.p = 1.0 / n_cells;
-                SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
-                sp.greedy(9000);
-                epcg.p = 1.0 / sp.detected_cells[sp.last_idx].size();
+                std::vector<size_t> cell_counts(goal.roi.size(), 0);
+                detection_t observable_union = opc.observableUnion();
+                for(detection_t::iterator it = observable_union.begin(); it != observable_union.end(); ++it)
+                {
+                    success_probability += rpcg(*it);
+                    size_t ridx = region_collection.findRegion(ObservationPoseCollection::cellIdIntToMsg(*it));
+                    assert(ridx < cell_counts.size());
+                    cell_counts[ridx]++;
+                }
 
-                // Termination criterion:
-                if(sp.detected_cells[sp.last_idx].size() * cell_volume < goal.min_observable_volume)
+                // Termination criterion
+                bool terminate = true;
+                for(size_t i = 0; i < cell_counts.size(); ++i)
+                {
+                    double observable_volume = cell_counts[i] * cell_volume;
+                    if(observable_volume >= goal.min_observable_volume)
+                    {
+                        terminate = false;
+                        break;
+                    }
+                }
+                if(terminate)
                 {
                     loginfo("termination criterion: min_observable_volume");
                     m_observe_volumes_server.setSucceeded();
                     return;
                 }
             }
+            logval("success_probability", success_probability);
 
             ROS_INFO("entering planning phase");
             t0 = ros::WallTime::now();
@@ -329,7 +413,7 @@ private:
             }
             else if(m_planning_mode == "search")
             {
-                SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
+                SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double etime;
                 bool finished = spl.makePlan(m_depth_limit,
                                              success_probability * m_relative_lookahead,
@@ -343,7 +427,7 @@ private:
             }
             else if(m_planning_mode == "greedy-reorder")
             {
-                SearchPlanner<EqualProbabilityCellGain> spl(epcg, opc);
+                SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double etime;
                 spl.makeGreedy(plan, etime);
                 bool finished = spl.optimalOrder(m_depth_limit,
@@ -371,7 +455,7 @@ private:
             }
 
             // log and publish some plan details
-            SearchPlan<EqualProbabilityCellGain> sp(epcg, opc);
+            SearchPlan<RegionalProbabilityCellGain> sp(rpcg, opc);
             sp.pushSequence(plan, 1, plan.size());
             sp.deleteMarker(m_world_frame_id, m_marker_pub, "plan", marker_count);
             marker_count = sp.sendMarker(m_world_frame_id, m_marker_pub, "plan");

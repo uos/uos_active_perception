@@ -115,6 +115,20 @@ public:
                                                     50);
     }
 
+    detection_t observableUnion()
+    {
+        detection_t all;
+        for(size_t i = 0; i < m_observation_poses.size(); ++i)
+        {
+            for(size_t j = 0; j < m_observation_poses[i].cell_id_sets.size(); ++j)
+            {
+                detection_t & ins = m_observation_poses[i].cell_id_sets[j];
+                all.insert(ins.begin(), ins.end());
+            }
+        }
+        return all;
+    }
+
     static uint64_t cellIdMsgToInt(const uos_active_perception_msgs::CellId & msg)
     {
         uint64_t id = 0;

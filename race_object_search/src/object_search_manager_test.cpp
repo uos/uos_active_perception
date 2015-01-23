@@ -112,8 +112,10 @@ int main(int argc, char** argv)
 
     // Create the request
     std::vector<uos_active_perception_msgs::BoundingBox> boxes;
+    std::vector<double> probs;
     bool reset = false;
     bool nosearch = false;
+    bool has_p = false;
     double min_observable_volume = 0.0;
 
     for(long i = 1; i < argc; ++i) {
@@ -121,24 +123,33 @@ int main(int argc, char** argv)
             reset = true;
         } else if(!strcmp(argv[i], "nosearch")) {
             nosearch = true;
+        } else if(!strcmp(argv[i], "p")) {
+            has_p = true;
         } else if(!strcmp(argv[i], "min_observable_volume")) {
             min_observable_volume = std::atof(argv[++i]);
         } else if(!strcmp(argv[i], "table1")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeTable1());
         } else if(!strcmp(argv[i], "table2")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeTable2());
         } else if(!strcmp(argv[i], "counter")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeCounter());
         } else if(!strcmp(argv[i], "raceRoom")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeRaceRoom());
         } else if(!strcmp(argv[i], "shelf1")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeShelf1());
         } else if(!strcmp(argv[i], "shelf2")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeShelf2());
         } else if(!strcmp(argv[i], "shelf3")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeShelf3());
         } else {
-            ROS_ERROR_STREAM("UNKNOWN BOX: " << argv[i]);
+            ROS_ERROR_STREAM("UNKNOWN ARG: " << argv[i]);
         }
     }
 
@@ -182,14 +193,18 @@ int main(int argc, char** argv)
         }
         race_object_search::ObserveVolumesGoal goal;
         goal.roi.insert(goal.roi.end(), boxes.begin(), boxes.end());
-        // Set probabilities to equal distribution
+        // Set probabilities
         goal.p.resize(goal.roi.size());
         double total_volume = 0.0;
         for(size_t i = 0; i < goal.roi.size(); ++i) {
             total_volume += goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z;
         }
         for(size_t i = 0; i < goal.roi.size(); ++i) {
-            goal.p[i] = (goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z) / total_volume;
+            if(has_p) {
+                goal.p[i] = probs[i];
+            } else {
+                goal.p[i] = (goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z) / total_volume;
+            }
         }
         goal.min_observable_volume = min_observable_volume;
         ROS_INFO("Sending goal...");

@@ -39,6 +39,11 @@ void Kmeans::converge()
     max_remote_distance = std::sqrt(dist2(points[max_remote_point_idx], points[centroid_idxs[assignment[max_remote_point_idx]]]));
 }
 
+const Kmeans::Point & Kmeans::getCentroid(const size_t point_id) const
+{
+    return points[centroid_idxs[assignment[point_id]]];
+}
+
 std::vector<Kmeans::Point> const & Kmeans::getPoints() const
 {
     return points;

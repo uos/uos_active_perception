@@ -39,12 +39,20 @@ public:
 
 private: 
     // execution speed constants
-    double static const DRIVE_SPEED = 0.2; // [m/s]
-    double static const TURN_SPEED = 0.5; // [rad/s]
+    double static const DRIVE_TIME_TOLERANCE = 8; // [s]
+    double static const TURN_SPEED = 1.57079632679; // [rad/s]
     double static const LIFT_SPEED = 0.01; // [m/s]
     double static const HEAD_SPEED = 3.14; // [rad/s]
     double static const HORIZONTAL_TOLERANCE = 0.05;
     double static const VERTICAL_TOLERANCE = 0.05;
+
+    /**
+      Drive time prediction based on linear regression.
+      */
+    double static pathCostToDriveTime(const double path_cost)
+    {
+        return 0.0015513931248 * path_cost + 7.97932567664;
+    }
 
     // read as ros parameter
     double ACQUISITION_TIME;

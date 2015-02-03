@@ -4,6 +4,7 @@
 
 #include <move_base/GetMultiplePlans.h>
 #include <nav_msgs/Path.h>
+#include <visualization_msgs/Marker.h>
 
 #include <map>
 #include <sstream>
@@ -135,6 +136,12 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         std::vector<size_t> const & target_pose_idxs,
         size_t const n_clusters) const
 {  
+    #ifdef PR2_AGENT_DEBUG
+    // Prepare debug marker publisher
+    ros::Publisher dbg_marker_pub(ros::NodeHandle().advertise<visualization_msgs::Marker>("/pr2_agent_dbg", 10000));
+    ros::WallDuration(5.0).sleep();
+    #endif
+
     assert(start_pose_idxs.size() == target_pose_idxs.size());
     std::vector<double> times(start_pose_idxs.size(), std::numeric_limits<double>::infinity());
 
@@ -149,17 +156,64 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         km.addCluster();
     }
     ROS_INFO_STREAM("k-means completed with max_remote_distance=" << km.getMaxRemoteDistance());
-    // Uncomment to dump clustering result
-    // km.writeTabFiles();
 
-    // Compile a map of (origin,target):path between clusters
-    typedef std::map<std::pair<size_t, size_t>, std::pair<double, double> > cluster_pathmap_t;
+    #ifdef PR2_AGENT_DEBUG
+    // Publish cluster centers
+    visualization_msgs::Marker clusters_marker;
+    clusters_marker.action = visualization_msgs::Marker::ADD;
+    clusters_marker.header.frame_id = m_world_frame_id;
+    clusters_marker.type = visualization_msgs::Marker::SPHERE_LIST;
+    clusters_marker.ns = "cluster_centers";
+    clusters_marker.id = 0;
+    clusters_marker.color.r = 1.0;
+    clusters_marker.color.a = 1.0;
+    clusters_marker.scale.x = 0.1;
+    clusters_marker.scale.y = 0.1;
+    clusters_marker.scale.z = 0.1;
+    clusters_marker.points.resize(km.getCentroidIdxs().size());
+    for(size_t centroid_idx = 0; centroid_idx < km.getCentroidIdxs().size(); ++centroid_idx)
+    {
+        Kmeans::Point & p = points[km.getCentroidIdxs()[centroid_idx]];
+        clusters_marker.points[centroid_idx].x = p.x;
+        clusters_marker.points[centroid_idx].y = p.y;
+        clusters_marker.points[centroid_idx].z = 0.0;
+    }
+    dbg_marker_pub.publish(clusters_marker);
+    // Publish assignments
+    visualization_msgs::Marker assignment_marker;
+    assignment_marker.action = visualization_msgs::Marker::ADD;
+    assignment_marker.header.frame_id = m_world_frame_id;
+    assignment_marker.type = visualization_msgs::Marker::LINE_LIST;
+    assignment_marker.ns = "cluster_assignments";
+    assignment_marker.id = 0;
+    assignment_marker.color.r = 1.0;
+    assignment_marker.color.a = 1.0;
+    assignment_marker.scale.x = 0.02;
+    assignment_marker.scale.y = 0.02;
+    assignment_marker.scale.z = 0.02;
+    assignment_marker.points.resize(2 * points.size());
+    for(size_t i = 0; i < points.size(); ++i)
+    {
+        const Kmeans::Point & p = km.getCentroid(i);
+        assignment_marker.points[2*i].x = p.x;
+        assignment_marker.points[2*i].y = p.y;
+        assignment_marker.points[2*i].z = 0.0;
+        assignment_marker.points[2*i+1].x = points[i].x;
+        assignment_marker.points[2*i+1].y = points[i].y;
+        assignment_marker.points[2*i+1].z = 0.0;
+
+    }
+    dbg_marker_pub.publish(assignment_marker);
+    #endif
+
+    // Compile a map of (origin,target):drive_time between clusters
+    typedef std::map<std::pair<size_t, size_t>, double> cluster_pathmap_t;
     cluster_pathmap_t cluster_pathmap;
     for(size_t i = 0; i < start_pose_idxs.size(); ++i) {
         size_t origin_cluster = km.getAssignment()[start_pose_idxs[i]];
         size_t target_cluster = km.getAssignment()[target_pose_idxs[i]];
         cluster_pathmap[std::pair<size_t, size_t>(origin_cluster, target_cluster)] =
-                std::make_pair(-std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity());
+                -std::numeric_limits<double>::infinity();
     }
 
     // generate path planner request
@@ -171,7 +225,6 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         for(cluster_pathmap_t::iterator it = cluster_pathmap.begin(); it != cluster_pathmap.end(); ++it) {
             tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.first]], get_plans_call.request.start[i].pose);
             get_plans_call.request.start[i].header.frame_id = m_world_frame_id;
-            get_plans_call.request.start[i].header.stamp = ros::Time::now();
             tf::poseTFToMsg(poses[km.getCentroidIdxs()[it->first.second]], get_plans_call.request.goal[i].pose);
             get_plans_call.request.goal[i].header = get_plans_call.request.start[i].header;
             ++i;
@@ -183,54 +236,49 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         return times;
     }
 
-    // Uncomment to dump all generated paths to tab files
-    /*
-    for(size_t i = 0; i < get_plans_call.response.plans.size(); ++i) {
-        std::stringstream ss;
-        ss << "path_" << i << ".tab";
-        std::ofstream f;
-        f.open(ss.str().c_str());
-        f << "x\ty\ttype\n";
-        f << "c\tc\td\n";
-        f << "\t\tc\n";
-        f << get_plans_call.request.start[i].pose.position.x << "\t"
-          << get_plans_call.request.start[i].pose.position.y << "\t" << "start" << "\n";
-        for(size_t j = 0; j < get_plans_call.response.plans[i].poses.size(); ++j) {
-            f << get_plans_call.response.plans[i].poses[j].pose.position.x << "\t"
-              << get_plans_call.response.plans[i].poses[j].pose.position.y << "\t" << "path" << "\n";
-        }
-        f << get_plans_call.request.goal[i].pose.position.x << "\t"
-          << get_plans_call.request.goal[i].pose.position.y << "\t" << "goal" << "\n";
-        f.close();
-        ss.str("");
-        ss << "path_" << i << ".txt";
-        f.open(ss.str().c_str());
-        f << get_plans_call.response.plans[i];
-        f.close();
-    }
-    */
+    #ifdef PR2_AGENT_DEBUG
+    // Publish all paths as markers
+    dbg_path_markers.clear();
+    for(size_t i = 0; i < start_pose_idxs.size(); ++i) {
+        size_t start_pose_idx = start_pose_idxs[i];
+        size_t target_pose_idx = target_pose_idxs[i];
+        // Figure out the correct connecting path
+        size_t origin_cluster = km.getAssignment()[start_pose_idx];
+        size_t target_cluster = km.getAssignment()[target_pose_idx];
+        size_t path_idx = std::distance(cluster_pathmap.begin(), cluster_pathmap.lower_bound(std::make_pair(origin_cluster, target_cluster)));
 
-    // Fill the cluster_pathmap with (length, curvature) of each path
+        visualization_msgs::Marker path_marker;
+        path_marker.action = visualization_msgs::Marker::ADD;
+        path_marker.header.frame_id = m_world_frame_id;
+        path_marker.type = visualization_msgs::Marker::LINE_STRIP;
+        path_marker.ns = "cluster_paths";
+        path_marker.id = i;
+        //path_marker.lifetime = ros::Duration(5.0);
+        path_marker.color.r = 1.0;
+        path_marker.color.g = 1.0;
+        path_marker.color.a = 1.0;
+        path_marker.scale.x = 0.02;
+        path_marker.scale.y = 0.02;
+        path_marker.scale.z = 0.02;
+        path_marker.points.resize(get_plans_call.response.plans[path_idx].poses.size());
+        for(size_t j = 0; j < get_plans_call.response.plans[path_idx].poses.size(); ++j) {
+            path_marker.points[j].x = get_plans_call.response.plans[path_idx].poses[j].pose.position.x;
+            path_marker.points[j].y = get_plans_call.response.plans[path_idx].poses[j].pose.position.y;
+            path_marker.points[j].z = get_plans_call.response.plans[path_idx].poses[j].pose.position.z;
+        }
+        dbg_marker_pub.publish(path_marker);
+    }
+    #endif
+
+    // Fill the cluster_pathmap with drive time estimation for each path
     {
         size_t i = 0;
         for(cluster_pathmap_t::iterator it = cluster_pathmap.begin(); it != cluster_pathmap.end(); ++it) {
-            double length = 0, curvature = 0;
-            std::vector<geometry_msgs::PoseStamped> const & p = get_plans_call.response.plans[i].poses;
-            if(p.empty()) {
-                length = std::numeric_limits<double>::infinity();
+            if(get_plans_call.response.plans[i].poses.empty()) {
+                it->second = std::numeric_limits<double>::infinity();
             } else {
-                double x1 = p[0].pose.position.x;
-                double y1 = p[0].pose.position.y;
-                for(size_t i_path = 1; i_path + 1 < p.size(); i_path++) {
-                    double x2 = p[i_path].pose.position.x;
-                    double y2 = p[i_path].pose.position.y;
-                    length += std::sqrt(std::pow(x1-x2, 2) + std::pow(y1-y2, 2));
-                    // TODO: calculate curvature
-                    x1 = x2;
-                    y1 = y2;
-                }
+                it->second = get_plans_call.response.plan_costs[i];
             }
-            it->second = std::make_pair(length, curvature);
             ++i;
         }
     }
@@ -241,13 +289,12 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         // Figure out the correct connecting path
         size_t origin_cluster = km.getAssignment()[start_pose_idx];
         size_t target_cluster = km.getAssignment()[target_pose_idx];
-        std::pair<double, double> const & path_length_curvature =
-                cluster_pathmap[std::make_pair(origin_cluster, target_cluster)];
-        // Estimate time
-        times[i] = path_length_curvature.first / DRIVE_SPEED
-                   + path_length_curvature.second / TURN_SPEED
-                   + poses[start_pose_idxs[i]].getRotation().angleShortestPath(
-                     poses[target_pose_idxs[i]].getRotation()) / TURN_SPEED;
+        // Set drive time prediction
+        double yaw_diff = poses[start_pose_idxs[i]].getRotation().angleShortestPath(
+                            poses[target_pose_idxs[i]].getRotation());
+        assert(yaw_diff >= 0);
+        times[i] = cluster_pathmap[std::make_pair(origin_cluster, target_cluster)]
+                   + yaw_diff / TURN_SPEED;
     }
 
     return times;

@@ -115,6 +115,48 @@ public:
                                                     50);
     }
 
+    bool sanityCheck()
+    {
+        size_t ii, jj, kk;
+        double failtime = 0.0;
+        for(size_t i = 0; i < m_observation_poses.size(); ++i)
+        {
+            for(size_t j = 0; j < i; ++j)
+            {
+                for(size_t k = 0; k < m_observation_poses.size(); ++k)
+                {
+                    if(k == i || k == j) continue;
+                    double tt = getTravelTime(i, j);
+                    if((tt < std::numeric_limits<double>::infinity()) &&
+                       (tt > (getTravelTime(i, k) + getTravelTime(k, j))))
+                    {
+                        double fail = (tt - (getTravelTime(i, k) + getTravelTime(k, j)));
+                        if(fail > failtime)
+                        {
+                            failtime = fail;
+                            ii = i;
+                            jj = j;
+                            kk = k;
+                        }
+                    }
+                }
+            }
+        }
+        if(failtime > 0) {
+            geometry_msgs::Pose a,b,c;
+            tf::poseTFToMsg(m_observation_poses[ii].pose, a);
+            tf::poseTFToMsg(m_observation_poses[jj].pose, b);
+            tf::poseTFToMsg(m_observation_poses[kk].pose, c);
+            ROS_ERROR_STREAM("Sanity check failed, indirect route is " << failtime << " faster!" <<
+                             "\n--- Long path\nStart:\n" << a << "\nGoal:\n" << b <<
+                             "\n--- Faster[1]:\nStart:\n" << a << "\nGoal:\n" << c <<
+                             "\n--- Faster[2]:\nStart:\n" << c << "\nGoal:\n" << b);
+            return false;
+        }
+
+        return true;
+    }
+
     detection_t observableUnion()
     {
         detection_t all;

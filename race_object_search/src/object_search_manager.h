@@ -370,6 +370,9 @@ private:
             t0 = ros::WallTime::now();
             opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
             logtime("mutual_tt_lut_time", t0);
+            if(!opc.sanityCheck()) {
+                logerror("Transition time sanity check failed!");
+            }
 
             // Find the number and total gain of discoverable cells using a greedy strategy
             double success_probability = 0.0;

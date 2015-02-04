@@ -277,7 +277,7 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
             if(get_plans_call.response.plans[i].poses.empty()) {
                 it->second = std::numeric_limits<double>::infinity();
             } else {
-                it->second = get_plans_call.response.plan_costs[i];
+                it->second = pathCostToDriveTime(get_plans_call.response.plan_costs[i]);
             }
             ++i;
         }
@@ -293,8 +293,8 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
         double yaw_diff = poses[start_pose_idxs[i]].getRotation().angleShortestPath(
                             poses[target_pose_idxs[i]].getRotation());
         assert(yaw_diff >= 0);
-        times[i] = cluster_pathmap[std::make_pair(origin_cluster, target_cluster)]
-                   + yaw_diff / TURN_SPEED;
+        times[i] = cluster_pathmap[std::make_pair(origin_cluster, target_cluster)];
+                   //+ yaw_diff / TURN_SPEED;
     }
 
     return times;

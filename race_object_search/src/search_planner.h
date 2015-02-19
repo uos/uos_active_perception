@@ -117,11 +117,11 @@ private:
             for(size_t i = 0; i < opc_subset.size(); ++i) {
                 detection_t const & d = opc.getPoses()[opc_subset[i]].cell_id_sets[0];
                 detectables.push_back(d);
-                double g = 0.0;
+                double g = 1.0;
                 for(detection_t::iterator it = d.begin(); it != d.end(); ++it) {
-                    g += cgl(*it);
+                    g *= 1.0 - cgl(*it);
                 }
-                gain.push_back(g);
+                gain.push_back(1.0 - g);
             }
         }
 
@@ -139,11 +139,14 @@ private:
         void removeCells(detection_t const & d, CELL_GAIN_LOOKUP const & cgl)
         {
             for(size_t i = 0; i < detectables.size(); ++i) {
+                double p_not_in_removed = 1.0;
                 for(detection_t::iterator it = d.begin(); it != d.end(); ++it) {
                     if(detectables[i].erase(*it)) {
-                        gain[i] -= cgl(*it);
+                        p_not_in_removed *= 1.0 - cgl(*it);
                     }
                 }
+                // update gain
+                gain[i] = 1.0 - (1.0 - gain[i]) / p_not_in_removed;
             }
         }
     };
@@ -237,7 +240,9 @@ private:
             memory[stage+1].detec_opts.assignEqualSize(memory[stage].detec_opts);
             memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[opc_subset_idx], cgl);
             // Explore next stage
-            makePlanRecursive(stage + 1, pdone + memory[stage].detec_opts.gain[opc_subset_idx], new_etime);
+            makePlanRecursive(stage + 1,
+                              pdone + (1.0 - pdone) * memory[stage].detec_opts.gain[opc_subset_idx],
+                              new_etime);
             if(timeout != boost::date_time::not_a_date_time &&
                boost::posix_time::microsec_clock::local_time() > timeout) {
                 return false;

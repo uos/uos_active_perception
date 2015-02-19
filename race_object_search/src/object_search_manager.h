@@ -246,9 +246,9 @@ private:
         std::vector<double> roi_cell_gain(goal.roi.size());
         for(size_t i = 0; i < goal.roi.size(); ++i)
         {
-            roi_probability_density[i] = goal.p[i] / (goal.roi[i].dimensions.x *
-                                                      goal.roi[i].dimensions.y *
-                                                      goal.roi[i].dimensions.z);
+            roi_probability_density[i] = 1.0 - std::pow(1.0 - goal.p[i], 1.0 / (goal.roi[i].dimensions.x *
+                                                                                goal.roi[i].dimensions.y *
+                                                                                goal.roi[i].dimensions.z));
 
             uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
             get_bbox_occupancy.request.bbox = goal.roi[i];
@@ -260,7 +260,7 @@ private:
             cell_volume = get_bbox_occupancy.response.cell_volume;
             region_collection.regions[i].min = get_bbox_occupancy.response.bbox_min;
             region_collection.regions[i].max = get_bbox_occupancy.response.bbox_max;
-            roi_cell_gain[i] = goal.p[i] / region_collection.regions[i].cellCount();
+            roi_cell_gain[i] = 1.0 - std::pow(1.0 - goal.p[i], 1.0 / region_collection.regions[i].cellCount());
         }
         RegionalProbabilityCellGain rpcg(region_collection, roi_cell_gain);
 
@@ -284,8 +284,11 @@ private:
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
                 }
-                probability_sum += get_bbox_occupancy.response.unknown * roi_probability_density[i];
-                gain += (unknown_roi_space[i] - get_bbox_occupancy.response.unknown) * roi_probability_density[i];
+                probability_sum += (1.0 - probability_sum) * (1.0 - std::pow(1.0 - roi_probability_density[i],
+                                                                             get_bbox_occupancy.response.unknown));
+                gain += (1.0 - probability_sum) *
+                        (1.0 - std::pow(1.0 - roi_probability_density[i],
+                                              unknown_roi_space[i] - get_bbox_occupancy.response.unknown));
                 unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
             }
             if(iteration_counter > 0)
@@ -381,7 +384,7 @@ private:
                 detection_t observable_union = opc.observableUnion();
                 for(detection_t::iterator it = observable_union.begin(); it != observable_union.end(); ++it)
                 {
-                    success_probability += rpcg(*it);
+                    success_probability += (1.0 - success_probability) * rpcg(*it);
                     size_t ridx = region_collection.findRegion(ObservationPoseCollection::cellIdIntToMsg(*it));
                     assert(ridx < cell_counts.size());
                     cell_counts[ridx]++;

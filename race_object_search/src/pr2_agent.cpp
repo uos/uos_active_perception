@@ -36,7 +36,12 @@ Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & worl
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
     // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 8.0 here)
-    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 1.0);
+    if(!ros::param::has("~acquisition_time"))
+    {
+        ROS_WARN("Sensor acquisition time not set. Using default!");
+    }
+    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 8.0);
+    ROS_INFO_STREAM("Sensor acquisition time: " << ACQUISITION_TIME);
 }
 
 tf::Pose Pr2Agent::getCurrentRobotPose() const
@@ -110,10 +115,7 @@ std::vector<double> Pr2Agent::estimateMoveTimes
         // calculate time needed to lift the torso
         double dz = std::abs(cam_poses[start_pose_idxs[i]].getOrigin().getZ() -
                              cam_poses[target_pose_idxs[i]].getOrigin().getZ());
-        if(dz > VERTICAL_TOLERANCE)
-        {
-            times[i] += dz / LIFT_SPEED;
-        }
+        times[i] += dz / LIFT_SPEED;
 
         // Calculate time needed to turn the camera if nothing else needs to move.
         // Otherwise, head movement is parallelized and does not cost extra time.

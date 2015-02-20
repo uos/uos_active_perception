@@ -481,6 +481,7 @@ private:
                                         opc.getPoses()[best_pose_idx].view_distance))
             {
                 // wait for acquisition
+                ROS_INFO_STREAM("waiting " << m_agent.getAcquisitionTime() << " s for data acquisition...");
                 ros::Duration(m_agent.getAcquisitionTime()).sleep();
             }
             else

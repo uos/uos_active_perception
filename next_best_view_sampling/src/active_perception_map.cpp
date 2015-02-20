@@ -54,8 +54,7 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                                               CameraConstraints const & camera_constraints)
 {
     // update occupancy map
-    m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), scan_pose);
-
+    m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), scan_pose, camera_constraints.range_max, true);
     // Detect space that should have been seen but was not (exceeding sensor max range).
     // This space is assumed to be empty and updated in the occupancy map.
     double azimuth_min = -camera_constraints.hfov / 2.0;

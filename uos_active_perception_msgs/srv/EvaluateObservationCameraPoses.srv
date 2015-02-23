@@ -1,0 +1,29 @@
+# Request:
+# Only roi and sample_size are required. All other fields are either optional or default to legal values.
+# - roi: List of  regions of interest
+# - camera_poses: A List of camera poses in the world coordinate frame.
+# - ray_skip: Probability that a ray cast will be skipped (speeds up information gain estimation).
+# - omit_cvm: If set to true, no conditional visibility maps are included in the response (reduces msg size). 
+# - objects: List of bounding boxes for moveable objects in the scene.
+#
+# Response:
+# - roi_cell_counts: Number of cells in the requested regions of interest
+# - target_points: A point in the center of the camera viewport at the corresponding camera pose.
+#                  Can be used as target for point_head.
+# - information_gains: A list of expected information gain for each camera pose.
+#                      Information gain is measured as revealed space [m^3]
+# - cvms: A list containing the conditional visibility map for each camera pose.
+#         Always empty if omit_cvm is set to true.
+
+BoundingBox[] roi
+geometry_msgs/Pose[] camera_poses
+float32 ray_skip
+bool omit_cvm
+BoundingBox[] objects
+---
+geometry_msgs/Pose[] camera_poses
+uint32[] roi_cell_counts
+geometry_msgs/Point[] target_points
+float32[] information_gains
+ConditionalVisibilityMap[] cvms
+ObjectSet[] object_sets

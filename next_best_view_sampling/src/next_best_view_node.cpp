@@ -73,6 +73,10 @@ NextBestViewNode::NextBestViewNode() :
                                               "/get_observation_camera_poses",
                                               &NextBestViewNode::getObservationCameraPosesCb,
                                               this)),
+    m_evaluate_observation_camera_poses_server(m_node_handle_pub.advertiseService(
+                                                   "/evaluate_observation_camera_poses",
+                                                   &NextBestViewNode::evaluateObservationCameraPosesCb,
+                                                   this)),
     m_reset_volumes_server(m_node_handle_pub.advertiseService(
                                        "/reset_volumes",
                                        &NextBestViewNode::resetVolumesCb,
@@ -307,46 +311,27 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     return true;
 }
 
-bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::GetObservationCameraPoses::Request& req,
-                                                   uos_active_perception_msgs::GetObservationCameraPoses::Response& res)
-{
-    ros::Time callback_timeout = ros::Time::now() + req.timeout;
-    ObservationPoseSampler ops(m_camera_constraints, m_camera_range_tolerance);
-    boost::mt19937 rng(std::time(0));
+uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestViewNode::evaluateObservationCameraPoses
+(
+    const ActivePerceptionMap & map,
+    const std::vector<tf::Pose> & observation_poses,
+    const OcTreeBoxSet & roi,
+    const OcTreeBoxSet & object_boxes,
+    const double ray_skip,
+    const ros::Duration timeout,
+    const bool omit_cvm
+) const {
+    uos_active_perception_msgs::EvaluateObservationCameraPoses::Response res;
+    ros::Time callback_timeout = ros::Time::now() + timeout;
+    boost::mt19937 rng(0);//(std::time(0));
     boost::uniform_01<> rand_u01;
-    // TODO: Shrink the ROI to an area that is in principle observable
-    // (not higher/lower than the camera constraints allow observations to be made)
-    // Should be implemented together with the ObservationSampler class which will wrap the
-    // sampleObservationSpace method and allow to ask for single samples
-
-    // translate roi to octomap
-    OcTreeBoxSet roi = boxSetFromMsg(req.roi);
-    unsigned int roi_cell_count = roi.cellCount();
-    if(!roi_cell_count)
-    {
-        // If the roi is empty (exploration mode), we estimate the number of cells in the view cone
-        roi_cell_count =
-        ((std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.hfov))) *
-          std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.vfov))) *
-          m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
-    }
-    // fill roi_cell_counts of answer
-    res.roi_cell_counts.resize(roi.elements.size());
-    for(size_t i = 0; i < roi.elements.size(); ++i) {
-        res.roi_cell_counts[i] = roi.elements[i].cellCount();
-    }
-    // translate objects to octomap
-    OcTreeBoxSet object_boxes = boxSetFromMsg(req.objects);
     ActivePerceptionMap::ObjectSetMap object_sets;
     object_sets.rehash(object_boxes.elements.size() / object_sets.max_load_factor());
-    ROS_INFO_STREAM("NBV sampling with " << object_boxes.elements.size() << " objects.");
+    std::vector<visualization_msgs::Marker> markers;
+    markers.reserve(observation_poses.size());
+    size_t max_gain = 0;
 
-    // make local copy of the map, so that sampling and mapping can occur in parallel
-    std::auto_ptr<ActivePerceptionMap> map;
-    {
-        boost::mutex::scoped_lock lock(m_map_mutex);
-        map.reset(new ActivePerceptionMap(m_perception_map));
-    }
+    ROS_INFO_STREAM("NBV evaluation with " << object_boxes.elements.size() << " objects.");
 
     // Some derived camera parameters
     double azimuth_min = -m_camera_constraints.hfov / 2.0;
@@ -357,64 +342,33 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
     double angle_increment = std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(ray_length, 2))));
 
-    // Gather fringe voxel centers
-    std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
-    if(!roi.elements.empty())
+    // fill roi_cell_counts of answer
+    unsigned int roi_cell_count = roi.cellCount();
+    if(!roi_cell_count)
     {
-        pubActiveFringe(active_fringe);
+        // If the roi is empty (exploration mode), we estimate the number of cells in the view cone
+        roi_cell_count =
+        ((std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.hfov))) *
+          std::sqrt((2.0 * std::pow(m_camera_constraints.range_max, 2)) * (1.0 - std::cos(m_camera_constraints.vfov))) *
+          m_camera_constraints.range_max) / 3.0) / std::pow(m_resolution, 3);
     }
-    last_roi = roi;
-    if(active_fringe.empty()) return true;
-
-    bool observation_position_set = !req.observation_position.header.frame_id.empty();
-    octomath::Vector3 observation_position;
-    if(observation_position_set)
+    res.roi_cell_counts.resize(roi.elements.size());
+    for(size_t i = 0; i < roi.elements.size(); ++i)
     {
-        if(!m_tf_listener.waitForTransform(m_world_frame_id,
-                                           req.observation_position.header.frame_id,
-                                           req.observation_position.header.stamp,
-                                           ros::Duration(1)))
+        res.roi_cell_counts[i] = roi.elements[i].cellCount();
+    }
+
+    for(size_t sample_id = 0; sample_id < observation_poses.size(); ++sample_id)
+    {
+        // check timeout
+        if(timeout.toNSec() > 0 && ros::Time::now() > callback_timeout)
         {
-            ROS_ERROR_STREAM("next_best_view_node: Timed out while waiting for transform from " <<
-                              req.observation_position.header.frame_id << " to " <<
-                              m_world_frame_id);
-            return false;
-        }
-        geometry_msgs::PointStamped obspos_msg;
-        m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obspos_msg);
-        observation_position = octomap::pointMsgToOctomap(obspos_msg.point);
-    }
-
-    std::vector<visualization_msgs::Marker> markers;
-    markers.reserve(req.sample_size);
-    size_t max_gain = 0;
-    for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
-    {
-        // Abort if there is no time left
-        if(req.timeout > ros::Duration(0,0) && ros::Time::now() > callback_timeout) {
+            ROS_INFO_STREAM("Sampling timeout reached after n=" << sample_id);
             break;
         }
 
-        tf::Transform sample;
-        if(observation_position_set)
-        {
-            sample = ops.genPoseSample(observation_position, req.lock_height);
-        }
-        else
-        {
-            try
-            {
-                sample = ops.genObservationSample(
-                            active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)]);
-            }
-            catch (std::runtime_error e)
-            {
-                ROS_WARN("Skipped unobservable fringe voxel");
-            }
-
-        }
-
-        octomap::point3d cam_point = octomap::pointTfToOctomap(sample.getOrigin());
+        const tf::Pose & sample = observation_poses[sample_id];
+        const octomap::point3d cam_point = octomap::pointTfToOctomap(sample.getOrigin());
 
         ActivePerceptionMap::OcTreeKeyMap discovery_field;
         discovery_field.rehash(roi_cell_count / discovery_field.max_load_factor()); // reserve enough space
@@ -423,7 +377,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
         {
             for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
             {
-                if(rand_u01(rng) < req.ray_skip)
+                if(rand_u01(rng) < ray_skip)
                 {
                     continue;
                 }
@@ -431,18 +385,18 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                                            ray_length * std::sin(azimuth),
                                            ray_length * std::sin(inclination));
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
-                map->estimateRayGainObjectAware(cam_point, ray_end, roi, object_boxes, object_sets, discovery_field);
+                map.estimateRayGainObjectAware(cam_point, ray_end, roi, object_boxes, object_sets, discovery_field);
             }
         }
         unsigned int gain = discovery_field.size();
 
         // Fetch target point
         octomap::point3d target_point_octomap;
-        map->getOccupancyMap().castRay(cam_point,
-                                       octomap::pointTfToOctomap(sample(tf::Vector3(ray_length, 0.0, 0.0))) - cam_point,
-                                       target_point_octomap,
-                                       true,
-                                       ray_length);
+        map.getOccupancyMap().castRay(cam_point,
+                                      octomap::pointTfToOctomap(sample(tf::Vector3(ray_length, 0.0, 0.0))) - cam_point,
+                                      target_point_octomap,
+                                      true,
+                                      ray_length);
 
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
@@ -452,7 +406,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
             res.camera_poses.push_back(camera_pose_msg);
             res.target_points.push_back(octomap::pointOctomapToMsg(target_point_octomap));
             res.information_gains.push_back(gain * std::pow(m_resolution, 3));
-            if(!req.omit_cvm)
+            if(!omit_cvm)
             {
                 // Prepare the conditional visibility map for this sample
                 boost::unordered_map<unsigned int, std::list<octomap::OcTreeKey> > cvm_hashed;
@@ -538,9 +492,129 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                     res.object_sets[it->second].objects.begin(), it->first.begin(), it->first.end());
     }
 
+    return res;
+}
+
+bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::GetObservationCameraPoses::Request& req,
+                                                   uos_active_perception_msgs::GetObservationCameraPoses::Response& res)
+{
+    ObservationPoseSampler ops(m_camera_constraints, m_camera_range_tolerance);
+    boost::mt19937 rng(std::time(0));
+    // TODO: Shrink the ROI to an area that is in principle observable
+    // (not higher/lower than the camera constraints allow observations to be made)
+    // Should be implemented together with the ObservationSampler class which will wrap the
+    // sampleObservationSpace method and allow to ask for single samples
+
+    // translate roi to octomap
+    OcTreeBoxSet roi = boxSetFromMsg(req.roi);
+
+    // make local copy of the map, so that sampling and mapping can occur in parallel
+    std::auto_ptr<ActivePerceptionMap> map;
+    {
+        boost::mutex::scoped_lock lock(m_map_mutex);
+        map.reset(new ActivePerceptionMap(m_perception_map));
+    }
+
+    // Gather fringe voxel centers
+    std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
+    if(!roi.elements.empty())
+    {
+        pubActiveFringe(active_fringe);
+    }
+    last_roi = roi;
+    if(active_fringe.empty()) return true;
+
+    bool observation_position_set = !req.observation_position.header.frame_id.empty();
+    octomath::Vector3 observation_position;
+    if(observation_position_set)
+    {
+        if(!m_tf_listener.waitForTransform(m_world_frame_id,
+                                           req.observation_position.header.frame_id,
+                                           req.observation_position.header.stamp,
+                                           ros::Duration(1)))
+        {
+            ROS_ERROR_STREAM("next_best_view_node: Timed out while waiting for transform from " <<
+                              req.observation_position.header.frame_id << " to " <<
+                              m_world_frame_id);
+            return false;
+        }
+        geometry_msgs::PointStamped obspos_msg;
+        m_tf_listener.transformPoint(m_world_frame_id, req.observation_position, obspos_msg);
+        observation_position = octomap::pointMsgToOctomap(obspos_msg.point);
+    }
+
+    std::vector<tf::Pose> samples;
+    samples.reserve(req.sample_size);
+    for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
+    {
+        if(observation_position_set)
+        {
+            samples.push_back(ops.genPoseSample(observation_position, req.lock_height));
+        }
+        else
+        {
+            try
+            {
+                samples.push_back(ops.genObservationSample(
+                            active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)]));
+            }
+            catch (std::runtime_error e)
+            {
+                ROS_WARN("Skipped unobservable fringe voxel");
+            }
+        }
+    }
+
+    uos_active_perception_msgs::EvaluateObservationCameraPoses::Response eval_res = evaluateObservationCameraPoses(
+                *map,
+                samples,
+                boxSetFromMsg(req.roi),
+                boxSetFromMsg(req.objects),
+                req.ray_skip,
+                req.timeout,
+                req.omit_cvm);
+
+    // Fill response fields
+    res.camera_poses = eval_res.camera_poses;
+    res.cvms = eval_res.cvms;
+    res.information_gains = eval_res.information_gains;
+    res.object_sets = eval_res.object_sets;
+    res.roi_cell_counts = eval_res.roi_cell_counts;
+    res.target_points = eval_res.target_points;
+
     return true;
 }
 
+bool NextBestViewNode::evaluateObservationCameraPosesCb
+(
+    uos_active_perception_msgs::EvaluateObservationCameraPoses::Request& req,
+    uos_active_perception_msgs::EvaluateObservationCameraPoses::Response& res)
+{
+    std::vector<tf::Pose> cam_poses(req.camera_poses.size());
+    for(size_t i = 0; i < req.camera_poses.size(); ++i)
+    {
+        tf::poseMsgToTF(req.camera_poses[i], cam_poses[i]);
+    }
+    // make local copy of the map, so that sampling and mapping can occur in parallel
+    std::auto_ptr<ActivePerceptionMap> map;
+    {
+        boost::mutex::scoped_lock lock(m_map_mutex);
+        map.reset(new ActivePerceptionMap(m_perception_map));
+    }
+    OcTreeBoxSet roi = boxSetFromMsg(req.roi);
+    // Do this stuff so the active fringe markers are updated
+    if(!roi.elements.empty()) pubActiveFringe(getActiveFringe(roi, *map));
+    last_roi = roi;
+
+    res = evaluateObservationCameraPoses(*map,
+                                         cam_poses,
+                                         roi,
+                                         boxSetFromMsg(req.objects),
+                                         req.ray_skip,
+                                         ros::Duration(),
+                                         req.omit_cvm);
+    return true;
+}
 
 void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 {

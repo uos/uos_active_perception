@@ -47,6 +47,7 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <uos_active_perception_msgs/GetBboxOccupancy.h>
 #include <uos_active_perception_msgs/GetObservationCameraPoses.h>
+#include <uos_active_perception_msgs/EvaluateObservationCameraPoses.h>
 #include <uos_active_perception_msgs/ResetVolumes.h>
 #include <uos_active_perception_msgs/BoundingBox.h>
 #include <boost/thread/mutex.hpp>
@@ -67,6 +68,7 @@ private:
     ros::Subscriber m_static_map_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
+    ros::ServiceServer m_evaluate_observation_camera_poses_server;
     ros::ServiceServer m_reset_volumes_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
@@ -90,6 +92,17 @@ private:
     std::vector<octomap::point3d> getActiveFringe(const OcTreeBoxSet & roi,  ActivePerceptionMap & map);
     void pubActiveFringe(const std::vector<octomap::point3d> & active_fringe);
 
+    uos_active_perception_msgs::EvaluateObservationCameraPoses::Response evaluateObservationCameraPoses
+    (
+        const ActivePerceptionMap & map,
+        const std::vector<tf::Pose> & observation_poses,
+        const OcTreeBoxSet & roi,
+        const OcTreeBoxSet & object_boxes,
+        const double ray_skip,
+        const ros::Duration timeout,
+        const bool omit_cvm
+    ) const;
+
     // Callbacks
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
 
@@ -100,6 +113,9 @@ private:
 
     bool getObservationCameraPosesCb(uos_active_perception_msgs::GetObservationCameraPoses::Request&,
                                      uos_active_perception_msgs::GetObservationCameraPoses::Response&);
+
+    bool evaluateObservationCameraPosesCb(uos_active_perception_msgs::EvaluateObservationCameraPoses::Request&,
+                                          uos_active_perception_msgs::EvaluateObservationCameraPoses::Response&);
 
     bool resetVolumesCb(uos_active_perception_msgs::ResetVolumes::Request&,
                         uos_active_perception_msgs::ResetVolumes::Response&);

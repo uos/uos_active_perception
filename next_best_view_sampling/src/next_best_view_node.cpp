@@ -323,7 +323,7 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
 ) const {
     uos_active_perception_msgs::EvaluateObservationCameraPoses::Response res;
     ros::Time callback_timeout = ros::Time::now() + timeout;
-    boost::mt19937 rng(0);//(std::time(0));
+    boost::mt19937 rng(std::time(0));
     boost::uniform_01<> rand_u01;
     ActivePerceptionMap::ObjectSetMap object_sets;
     object_sets.rehash(object_boxes.elements.size() / object_sets.max_load_factor());

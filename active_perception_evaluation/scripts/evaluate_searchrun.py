@@ -9,6 +9,7 @@ import pylab
 import numpy as np
 import sys
 import os
+import bisect
 
 # These are the "Tableau 20" colors as RGB.
 tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
@@ -78,6 +79,10 @@ def main():
     # Gridlines
     ax.yaxis.grid(b=True, which='both', color='black', alpha=0.3, ls='--')
 
+    # To compare two runs, both must find the target with equal probability. If they don't, we must find the run with
+    # the lowest success probability and truncate all other plans to match that probability
+    min_psuccess = np.min([1 - np.prod([1 - p for p in vallist(vals, "gain")]) for vals in vals_batch])
+
     for trial_nr, vals in enumerate(vals_batch):
         label = label=label_batch[trial_nr]
         color = tableau20[trial_nr*20/len(vals_batch)]
@@ -92,14 +97,19 @@ def main():
         # probability to see target at or before step i
         pdone = np.array([1 - np.prod([1 - move_gains[i] for i in range(k+1)]) for k in range(len(move_gains))])
 
+        # cutoff position
+        cutoff = bisect.bisect(pdone, min_psuccess) + 1
+        if cutoff < len(pdone):
+            print "WARNING: cutting off to enable comparison"
+
         # compare gains calculated in runtime and by analysis of probability sum difference
         #print np.array([1 - (1-psums[i-1]) / (1-psums[i]) for i in range(1, len(timeline))]) - np.array(vallist(vals, "gain"))
 
         # plot pdone vs timeline
-        pylab.step(timeline, pdone*100, "-", lw=2.0, color=color, label=label, where='post')
+        pylab.step(timeline[:cutoff], pdone[:cutoff]*100, "-", lw=2.0, color=color, label=label, where='post')
 
         etime = 0;
-        for i in range(len(move_times)-1):
+        for i in range(len(move_times[:cutoff])-1):
             etime += (1.0 - pdone[i]) * move_times[i+1]
         pylab.axvline(etime, ls="--", lw=2.0, color=color)
         print "etime %.2f" % etime

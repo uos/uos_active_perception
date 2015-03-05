@@ -37,6 +37,8 @@ void ObservationPoseCollection::addPoses
             }
             op.cell_id_sets.push_back(cell_keys);
         }
+        // Ensure that even poses with no cells have condition field 0
+        if(op.cell_id_sets.empty()) op.cell_id_sets.resize(1);
         m_observation_poses.push_back(op);
     }
 }

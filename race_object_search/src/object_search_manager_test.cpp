@@ -22,10 +22,10 @@ uos_active_perception_msgs::BoundingBox makeTable1()
     uos_active_perception_msgs::BoundingBox box = makeBox();
     box.pose_stamped.pose.position.x = 7.7;
     box.pose_stamped.pose.position.y = 11.5;
-    box.pose_stamped.pose.position.z = 1.0;
+    box.pose_stamped.pose.position.z = 0.86;
     box.dimensions.x = .8;
     box.dimensions.y = .8;
-    box.dimensions.z = .5;
+    box.dimensions.z = .2;
     return box;
 }
 
@@ -34,22 +34,22 @@ uos_active_perception_msgs::BoundingBox makeTable2()
     uos_active_perception_msgs::BoundingBox box = makeBox();
     box.pose_stamped.pose.position.x = 10.25;
     box.pose_stamped.pose.position.y = 11.5;
-    box.pose_stamped.pose.position.z = 1.0;
+    box.pose_stamped.pose.position.z = 0.86;
     box.dimensions.x = .8;
     box.dimensions.y = .8;
-    box.dimensions.z = .5;
+    box.dimensions.z = .2;
     return box;
 }
 
 uos_active_perception_msgs::BoundingBox makeCounter()
 {
     uos_active_perception_msgs::BoundingBox box = makeBox();
-    box.pose_stamped.pose.position.x = 5.225;
+    box.pose_stamped.pose.position.x = 5.3;
     box.pose_stamped.pose.position.y = 10.08;
-    box.pose_stamped.pose.position.z = 1.0;
+    box.pose_stamped.pose.position.z = 0.9;
     box.dimensions.x = 0.75;
     box.dimensions.y = 1.45;
-    box.dimensions.z = 0.5;
+    box.dimensions.z = 0.2;
     return box;
 }
 
@@ -68,11 +68,11 @@ uos_active_perception_msgs::BoundingBox makeRaceRoom()
 uos_active_perception_msgs::BoundingBox makeShelf1()
 {
     uos_active_perception_msgs::BoundingBox box = makeBox();
-    box.pose_stamped.pose.position.x = 7.75;
+    box.pose_stamped.pose.position.x = 7.82;
     box.pose_stamped.pose.position.y = 9.25;
     box.pose_stamped.pose.position.z = 0.58;
     box.dimensions.x = 0.8;
-    box.dimensions.y = 0.4;
+    box.dimensions.y = 0.3;
     box.dimensions.z = 1.15;
     return box;
 }
@@ -83,7 +83,7 @@ uos_active_perception_msgs::BoundingBox makeShelf2()
     box.pose_stamped.pose.position.x = 3.3;
     box.pose_stamped.pose.position.y = 11.2;
     box.pose_stamped.pose.position.z = 0.58;
-    box.dimensions.x = 0.4;
+    box.dimensions.x = 0.3;
     box.dimensions.y = 0.8;
     box.dimensions.z = 1.15;
     return box;
@@ -92,10 +92,10 @@ uos_active_perception_msgs::BoundingBox makeShelf2()
 uos_active_perception_msgs::BoundingBox makeShelf3()
 {
     uos_active_perception_msgs::BoundingBox box = makeBox();
-    box.pose_stamped.pose.position.x = -0.05;
+    box.pose_stamped.pose.position.x = -0.12;
     box.pose_stamped.pose.position.y = 11.2;
     box.pose_stamped.pose.position.z = 0.58;
-    box.dimensions.x = 0.4;
+    box.dimensions.x = 0.3;
     box.dimensions.y = 0.8;
     box.dimensions.z = 1.15;
     return box;
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
     bool reset = false;
     bool nosearch = false;
     bool has_p = false;
-    double min_observable_volume = 0.0;
+    double min_p_succ = 0.0;
 
     for(long i = 1; i < argc; ++i) {
         if(!strcmp(argv[i], "reset")) {
@@ -125,8 +125,8 @@ int main(int argc, char** argv)
             nosearch = true;
         } else if(!strcmp(argv[i], "p")) {
             has_p = true;
-        } else if(!strcmp(argv[i], "min_observable_volume")) {
-            min_observable_volume = std::atof(argv[++i]);
+        } else if(!strcmp(argv[i], "min_p_succ")) {
+            min_p_succ = std::atof(argv[++i]);
         } else if(!strcmp(argv[i], "table1")) {
             if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeTable1());
@@ -206,7 +206,7 @@ int main(int argc, char** argv)
                 goal.p[i] = (goal.roi[i].dimensions.x * goal.roi[i].dimensions.y * goal.roi[i].dimensions.z) / total_volume;
             }
         }
-        goal.min_observable_volume = min_observable_volume;
+        goal.min_p_succ = min_p_succ;
         ROS_INFO("Sending goal...");
         ac.sendGoal(goal);
         ac.waitForResult();

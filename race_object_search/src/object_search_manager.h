@@ -426,24 +426,13 @@ private:
                     assert(ridx < cell_counts.size());
                     cell_counts[ridx]++;
                 }
-
-                // Termination criterion
-                bool terminate = true;
-                for(size_t i = 0; i < cell_counts.size(); ++i)
-                {
-                    //double observable_volume = cell_counts[i] * cell_volume;
-                    if(cell_counts[i] > 0)//observable_volume >= goal.min_observable_volume)
-                    {
-                        terminate = false;
-                        break;
-                    }
-                }
-                if(terminate)
-                {
-                    loginfo("termination criterion: min_observable_volume");
-                    m_observe_volumes_server.setSucceeded();
-                    return;
-                }
+            }
+            // Termination criterion
+            if(success_probability <= goal.min_p_succ)
+            {
+                loginfo("termination criterion: success_probability <= min_p_succ");
+                m_observe_volumes_server.setSucceeded();
+                return;
             }
             logval("success_probability", success_probability);
 

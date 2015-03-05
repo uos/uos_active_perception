@@ -205,30 +205,6 @@ private:
         }
     }
 
-    std::vector<size_t> makePlanSimple(const ObservationPoseCollection & opc)
-    {
-        size_t best_pose_idx;
-        double best_utility = 0;
-        for(size_t i = 0; i < opc.getPoses().size(); i++)
-        {
-            double utility = opc.getPoses()[i].cell_id_sets[0].size() / opc.getInitialTravelTime(i);
-            if(utility > best_utility)
-            {
-                best_pose_idx = i;
-                best_utility = utility;
-            }
-        }
-        if(best_utility > std::numeric_limits<double>::epsilon())
-        {
-            // The first value in a plan sequence is always the initial value and will be ignored, so insert 2 elements
-            return std::vector<size_t>(2, best_pose_idx);
-        }
-        else
-        {
-            return std::vector<size_t>();
-        }
-    }
-
     // Callbacks
     void observeVolumesCb(race_object_search::ObserveVolumesGoalConstPtr const & goal_ptr)
     {
@@ -471,15 +447,11 @@ private:
             }
             logval("success_probability", success_probability);
 
-            ROS_INFO("entering planning phase");
             t0 = ros::WallTime::now();
             std::vector<size_t> plan;
-            if(m_planning_mode == "simple")
+            if(m_planning_mode == "search")
             {
-                plan = makePlanSimple(opc);
-            }
-            else if(m_planning_mode == "search")
-            {
+                ROS_INFO("entering planning phase (search)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double etime;
                 bool finished = spl.makePlan(m_depth_limit,
@@ -494,6 +466,7 @@ private:
             }
             else if(m_planning_mode == "greedy-reorder")
             {
+                ROS_INFO("entering planning phase (greedy-reorder)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double etime;
                 spl.makeGreedy(plan, etime);

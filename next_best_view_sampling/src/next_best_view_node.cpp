@@ -319,7 +319,8 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
     const OcTreeBoxSet & object_boxes,
     const double ray_skip,
     const ros::Duration timeout,
-    const bool omit_cvm
+    const bool omit_cvm,
+    const bool keep_blind_poses
 ) const {
     uos_active_perception_msgs::EvaluateObservationCameraPoses::Response res;
     ros::Time callback_timeout = ros::Time::now() + timeout;
@@ -401,7 +402,7 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
         tf::poseTFToMsg(sample, camera_pose_msg);
-        if(gain > 0)
+        if(gain > 0 || keep_blind_poses)
         {
             res.camera_poses.push_back(camera_pose_msg);
             res.target_points.push_back(octomap::pointOctomapToMsg(target_point_octomap));
@@ -572,7 +573,8 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                 boxSetFromMsg(req.objects),
                 req.ray_skip,
                 req.timeout,
-                req.omit_cvm);
+                req.omit_cvm,
+                false);
 
     // Fill response fields
     res.camera_poses = eval_res.camera_poses;
@@ -612,7 +614,8 @@ bool NextBestViewNode::evaluateObservationCameraPosesCb
                                          boxSetFromMsg(req.objects),
                                          req.ray_skip,
                                          ros::Duration(),
-                                         req.omit_cvm);
+                                         req.omit_cvm,
+                                         true);
     return true;
 }
 

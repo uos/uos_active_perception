@@ -100,7 +100,8 @@ private:
         const OcTreeBoxSet & object_boxes,
         const double ray_skip,
         const ros::Duration timeout,
-        const bool omit_cvm
+        const bool omit_cvm,
+        const bool keep_blind_poses
     ) const;
 
     // Callbacks

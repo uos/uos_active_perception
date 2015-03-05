@@ -4,7 +4,7 @@
   
   <node if="$(arg sim)" name="point_cloud_2_motion_filter" pkg="sensor_motion_filter" type="point_cloud_2_motion_filter" output="screen" respawn="true">
     <param name="static_frame" type="string" value="/map" />
-    <param name="block_time"   type="double" value="2.0" />
+    <param name="block_time"   type="double" value="3.0" />
     <param name="max_distance" type="double" value="0.01" />
     <param name="max_rotation" type="double" value="0.002" />
     <remap from="cloud_in" to="/head_mount_kinect/depth_registered/points" />

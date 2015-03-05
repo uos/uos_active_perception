@@ -40,7 +40,7 @@ Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & worl
     {
         ROS_WARN("Sensor acquisition time not set. Using default!");
     }
-    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 8.0);
+    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 10.0);
     ROS_INFO_STREAM("Sensor acquisition time: " << ACQUISITION_TIME);
 }
 

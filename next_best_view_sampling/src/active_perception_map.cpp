@@ -125,10 +125,10 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
 /**
   Removes a bounding box from the map. Fringe voxels are updated accordingly.
   */
-void ActivePerceptionMap::resetVolume(octomap::point3d const & min, octomap::point3d const & max)
+void ActivePerceptionMap::resetVolume(octomap::point3d const & min, octomap::point3d const & max, bool keep_occupied)
 {
-    deleteMapVolume(m_occupancy_map, min, max);
-    deleteMapVolume(m_fringe_map, min, max);
+    deleteMapVolume(m_occupancy_map, min, max, !keep_occupied, true);
+    deleteMapVolume(m_fringe_map, min, max, true, true);
 
     // check boundary voxels for fringeness
     std::vector<octomap::OcTreeKey> boundary = getBoundaryVoxels(min, max);
@@ -464,7 +464,9 @@ void ActivePerceptionMap::deleteMapVolume
 (
         octomap::OcTree & tree,
         octomap::point3d const & min,
-        octomap::point3d const & max)
+        octomap::point3d const & max,
+        bool delete_occupied,
+        bool delete_free)
 {
     octomap::OcTreeKey min_key = tree.coordToKey(min);
     octomap::OcTreeKey max_key = tree.coordToKey(max);
@@ -474,7 +476,15 @@ void ActivePerceptionMap::deleteMapVolume
         {
             for(int z = min_key[2]; z <= max_key[2]; z++)
             {
-                tree.deleteNode(octomap::OcTreeKey(x, y, z));
+                octomap::OcTreeNode * node_ptr = tree.search(octomap::OcTreeKey(x, y, z));
+                if(node_ptr)
+                {
+                    if((!tree.isNodeOccupied(node_ptr) && delete_free) ||
+                       ( tree.isNodeOccupied(node_ptr) && delete_occupied))
+                    {
+                        tree.deleteNode(octomap::OcTreeKey(x, y, z));
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,7 @@
 # Request:
 # - volumes: List of  Volumes to remove from the map of known space.
+# - keep_occupied: Whether to keep occupied cells or delete them
 
 BoundingBox[] volumes
+bool keep_occupied
 ---

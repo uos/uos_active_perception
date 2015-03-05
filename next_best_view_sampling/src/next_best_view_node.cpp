@@ -756,7 +756,7 @@ bool NextBestViewNode::resetVolumesCb
         octomath::Vector3 min, max;
         if(getAxisAlignedBounds(*it, min, max))
         {
-            m_perception_map.resetVolume(min, max);
+            m_perception_map.resetVolume(min, max, req.keep_occupied);
         }
         else
         {

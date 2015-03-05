@@ -72,7 +72,7 @@ public:
                              octomap::pose6d const & scan_pose,
                              tf::Pose const & camera_pose,
                              CameraConstraints const & camera_constraints);
-    void resetVolume(octomap::point3d const & min, octomap::point3d const & max);
+    void resetVolume(octomap::point3d const & min, octomap::point3d const & max, bool keep_occupied);
     void setOccupied(octomap::point3d const & min, octomap::point3d const & max);
     void updateInnerOccupancy();
     octomap::OcTree const & getOccupancyMap() const;
@@ -103,7 +103,9 @@ private:
 
     static void deleteMapVolume(octomap::OcTree & tree,
                                 octomap::point3d const & min,
-                                octomap::point3d const & max);
+                                octomap::point3d const & max,
+                                bool delete_occupied,
+                                bool delete_free);
 };
 
 #endif // ACTIVE_PERCEPTION_MAP_H

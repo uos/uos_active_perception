@@ -61,11 +61,10 @@ public:
             return false;
         }
         double duration = opc.getTravelTime(cam_pose_idx[last_idx], next_cam_pose_idx);
-        double eduration = (1.0 - pdone[last_idx]) * duration;
         cam_pose_idx.push_back(next_cam_pose_idx);
         time.push_back(time[last_idx] + duration);
-        etime.push_back(etime[last_idx] + eduration);
-        pdone.push_back(pdone[last_idx] + gain);
+        etime.push_back(etime[last_idx] + (1.0 - pdone[last_idx]) * duration);
+        pdone.push_back(pdone[last_idx] + (1.0 - pdone[last_idx]) * gain);
         detected_cells.push_back(detection_union(detected_cells[last_idx], new_detection));
         ++last_idx;
         return true;
@@ -215,13 +214,13 @@ private:
 
     double calcGain(detection_t const & a, detection_t const & b)
     {
-        double gain = 0.0;
+        double igain = 1.0;
         for(detection_t::iterator it = b.begin(); it != b.end(); ++it) {
             if(!a.count(*it)) {
-                gain += cgl(*it);
+                igain *= (1.0 - cgl(*it));
             }
         }
-        return gain;
+        return 1.0 - igain;
     }
 
     static detection_t detection_union(detection_t const & a, detection_t const & b)

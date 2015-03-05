@@ -270,7 +270,8 @@ private:
             }
 
             // evaluate actual information gain between iterations
-            double gain = 0.0, probability_sum = 0.0;
+            double igain = 1.0, iprobability_sum = 1.0;
+            double gain_vol = 0.0;
             for(size_t i = 0; i < goal.roi.size(); ++i)
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
@@ -280,16 +281,19 @@ private:
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
                 }
-                probability_sum += (1.0 - probability_sum) * (1.0 - std::pow(1.0 - roi_probability_density[i],
-                                                                             get_bbox_occupancy.response.unknown));
-                gain += (1.0 - probability_sum) *
-                        (1.0 - std::pow(1.0 - roi_probability_density[i],
-                                              unknown_roi_space[i] - get_bbox_occupancy.response.unknown));
+                iprobability_sum *= std::pow(1.0 - roi_probability_density[i],
+                                             get_bbox_occupancy.response.unknown);
+                igain *= std::pow(1.0 - roi_probability_density[i],
+                                  unknown_roi_space[i] - get_bbox_occupancy.response.unknown);
+                gain_vol += unknown_roi_space[i] - get_bbox_occupancy.response.unknown;
                 unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
             }
+            double gain = 1.0 - igain;
+            double probability_sum = 1.0 - iprobability_sum;
             if(iteration_counter > 0)
             {
                 logval("gain", gain);
+                logval("gainvol", gain_vol);
             }
 
             iteration_counter++;
@@ -417,16 +421,16 @@ private:
             // Find the number and total gain of discoverable cells using a greedy strategy
             double success_probability = 0.0;
             {
-                std::vector<size_t> cell_counts(goal.roi.size(), 0);
+                double isuccess_probability = 1.0;
                 detection_t observable_union = opc.observableUnion();
                 for(detection_t::iterator it = observable_union.begin(); it != observable_union.end(); ++it)
                 {
-                    success_probability += (1.0 - success_probability) * rpcg(*it);
-                    size_t ridx = region_collection.findRegion(ObservationPoseCollection::cellIdIntToMsg(*it));
-                    assert(ridx < cell_counts.size());
-                    cell_counts[ridx]++;
+                    isuccess_probability *= (1.0 - rpcg(*it));
                 }
+                success_probability = 1.0 - isuccess_probability;
+                logval("success_probability", success_probability);
             }
+
             // Termination criterion
             if(success_probability <= goal.min_p_succ)
             {
@@ -434,7 +438,6 @@ private:
                 m_observe_volumes_server.setSucceeded();
                 return;
             }
-            logval("success_probability", success_probability);
 
             t0 = ros::WallTime::now();
             std::vector<size_t> plan;
@@ -442,9 +445,10 @@ private:
             {
                 ROS_INFO("entering planning phase (search)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
+                double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
                 double etime;
                 bool finished = spl.makePlan(m_depth_limit,
-                                             success_probability * m_relative_lookahead,
+                                             pdone_goal * m_relative_lookahead,
                                              m_max_rel_branch_cost,
                                              m_planning_timeout * 1000,
                                              plan, etime);
@@ -497,6 +501,18 @@ private:
 
             size_t best_pose_idx = plan[1];
             logval("expected_move_time", opc.getInitialTravelTime(best_pose_idx));
+
+            double iegain = 1.0;
+            double egainvol = 0.0;
+            for(detection_t::iterator it = opc.getPoses()[best_pose_idx].cell_id_sets[0].begin();
+                it != opc.getPoses()[best_pose_idx].cell_id_sets[0].end();
+                ++it)
+            {
+                iegain *= (1.0 - rpcg(*it));
+                egainvol += cell_volume;
+            }
+            logval("expected_gain", 1.0 - iegain);
+            logval("egainvol", egainvol);
 
             // move the robot
             ros::Time st0 = ros::Time::now();

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python -u
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb 25 11:14:27 2015
@@ -21,10 +21,11 @@ class Evman:
         self.procMapping = None
         self.procSearchMan = None
         self.procRviz = None
+        self.procRosbag = None
         self.baselog = open('%s/evman_base.log' % script, 'w')
         self.calllog = open('%s/evman_call.log' % script, 'w')
-        self.nbvlog = open('%s/evman_nbv.log' % script, 'w')
-        self.smlog = open('%s/evman_sm.log' % script, 'w')
+        self.logMapping = None
+        self.logSearchMan = None
 
     def initBaseSystem(self, gui=False):
         print "> Launching base system..."
@@ -42,23 +43,26 @@ class Evman:
         print "> Base system ready"
 
     def setCamera(self, xypose=None):
-        print "> Setting camera to random position"
+        print "> Setting camera pose"
         # xypose = map-gz-tf + random valid cam pose. cam is set to point upwards
         if not xypose:
             xypose = tuple(np.array((-12.28, -10.20)) + np.array(self.campoints[random.randint(0, len(self.campoints)-1)]))
         subprocess.call("exec rosservice call /gazebo/set_model_state 'model_state:\n  model_name: floating_kinect\n  pose:\n    position:\n      x: %s\n      y: %s\n      z: 1.5\n    orientation:\n      x: 0.0\n      y: 0.71\n      z: 0.0\n      w: -0.71'" % xypose, shell=True, stdout=self.calllog, stderr=self.calllog)
+        time.sleep(5)
         return xypose
 
     def resetGzworld(self):
         print "> Resetting Gazebo"
         subprocess.call("exec rosservice call /gazebo/reset_world", shell=True, stdout=self.calllog, stderr=self.calllog)
+        time.sleep(5)
 
-    def initMapping(self):
+    def initMapping(self, log=os.getcwd()):
         if not self.procsBase:
             print "> WARNING: Running Mapping without Base"
             self.initBaseSystem()
         print "> Starting Mapping"
-        self.procMapping = subprocess.Popen("exec roslaunch race_object_search object_search_prerequisites_pr2.launch sim:=true map:=race_extended_inflated fk:=true", shell=True, preexec_fn=os.setsid, stdout=self.nbvlog, stderr=self.nbvlog)
+        self.logMapping = open('%s/evman_mapping.log' % log, 'w')
+        self.procMapping = subprocess.Popen("exec roslaunch race_object_search object_search_prerequisites_pr2.launch sim:=true map:=race_extended_inflated fk:=true", shell=True, preexec_fn=os.setsid, stdout=self.logMapping, stderr=self.logMapping)
         time.sleep(10)
 
     def stopMapping(self):
@@ -66,16 +70,18 @@ class Evman:
         if self.procMapping:
             os.killpg(self.procMapping.pid, signal.SIGTERM)
             self.procMapping.wait()
+            self.logMapping.close()
             self.procMapping = None
 
-    def initSearchMan(self, dl=0, la=0.75, bl=1.5, to=60, lss=0, gss=200, rs=0, log=os.getcwd()):
+    def initSearchMan(self, dl=0, la=0.8, bl=1.8, to=60, lss=0, gss=200, rs=0, log=os.getcwd()):
         if not self.procMapping:
             print "> WARNING: Running SearchMan without Mapping"
             self.initMapping()
         print "> Starting SearchMan"
         params = (dl, la, bl, to, log, lss, gss, rs)
+        self.logSearchMan = open('%s/evman_searchman.log' % log, 'w')
         cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _planning_mode:=search _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f" % params
-        self.procSearchMan = subprocess.Popen("exec " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.smlog, stderr=self.smlog)
+        self.procSearchMan = subprocess.Popen("exec " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.logSearchMan, stderr=self.logSearchMan)
         time.sleep(10)
 
     def stopSearchMan(self):
@@ -83,6 +89,7 @@ class Evman:
         if self.procSearchMan:
             os.killpg(self.procSearchMan.pid, signal.SIGTERM)
             self.procSearchMan.wait()
+            self.logSearchMan.close()
             self.procSearchMan = None
 
     def initRviz(self, gui=False):
@@ -103,15 +110,31 @@ class Evman:
             self.procRviz.wait()
             self.procRviz = None
 
-    def runTest(self, cmd="reset table1 table2 counter shelf1 shelf2 shelf3"):
+    def recordRosbag(self, d=".", topics=None):
+        print "> Starting Rosbag record"
+        if topics == None:
+            topics = "/clock /tf /map /next_best_view_marker /object_search_marker"
+        fnull = open(os.devnull, 'w')
+        self.procRosbag = subprocess.Popen("exec rosbag record -O %s/ros.bag %s" % (d, topics), shell=True, preexec_fn=os.setsid, stdout=fnull)
+        time.sleep(5)
+
+    def stopRosbag(self):
+        print "> Stopping Rosbag"
+        if self.procRosbag:
+            os.killpg(self.procRosbag.pid, signal.SIGINT)
+            self.procRosbag.wait()
+            self.procRosbag = None
+
+    def runTest(self, cmd="reset min_p_succ 0.05 p table1 0.2 table2 0.2 counter 0.2 shelf1 0.5 shelf2 0.5 shelf3 0.5"):
         if not self.procSearchMan:
             print "> WARNING: Running Test without SearchMan"
             self.initSearchMan
         print "> Running Test"
-        subprocess.call("rosrun race_object_search object_search_manager_test " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.calllog, stderr=self.calllog)
+        subprocess.call("exec rosrun race_object_search object_search_manager_test " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.calllog, stderr=self.calllog)
 
     def shutdown(self):
         print "> Shutting down ROS processes..."
+        self.stopRosbag()
         self.stopSearchMan()
         self.stopMapping()
         self.stopRviz()
@@ -139,6 +162,14 @@ def init(script="."):
     signal.signal(signal.SIGINT, evman.shutdown_handler)
     return evman
 
+def base():
+    script = "base"
+    print "*** %s ***" % script
+    evman = init()
+    evman.initBaseSystem(True)
+    evman.initRviz(True)
+    signal.pause()
+
 def iros0215_nomap(N=20, gui=False):
     script = "iros0215_nomap"
     print "*** %s ***" % script
@@ -155,8 +186,9 @@ def iros0215_nomap(N=20, gui=False):
         evman.initBaseSystem(gui)
         evman.initRviz(gui)
         xypose = evman.setCamera()
-        evman.initMapping()
+        evman.initMapping(logdir)
         evman.initSearchMan(dl=0, log=logdir)
+        evman.recordRosbag(logdir)
         evman.runTest()
         evman.shutdown()
         # --- PLANNING ---
@@ -166,13 +198,16 @@ def iros0215_nomap(N=20, gui=False):
         evman.initBaseSystem(gui)
         evman.initRviz(gui)
         evman.setCamera(xypose)
-        evman.initMapping()
-        evman.initSearchMan(dl=5, log=logdir)
+        evman.initMapping(logdir)
+        evman.initSearchMan(dl=50, la=0.8, bl=1.5, log=logdir)
+        evman.recordRosbag(logdir)
         evman.runTest()
         evman.shutdown()
         # --- CLEANUP ---
         try:
             os.remove("persistent_samples")
+            os.remove("persistent_initial_tt")
+            os.remove("persistent_tt")
         except OSError:
             print "WARNING: Expected to see persistent_samples, but there were none!"
     evman.shutdown()
@@ -186,42 +221,69 @@ def iros0215_withmap(N=20, gui=False):
         return False
     os.mkdir(script)
     evman = init(script)
-    # --- INIT ---
-    evman.initBaseSystem(gui)
-    evman.initRviz(gui)
-    evman.initMapping()
-    evman.initSearchMan(dl=0, log=script)
-    evman.runTest()
-    for n in range(N):
+    def doit_cleanup():
+        # --- CLEANUP ---
+        try:
+            os.remove("persistent_samples")
+            os.remove("persistent_initial_tt")
+            os.remove("persistent_tt")
+        except OSError:
+            print "WARNING: Expected to see persistent_samples, but there were none!"
+    def doit_greedy(xypose):
         # --- GREEDY ---
         print "# Evaluating n=%i greedy" % n
         logdir = "%s/%s/greedy_%i" % (os.getcwd(), script, n)
         os.mkdir(logdir)
         evman.resetGzworld()
-        xypose = evman.setCamera()
+        evman.setCamera(xypose)
         evman.initSearchMan(dl=0, log=logdir)
+        evman.recordRosbag(logdir)
         evman.runTest()
+        evman.stopRosbag()
         evman.stopSearchMan()
+    def doit_planning(xypose):
         # --- PLANNING ---
         print "# Evaluating n=%i planning" % n
         logdir = "%s/%s/planning_%i" % (os.getcwd(), script, n)
         os.mkdir(logdir)
         evman.resetGzworld()
         evman.setCamera(xypose)
-        evman.initSearchMan(dl=5, log=logdir)
+        evman.initSearchMan(dl=50, bl=1.5, la=0.8, to=120, log=logdir)
+        evman.recordRosbag(logdir)
         evman.runTest()
+        evman.stopRosbag()
         evman.stopSearchMan()
-        # --- CLEANUP ---
-        try:
-            os.remove("persistent_samples")
-        except OSError:
-            print "WARNING: Expected to see persistent_samples, but there were none!"
+    # --- INIT ---
+    evman.initBaseSystem(gui)
+    evman.initRviz(gui)
+    for n in range(N):
+        # init
+        evman.resetGzworld()
+        xypose = evman.setCamera()
+        evman.initMapping(script)
+        evman.initSearchMan(dl=0, log=script)
+        evman.runTest("p table1 0.2 table2 0.2 counter 0.2 shelf1 0.2 shelf2 0.2 shelf3 0.2")
+        evman.stopSearchMan()
+        # greedy
+        doit_greedy(xypose)
+        evman.stopMapping()
+        # reinit
+        evman.resetGzworld()
+        evman.setCamera(xypose)
+        evman.initMapping(script)
+        evman.initSearchMan(dl=0, log=script)
+        evman.runTest("p table1 0.2 table2 0.2 counter 0.2 shelf1 0.2 shelf2 0.2 shelf3 0.2")
+        evman.stopSearchMan()
+        # planning
+        doit_planning(xypose)
+        evman.stopMapping()
+        doit_cleanup()
     evman.shutdown()
     return True
 
 def main():
-    iros0215_nomap()
-    iros0215_withmap()
+    iros0215_nomap(gui=False)
+    iros0215_withmap(gui=False)
 
 CAM_POINTS = """9.147	10.5173	27.0398
 11.1854	10.276	48.3509

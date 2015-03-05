@@ -4,6 +4,7 @@
 #include "observation_pose_collection.h"
 #include "search_plan.h"
 #include "search_planner.h"
+#include "ros_serialization_helper.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
@@ -34,6 +35,7 @@ public:
     {
         m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
         m_node_handle.param("log_dir", m_log_dir, std::string(""));
+        m_node_handle.param("persistent_sample_dir", m_ps_dir, std::string(""));
         // sampling params
         m_node_handle.param("local_sample_size", m_local_sample_size, 100);
         m_node_handle.param("global_sample_size", m_global_sample_size, 200);
@@ -105,6 +107,7 @@ private:
     double m_planning_timeout;
 
     // logging and evaluation data files
+    std::string m_ps_dir;
     std::string m_log_dir;
     std::ofstream m_file_events;
     std::ofstream m_file_vals;
@@ -214,24 +217,13 @@ private:
         ros::WallTime t0;
         size_t marker_count = 0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
+
+        // persistence buffers
         std::vector<geometry_msgs::Pose> persistent_samples;
-
+        ObservationPoseCollection opc;
+        if(!m_ps_dir.empty())
         {
-            std::ifstream iss("persistent_samples", std::ios::binary);
-            if(iss.good())
-            {
-
-                iss.seekg (0, std::ios::end);
-                std::streampos end = iss.tellg();
-                iss.seekg (0, std::ios::beg);
-                std::streampos begin = iss.tellg();
-                size_t file_size = end-begin;
-                boost::shared_array<uint8_t> ibuffer(new uint8_t[file_size]);
-                iss.read((char*) ibuffer.get(), file_size);
-                ros::serialization::IStream istream(ibuffer.get(), file_size);
-                ros::serialization::deserialize(istream, persistent_samples);
-                ROS_WARN_STREAM("Loaded " << persistent_samples.size() << " persistent samples");
-            }
+            persistent_samples = ObservationPoseCollection::deserializePoses(m_ps_dir);
         }
 
         double cell_volume = 0.0;
@@ -306,12 +298,12 @@ private:
             const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
             const tf::Pose cam_pose = m_agent.getCurrentCamPose();
 
-            ObservationPoseCollection opc;
             size_t n_cells = 0;
 
             t0 = ros::WallTime::now();
-            if(persistent_samples.empty())
+            if(m_ps_dir.empty() || (persistent_samples.empty() && iteration_counter == 1))
             {
+                opc = ObservationPoseCollection();
                 ROS_INFO("retrieving local pose candidates");
                 {
                     uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
@@ -354,21 +346,6 @@ private:
                                  pose_candidates_call.response.cvms,
                                  pose_candidates_call.response.object_sets);
                 }
-                persistent_samples.resize(opc.getPoses().size());
-                for(size_t i = 0; i < persistent_samples.size(); ++i)
-                {
-                    tf::poseTFToMsg(opc.getPoses()[i].pose, persistent_samples[i]);
-                }
-
-                // Write to disk
-                std::ofstream oss("persistent_samples", std::ios::binary);
-                size_t serial_size = ros::serialization::serializationLength(persistent_samples);
-                boost::shared_array<uint8_t> obuffer(new uint8_t[serial_size]);
-                ros::serialization::OStream ostream(obuffer.get(), serial_size);
-                ros::serialization::serialize(ostream, persistent_samples);
-                oss.write((char*) obuffer.get(), serial_size);
-                oss.close();
-                ROS_WARN_STREAM("Set " << persistent_samples.size() << " persistent samples");
             }
             else
             {
@@ -397,24 +374,34 @@ private:
             logtime("nbv_sampling_time", t0);
             logval("nbv_sample_count", opc.getPoses().size());
 
-            ROS_INFO("building travel time lookup tables");
-            t0 = ros::WallTime::now();
-            opc.prepareInitialTravelTimeLut(m_agent, robot_pose, cam_pose, m_world_frame_id);
-            logtime("initial_tt_lut_time", t0);
-            if(!m_log_dir.empty()) {
-                fname.str("");
-                fname.clear();
-                fname << m_log_dir << "/initial-tt-map-" << iteration_counter << ".tab";
-                opc.dumpInitialTravelTimeMap(fname.str());
+            if(m_ps_dir.empty() || persistent_samples.empty())
+            {
+                ROS_INFO("building travel time lookup tables");
+                t0 = ros::WallTime::now();
+                opc.prepareInitialTravelTimeLut(m_agent, robot_pose, cam_pose, m_world_frame_id);
+                logtime("initial_tt_lut_time", t0);
+                if(!m_log_dir.empty()) {
+                    fname.str("");
+                    fname.clear();
+                    fname << m_log_dir << "/initial-tt-map-" << iteration_counter << ".tab";
+                    opc.dumpInitialTravelTimeMap(fname.str());
+                }
+                size_t n_pruned = opc.pruneUnreachablePoses();
+                logval("unreachable_poses_pruned", n_pruned);
+
+                t0 = ros::WallTime::now();
+                opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
+                logtime("mutual_tt_lut_time", t0);
+
+                if(!m_ps_dir.empty())
+                {
+                    opc.serializeToFiles(m_ps_dir);
+                    ROS_INFO_STREAM("Set " << opc.getPoses().size() << " persistent samples.");
+                }
             }
 
-            size_t n_pruned = opc.pruneUnreachablePoses();
-            logval("unreachable_poses_pruned", n_pruned);
-
-            t0 = ros::WallTime::now();
-            opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
-            logtime("mutual_tt_lut_time", t0);
-            if(!opc.sanityCheck()) {
+            if(!opc.sanityCheck())
+            {
                 logerror("Transition time sanity check failed!");
             }
 
@@ -528,6 +515,9 @@ private:
                 logerror("failed to achieve target pose");
             }
             logval("actual_move_time", (ros::Time::now() - st0).toSec());
+
+            // update opc
+            opc.setCurrentPose(best_pose_idx);
 
             m_file_events.flush();
             m_file_vals.flush();

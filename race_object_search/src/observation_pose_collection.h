@@ -1,6 +1,8 @@
 #ifndef OBSERVATION_POSE_COLLECTION_H
 #define OBSERVATION_POSE_COLLECTION_H
 
+#include "ros_serialization_helper.h"
+
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
 #include <boost/unordered_set.hpp>
@@ -24,6 +26,8 @@ struct ObservationPose
 class ObservationPoseCollection
 {
 public:
+    static const std::string F_SAMPLES, F_INITIAL_TT, F_TT_LUT;
+
     void addPoses(std::vector<geometry_msgs::Pose> const & new_poses,
                   std::vector<geometry_msgs::Point> const & new_target_points,
                   std::vector<uos_active_perception_msgs::ConditionalVisibilityMap> const & new_cvms,
@@ -169,6 +173,74 @@ public:
             }
         }
         return all;
+    }
+
+    /** Remove target pose, set initial tt lut to start there, and keep all lookups intact */
+    void setCurrentPose(size_t rm)
+    {
+        // Update pose set and initial tt
+        std::vector<ObservationPose> oldposes = m_observation_poses;
+        m_observation_poses.clear();
+        m_initial_travel_time_lut.clear();
+        std::vector<size_t> oldidx;
+        for(size_t i = 0; i < oldposes.size(); ++i)
+        {
+            if(i != rm)
+            {
+                m_observation_poses.push_back(oldposes[i]);
+                m_initial_travel_time_lut.push_back(getTravelTime(rm, i));
+                oldidx.push_back(i);
+            }
+        }
+        // Update tt lut for new indices
+        std::vector<double> new_tt_lut = m_travel_time_lut;
+        for(size_t i = 0; i < m_observation_poses.size(); ++i)
+        {
+            for(size_t k = 0; k < i; ++k)
+            {
+                   new_tt_lut[getTtLutIdx(i, k)] = getTravelTime(oldidx[i], oldidx[k]);
+            }
+        }
+        m_travel_time_lut = new_tt_lut;
+    }
+
+    /** Serializes poses and lookups to three files */
+    void serializeToFiles(const std::string & path)
+    {
+        std::vector<geometry_msgs::Pose> poses(m_observation_poses.size());
+        for(size_t i = 0; i < poses.size(); ++i)
+        {
+            tf::poseTFToMsg(m_observation_poses[i].pose, poses[i]);
+        }
+        ros_serialization_helper::writeSerialized(path + F_SAMPLES, poses);
+        ros_serialization_helper::writeSerialized(path + F_INITIAL_TT, m_initial_travel_time_lut);
+        ros_serialization_helper::writeSerialized(path + F_TT_LUT, m_travel_time_lut);
+    }
+
+    /** Loads serialized transition time lookups and returns success. Lookups are destroyed on failure. */
+    bool loadSerializedLookups(const std::string & path)
+    {
+        if(ros_serialization_helper::readSerialized(path + F_INITIAL_TT, m_initial_travel_time_lut)
+           && ros_serialization_helper::readSerialized(path + F_TT_LUT, m_travel_time_lut)
+           && m_initial_travel_time_lut.size() == m_observation_poses.size()
+           && m_travel_time_lut.size() >= getTtLutIdx(m_observation_poses.size(), 0))
+        {
+            return true;
+        }
+        else
+        {
+            m_initial_travel_time_lut.clear();
+            m_travel_time_lut.clear();
+            return false;
+        }
+    }
+
+    /** Deserializes a vector of poses */
+    static std::vector<geometry_msgs::Pose> deserializePoses(const std::string & path)
+    {
+        std::vector<geometry_msgs::Pose> poses;
+        ros_serialization_helper::readSerialized(path + F_SAMPLES, poses);
+        return poses;
     }
 
     static uint64_t cellIdMsgToInt(const uos_active_perception_msgs::CellId & msg)

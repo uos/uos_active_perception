@@ -42,7 +42,8 @@ rosbuild_add_executable(object_search_manager src/object_search_manager.h
                                               src/pr2_agent.cpp
                                               src/floating_kinect_agent.cpp
                                               src/observation_pose_collection.cpp
-                                              src/kmeans.cpp)
+                                              src/kmeans.cpp
+                                              src/ros_serialization_helper.h)
 rosbuild_add_executable(object_search_planner src/object_search_planner.cpp
                                               src/search_plan.h
                                               src/search_planner.h

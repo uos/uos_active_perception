@@ -2,6 +2,10 @@
 
 #include <fstream>
 
+const std::string ObservationPoseCollection::F_SAMPLES = "/serialized_samples";
+const std::string ObservationPoseCollection::F_INITIAL_TT = "/serialized_initial_tt";
+const std::string ObservationPoseCollection::F_TT_LUT = "/serialized_tt_lut";
+
 void ObservationPoseCollection::addPoses
 (
     std::vector<geometry_msgs::Pose> const & new_poses,
@@ -94,5 +98,6 @@ size_t ObservationPoseCollection::pruneUnreachablePoses()
     }
     m_observation_poses = pruned_observation_poses;
     m_initial_travel_time_lut = pruned_initial_travel_time_lut;
+    m_travel_time_lut.clear();
     return n_pruned;
 }

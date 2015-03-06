@@ -37,6 +37,7 @@
 #include "active_perception_map.h"
 
 #include "octree_ray_iterator.h"
+#include "octree_regions.h"
 
 #include <octomap/octomap.h>
 #include <octomap_ros/conversions.h>
@@ -101,19 +102,49 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
     {
         octomap::OcTreeKey key = it->first;
         m_fringe_map.deleteNode(key);
-        // Only add to fringe if the observed node is free
-        if(!m_occupancy_map.isNodeOccupied(m_occupancy_map.search(key)))
+        if(m_occupancy_map.isNodeOccupied(m_occupancy_map.search(key)))
         {
-            // Check neighbor voxels for fringeiness
+            // Updated node is occupied, check if neighbours lose fringe property
             for(unsigned int i = 0; i < 6; i++)
             {
                 // Get neighbor key
-                octomap::OcTreeKey neighbor = key;
-                neighbor[i/2] += (i % 2 == 0) ? -1 : 1;
-                // Check if this is unknown in occupancy map
-                if(!m_occupancy_map.search(neighbor))
+                octomap::OcTreeKey candidate = key;
+                candidate[i/2] += (i % 2 == 0) ? -1 : 1;
+                if(m_fringe_map.search(candidate))
                 {
-                    m_fringe_map.updateNode(neighbor, true);
+                    // Check if this node still has fringe property
+                    bool is_fringe = false;
+                    for(unsigned int k = 0; k < 6; k++)
+                    {
+                        // Get neighbor key
+                        octomap::OcTreeKey neighbor = candidate;
+                        neighbor[k/2] += (k % 2 == 0) ? -1 : 1;
+                        // Check if this is free in occupancy map
+                        if(octomap::OcTreeNode * nptr = m_occupancy_map.search(neighbor))
+                        {
+                            if(!m_occupancy_map.isNodeOccupied(nptr))
+                            {
+                                is_fringe = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(!is_fringe) m_fringe_map.deleteNode(candidate);
+                }
+            }
+        }
+        else
+        {
+            // Updated node is free, check neighbor voxels for potential fringeness
+            for(unsigned int i = 0; i < 6; i++)
+            {
+                // Get neighbor key
+                octomap::OcTreeKey candidate = key;
+                candidate[i/2] += (i % 2 == 0) ? -1 : 1;
+                // Check if this is unknown in occupancy map
+                if(!m_occupancy_map.search(candidate))
+                {
+                    m_fringe_map.updateNode(candidate, true);
                 }
             }
         }
@@ -306,7 +337,8 @@ std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters()
   we want to start observations at the box's faces. This method returns the centers of all voxels that
   - are part of the face of the bounding box and
   - are unknown and
-  - are not already fringe voxels
+  - are not already fringe voxels and
+  - have at least one unknown neighbor outside of the boundary
   */
 std::vector<octomap::point3d> ActivePerceptionMap::genBoundaryFringeCenters
 (
@@ -315,13 +347,24 @@ std::vector<octomap::point3d> ActivePerceptionMap::genBoundaryFringeCenters
 {
     std::vector<octomap::point3d> centers;
     std::vector<octomap::OcTreeKey> boundary = getBoundaryVoxels(min, max);
+    OcTreeBbox box(m_occupancy_map.coordToKey(min), m_occupancy_map.coordToKey(max));
     for(std::vector<octomap::OcTreeKey>::iterator it = boundary.begin();
         it < boundary.end();
         ++it)
     {
         if(!m_fringe_map.search(*it) && !m_occupancy_map.search(*it))
         {
-            centers.push_back(m_occupancy_map.keyToCoord(*it));
+            // This is a candidate, check the neighbors
+            for(unsigned int i = 0; i < 6; i++)
+            {
+                octomap::OcTreeKey neighbor = *it;
+                neighbor[i/2] += (i % 2 == 0) ? -1 : 1;
+                if(!box.contains(neighbor) && !m_occupancy_map.search(neighbor))
+                {
+                    centers.push_back(m_occupancy_map.keyToCoord(*it));
+                    break;
+                }
+            }
         }
     }
 

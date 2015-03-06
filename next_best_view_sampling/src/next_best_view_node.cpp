@@ -56,6 +56,8 @@
 #include <memory>
 #include <stdint.h>
 
+#define PUB_FRINGE_NORMAL_MARKERS false
+
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
     m_node_handle_pub(),
@@ -242,8 +244,44 @@ std::vector<octomap::point3d> NextBestViewNode::getActiveFringe(
     return active_fringe;
 }
 
-void NextBestViewNode::pubActiveFringe(const std::vector<octomap::point3d> & active_fringe)
+void NextBestViewNode::pubActiveFringe(const std::vector<octomap::point3d> & active_fringe,
+                                       const std::vector<octomap::point3d> & active_fringe_normals)
 {
+    for(size_t i = 0; i < active_fringe_normals.size(); ++i)
+    {
+        visualization_msgs::Marker marker;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.ns = "active_fringe_normals";
+        marker.id = i;
+        marker.header.frame_id = m_world_frame_id;
+        marker.header.stamp = ros::Time::now();
+        marker.lifetime = ros::Duration(5.0);
+        if(active_fringe_normals[i].norm() < std::numeric_limits<double>::epsilon())
+        {
+            marker.type = visualization_msgs::Marker::SPHERE;
+            marker.scale.x = m_resolution;
+            marker.scale.y = m_resolution;
+            marker.scale.z = m_resolution;
+            marker.color.r = 1.0;
+            marker.color.a = 0.75;
+            marker.pose.position = octomap::pointOctomapToMsg(active_fringe[i]);
+        }
+        else
+        {
+            marker.type = visualization_msgs::Marker::ARROW;
+            marker.scale.x = 0.01;
+            marker.scale.y = 0.03;
+            marker.color.r = 1.0;
+            marker.color.g = 1.0;
+            marker.color.b = 0.0;
+            marker.color.a = 0.75;
+            marker.points.push_back(octomap::pointOctomapToMsg(active_fringe[i]));
+            marker.points.push_back(octomap::pointOctomapToMsg(active_fringe[i] +
+                                                               active_fringe_normals[i].normalized() * 0.25));
+        }
+        m_marker_pub.publish(marker);
+    }
+
     visualization_msgs::Marker marker;
     marker.action = visualization_msgs::Marker::ADD;
     marker.type = visualization_msgs::Marker::CUBE_LIST;
@@ -518,9 +556,16 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
 
     // Gather fringe voxel centers
     std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
+    std::vector<octomap::point3d> active_fringe_normals;
+    #if(PUB_FRINGE_NORMAL_MARKERS)
+    for(size_t i = 0; i < active_fringe.size(); ++i)
+    {
+        active_fringe_normals.push_back(map->getFringeNormal(active_fringe[i], roi));
+    }
+    #endif
     if(!roi.elements.empty())
     {
-        pubActiveFringe(active_fringe);
+        pubActiveFringe(active_fringe, active_fringe_normals);
     }
     last_roi = roi;
     if(active_fringe.empty()) return true;
@@ -605,7 +650,18 @@ bool NextBestViewNode::evaluateObservationCameraPosesCb
     }
     OcTreeBoxSet roi = boxSetFromMsg(req.roi);
     // Do this stuff so the active fringe markers are updated
-    if(!roi.elements.empty()) pubActiveFringe(getActiveFringe(roi, *map));
+    std::vector<octomap::point3d> active_fringe = getActiveFringe(roi, *map);
+    std::vector<octomap::point3d> active_fringe_normals;
+    #if(PUB_FRINGE_NORMAL_MARKERS)
+    for(size_t i = 0; i < active_fringe.size(); ++i)
+    {
+        active_fringe_normals.push_back(map->getFringeNormal(active_fringe[i], roi));
+    }
+    #endif
+    if(!roi.elements.empty())
+    {
+        pubActiveFringe(active_fringe, active_fringe_normals);
+    }
     last_roi = roi;
 
     res = evaluateObservationCameraPoses(*map,
@@ -667,7 +723,15 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     // Publish updated active fringe
     if(!last_roi.elements.empty())
     {
-        pubActiveFringe(getActiveFringe(last_roi, m_perception_map));
+        std::vector<octomap::point3d> active_fringe = getActiveFringe(last_roi, m_perception_map);
+        std::vector<octomap::point3d> active_fringe_normals;
+        #if(PUB_FRINGE_NORMAL_MARKERS)
+        for(size_t i = 0; i < active_fringe.size(); ++i)
+        {
+            active_fringe_normals.push_back(m_perception_map.getFringeNormal(active_fringe[i], last_roi));
+        }
+        #endif
+        pubActiveFringe(active_fringe, active_fringe_normals);
     }
 }
 

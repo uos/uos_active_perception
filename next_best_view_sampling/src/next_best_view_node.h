@@ -90,7 +90,8 @@ private:
     OcTreeBoxSet boxSetFromMsg(std::vector<uos_active_perception_msgs::BoundingBox> const & bbox_vec) const;
 
     std::vector<octomap::point3d> getActiveFringe(const OcTreeBoxSet & roi,  ActivePerceptionMap & map);
-    void pubActiveFringe(const std::vector<octomap::point3d> & active_fringe);
+    void pubActiveFringe(const std::vector<octomap::point3d> & active_fringe,
+                         const std::vector<octomap::point3d> & active_fringe_normals);
 
     uos_active_perception_msgs::EvaluateObservationCameraPoses::Response evaluateObservationCameraPoses
     (

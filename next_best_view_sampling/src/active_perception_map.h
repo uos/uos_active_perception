@@ -88,6 +88,7 @@ public:
                                     OcTreeBoxSet const & object_boxes,
                                     ObjectSetMap & object_sets,
                                     OcTreeKeyMap & visibility_map) const;
+    octomath::Vector3 getFringeNormal(octomap::point3d const & p, OcTreeBoxSet const & roi);
     std::vector<octomap::point3d> getFringeCenters(octomap::point3d min, octomap::point3d max);
     std::vector<octomap::point3d> getFringeCenters();
     std::vector<octomap::point3d> genBoundaryFringeCenters(octomap::point3d const & min,

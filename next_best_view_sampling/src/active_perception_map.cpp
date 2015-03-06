@@ -308,6 +308,45 @@ void ActivePerceptionMap::estimateRayGainObjectAware
     }
 }
 
+/** Returns a vector from the center of unknown cells in ROI towards the center of free cells. */
+octomath::Vector3 ActivePerceptionMap::getFringeNormal(octomap::point3d const & p, OcTreeBoxSet const & roi)
+{
+    octomap::OcTreeKey key = m_occupancy_map.coordToKey(p);
+    octomap::point3d roi_sum(0.0, 0.0, 0.0);
+    octomap::point3d outside_sum(0.0, 0.0, 0.0);
+    size_t roi_n = 0;
+    size_t outside_n = 0;
+    for(int i = -1; i <= 1; ++i) for(int j = -1; j <= 1; ++j) for(int k = -1; k <= 1; ++k)
+    {
+        octomap::OcTreeKey neighbor(key[0]+i, key[1]+j, key[2]+k);
+        octomap::OcTreeNode * nnode = m_occupancy_map.search(neighbor);
+        if(nnode)
+        {
+            if(!m_occupancy_map.isNodeOccupied(nnode))
+            {
+                outside_sum += m_occupancy_map.keyToCoord(neighbor);
+                outside_n++;
+            }
+        }
+        else
+        {
+            if(roi.getContainingBoxId(neighbor))
+            {
+                roi_sum += m_occupancy_map.keyToCoord(neighbor);
+                roi_n++;
+            }
+            else
+            {
+                outside_sum += m_occupancy_map.keyToCoord(neighbor);
+                outside_n++;
+            }
+        }
+    }
+    assert(outside_n > 0);
+    assert(roi_n > 0);
+    return (outside_sum * (1.0 / outside_n)) - (roi_sum * (1.0 / roi_n));
+}
+
 std::vector<octomap::point3d> ActivePerceptionMap::getFringeCenters(octomap::point3d min, octomap::point3d max)
 {
     std::vector<octomap::point3d> centers;

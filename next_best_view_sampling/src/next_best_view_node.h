@@ -50,6 +50,7 @@
 #include <uos_active_perception_msgs/EvaluateObservationCameraPoses.h>
 #include <uos_active_perception_msgs/ResetVolumes.h>
 #include <uos_active_perception_msgs/BoundingBox.h>
+#include <uos_active_perception_msgs/ReadWriteFiles.h>
 #include <boost/thread/mutex.hpp>
 
 #include <string>
@@ -70,10 +71,12 @@ private:
     ros::ServiceServer m_get_observation_camera_poses_server;
     ros::ServiceServer m_evaluate_observation_camera_poses_server;
     ros::ServiceServer m_reset_volumes_server;
+    ros::ServiceServer m_write_map_server;
+    ros::ServiceServer m_load_map_server;
     tf::TransformListener m_tf_listener;
     ros::Publisher m_marker_pub;
     CameraConstraints m_camera_constraints;
-    ActivePerceptionMap m_perception_map;
+    std::auto_ptr<ActivePerceptionMap> m_perception_map;
     double m_resolution, m_camera_range_tolerance;
     std::string m_world_frame_id;
     boost::mutex m_map_mutex;
@@ -121,6 +124,12 @@ private:
 
     bool resetVolumesCb(uos_active_perception_msgs::ResetVolumes::Request&,
                         uos_active_perception_msgs::ResetVolumes::Response&);
+
+    bool saveMapCb(uos_active_perception_msgs::ReadWriteFiles::Request&,
+                   uos_active_perception_msgs::ReadWriteFiles::Response&);
+
+    bool loadMapCb(uos_active_perception_msgs::ReadWriteFiles::Request&,
+                   uos_active_perception_msgs::ReadWriteFiles::Response&);
 };
 
 #endif // NEXT_BEST_VIEW_NODE_H

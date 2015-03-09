@@ -83,9 +83,16 @@ NextBestViewNode::NextBestViewNode() :
                                        "/reset_volumes",
                                        &NextBestViewNode::resetVolumesCb,
                                        this)),
+    m_write_map_server(m_node_handle_pub.advertiseService(
+                                       "/write_map",
+                                       &NextBestViewNode::saveMapCb,
+                                       this)),
+    m_load_map_server(m_node_handle_pub.advertiseService(
+                                       "/load_map",
+                                       &NextBestViewNode::loadMapCb,
+                                       this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000)),
-    m_perception_map(0.01)
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000))
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.1);
@@ -103,7 +110,17 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
     m_node_handle.param("roll"          , m_camera_constraints.roll      , PI);
 
-    m_perception_map.setResolution(m_resolution);
+    std::string initial_map_prefix;
+    m_node_handle.param("initial_map", initial_map_prefix, std::string(""));
+    if(!initial_map_prefix.empty())
+    {
+        m_perception_map.reset(new ActivePerceptionMap(initial_map_prefix));
+        m_resolution = m_perception_map->getOccupancyMap().getResolution();
+    }
+    else
+    {
+        m_perception_map.reset(new ActivePerceptionMap(m_resolution));
+    }
 
     bool load_2dmap;
     m_node_handle.param("load_2dmap", load_2dmap, false);
@@ -208,8 +225,8 @@ OcTreeBoxSet NextBestViewNode::boxSetFromMsg(std::vector<uos_active_perception_m
         if(getAxisAlignedBounds(bbox_vec[i], min, max))
         {
             octomap::OcTreeKey mink, maxk;
-            if(m_perception_map.getOccupancyMap().coordToKeyChecked(min, mink) &&
-               m_perception_map.getOccupancyMap().coordToKeyChecked(max, maxk))
+            if(m_perception_map->getOccupancyMap().coordToKeyChecked(min, mink) &&
+               m_perception_map->getOccupancyMap().coordToKeyChecked(max, maxk))
             {
                 boxSet.elements.push_back(OcTreeBbox(mink, maxk));
             }
@@ -311,8 +328,8 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     getAxisAlignedBounds(req.bbox, min, max);
     double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
     double free_volume = 0.0, occupied_volume = 0.0;
-    for(octomap::OcTree::leaf_bbx_iterator it = m_perception_map.getOccupancyMap().begin_leafs_bbx(min,max),
-        end = m_perception_map.getOccupancyMap().end_leafs_bbx();
+    for(octomap::OcTree::leaf_bbx_iterator it = m_perception_map->getOccupancyMap().begin_leafs_bbx(min,max),
+        end = m_perception_map->getOccupancyMap().end_leafs_bbx();
         it != end; ++it)
     {
         double side_len_half = it.getSize() / 2.0;
@@ -324,7 +341,7 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
         vox_max.y() += side_len_half;
         vox_max.z() += side_len_half;
         double v = getIntersectionVolume(min, max, vox_min, vox_max);
-        if(m_perception_map.getOccupancyMap().isNodeOccupied(*it))
+        if(m_perception_map->getOccupancyMap().isNodeOccupied(*it))
         {
             occupied_volume += v;
         }
@@ -338,11 +355,11 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     res.unknown = total_volume - res.free - res.occupied;
     res.total = total_volume;
     res.cell_volume = std::pow(m_resolution, 3);
-    octomap::OcTreeKey min_key = m_perception_map.getOccupancyMap().coordToKey(min);
+    octomap::OcTreeKey min_key = m_perception_map->getOccupancyMap().coordToKey(min);
     res.bbox_min.x = min_key[0];
     res.bbox_min.y = min_key[1];
     res.bbox_min.z = min_key[2];
-    octomap::OcTreeKey max_key = m_perception_map.getOccupancyMap().coordToKey(max);
+    octomap::OcTreeKey max_key = m_perception_map->getOccupancyMap().coordToKey(max);
     res.bbox_max.x = max_key[0];
     res.bbox_max.y = max_key[1];
     res.bbox_max.z = max_key[2];
@@ -551,7 +568,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
     std::auto_ptr<ActivePerceptionMap> map;
     {
         boost::mutex::scoped_lock lock(m_map_mutex);
-        map.reset(new ActivePerceptionMap(m_perception_map));
+        map.reset(new ActivePerceptionMap(*m_perception_map));
     }
 
     // Gather fringe voxel centers
@@ -646,7 +663,7 @@ bool NextBestViewNode::evaluateObservationCameraPosesCb
     std::auto_ptr<ActivePerceptionMap> map;
     {
         boost::mutex::scoped_lock lock(m_map_mutex);
-        map.reset(new ActivePerceptionMap(m_perception_map));
+        map.reset(new ActivePerceptionMap(*m_perception_map));
     }
     OcTreeBoxSet roi = boxSetFromMsg(req.roi);
     // Do this stuff so the active fringe markers are updated
@@ -701,19 +718,19 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 
     // Integrate point cloud
     boost::mutex::scoped_lock lock(m_map_mutex);
-    m_perception_map.integratePointCloud(octomap_cloud,
-                                         octomap::poseTfToOctomap(sensor_to_world_tf),
-                                         camera_to_world_tf,
-                                         m_camera_constraints);
+    m_perception_map->integratePointCloud(octomap_cloud,
+                                          octomap::poseTfToOctomap(sensor_to_world_tf),
+                                          camera_to_world_tf,
+                                          m_camera_constraints);
 
     // Publish rviz map visualization
-    visualization_msgs::Marker marker = m_perception_map.genOccupancyMarker();
+    visualization_msgs::Marker marker = m_perception_map->genOccupancyMarker();
     marker.header.frame_id = m_world_frame_id;
     marker.header.stamp = ros::Time::now();
     marker.id = 0;
     marker.ns = "occupancy_map";
     m_marker_pub.publish(marker);
-    marker = m_perception_map.genFringeMarker();
+    marker = m_perception_map->genFringeMarker();
     marker.header.frame_id = m_world_frame_id;
     marker.header.stamp = ros::Time::now();
     marker.id = 0;
@@ -723,7 +740,7 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     // Publish updated active fringe
     if(!last_roi.elements.empty())
     {
-        std::vector<octomap::point3d> active_fringe = getActiveFringe(last_roi, m_perception_map);
+        std::vector<octomap::point3d> active_fringe = getActiveFringe(last_roi, *m_perception_map);
         std::vector<octomap::point3d> active_fringe_normals;
         #if(PUB_FRINGE_NORMAL_MARKERS)
         for(size_t i = 0; i < active_fringe.size(); ++i)
@@ -776,7 +793,7 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
                 p1.setZ(0.0);
                 p2.setZ(2.5);
 
-                m_perception_map.setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
+                m_perception_map->setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
             }
         }
     }
@@ -798,10 +815,10 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
         p1.setZ(0.0);
         p2.setZ(0.0);
 
-        m_perception_map.setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
+        m_perception_map->setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
     }
 
-    m_perception_map.updateInnerOccupancy();
+    m_perception_map->updateInnerOccupancy();
 
     ROS_INFO("next_best_view_node: Added 2d map walls to octomap");
 }
@@ -820,7 +837,7 @@ bool NextBestViewNode::resetVolumesCb
         octomath::Vector3 min, max;
         if(getAxisAlignedBounds(*it, min, max))
         {
-            m_perception_map.resetVolume(min, max, req.keep_occupied);
+            m_perception_map->resetVolume(min, max, req.keep_occupied);
         }
         else
         {
@@ -828,6 +845,26 @@ bool NextBestViewNode::resetVolumesCb
         }
     }
     return success;
+}
+
+bool NextBestViewNode::saveMapCb
+(
+    uos_active_perception_msgs::ReadWriteFiles::Request& req,
+    uos_active_perception_msgs::ReadWriteFiles::Response& resp
+){
+    boost::mutex::scoped_lock lock(m_map_mutex);
+    return m_perception_map->serializeToFiles(req.prefix);
+}
+
+bool NextBestViewNode::loadMapCb
+(
+    uos_active_perception_msgs::ReadWriteFiles::Request& req,
+    uos_active_perception_msgs::ReadWriteFiles::Response& resp
+){
+    boost::mutex::scoped_lock lock(m_map_mutex);
+    m_perception_map.reset(new ActivePerceptionMap(req.prefix));
+    m_resolution = m_perception_map->getOccupancyMap().getResolution();
+    return true;
 }
 
 int main(int argc, char** argv)

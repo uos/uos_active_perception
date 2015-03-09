@@ -42,11 +42,32 @@
 #include <octomap/octomap.h>
 #include <octomap_ros/conversions.h>
 
+#include <stdexcept>
+
+const std::string ActivePerceptionMap::F_OCCUPANCY_MAP = "occupancy_map.bt";
+const std::string ActivePerceptionMap::F_FRINGE_MAP = "frontier_map.bt";
+
 ActivePerceptionMap::ActivePerceptionMap(double const & resolution) :
     m_occupancy_map(resolution),
     m_fringe_map(resolution)
 {
     m_occupancy_map.enableChangeDetection(true);
+}
+
+ActivePerceptionMap::ActivePerceptionMap(std::string const & prefix) :
+    m_occupancy_map(0.01),
+    m_fringe_map(0.01)
+{
+    if(m_occupancy_map.readBinary(prefix + F_OCCUPANCY_MAP) &&
+       m_fringe_map.readBinary(prefix + F_FRINGE_MAP))
+    {
+        m_occupancy_map.enableChangeDetection(true);
+    }
+    else
+    {
+        throw std::runtime_error("Error loading octomap files: \n"
+                                 + prefix + F_OCCUPANCY_MAP + "\n" + prefix + F_FRINGE_MAP);
+    }
 }
 
 void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
@@ -570,4 +591,11 @@ void ActivePerceptionMap::deleteMapVolume
             }
         }
     }
+}
+
+bool ActivePerceptionMap::serializeToFiles(const std::string & prefix)
+{
+    m_occupancy_map.prune();
+    m_fringe_map.prune();
+    return m_occupancy_map.writeBinary(prefix + F_OCCUPANCY_MAP) && m_fringe_map.writeBinary(prefix + F_FRINGE_MAP);
 }

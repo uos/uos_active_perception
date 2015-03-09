@@ -67,6 +67,7 @@ public:
     typedef boost::unordered_map<ObjectIdSet, unsigned int, ObjectIdSetHash> ObjectSetMap;
 
     ActivePerceptionMap(double const & resolution);
+    ActivePerceptionMap(std::string const & prefix);
 
     void integratePointCloud(octomap::Pointcloud const & scan,
                              octomap::pose6d const & scan_pose,
@@ -95,8 +96,11 @@ public:
                                                            octomap::point3d const & max) const;
     visualization_msgs::Marker genOccupancyMarker() const;
     visualization_msgs::Marker genFringeMarker() const;
+    bool serializeToFiles(const std::string & prefix);
 
 private:
+    static const std::string F_OCCUPANCY_MAP, F_FRINGE_MAP;
+
     octomap::OcTree m_occupancy_map, m_fringe_map;
 
     std::vector<octomap::OcTreeKey> getBoundaryVoxels(octomap::point3d const & min,

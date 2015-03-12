@@ -55,6 +55,7 @@
 #include <list>
 #include <memory>
 #include <stdint.h>
+#include <cstring>
 
 #define PUB_FRINGE_NORMAL_MARKERS false
 
@@ -616,14 +617,46 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
         }
         else
         {
+            octomap::point3d & poi = active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)];
+            octomath::Vector3 normal = map->getFringeNormal(poi, roi);
             try
             {
-                samples.push_back(ops.genObservationSample(
-                            active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)]));
+                samples.push_back(ops.genObservationSample(poi, normal));
             }
             catch (std::runtime_error e)
             {
-                ROS_WARN("Skipped unobservable fringe voxel");
+                ROS_WARN_STREAM("Skipped unobservable cell: " << e.what());
+                {
+                    visualization_msgs::Marker marker;
+                    marker.action = visualization_msgs::Marker::ADD;
+                    marker.ns = "unobservable_cells";
+                    marker.id = sample_id;
+                    marker.header.frame_id = m_world_frame_id;
+                    marker.lifetime = ros::Duration(5.0);
+                    marker.type = visualization_msgs::Marker::CUBE;
+                    marker.scale.x = m_resolution;
+                    marker.scale.y = m_resolution;
+                    marker.scale.z = m_resolution;
+                    marker.color.r = 1.0;
+                    marker.color.a = 1.0;
+                    marker.pose.position = octomap::pointOctomapToMsg(poi);
+                    m_marker_pub.publish(marker);
+                }{
+                    visualization_msgs::Marker marker;
+                    marker.action = visualization_msgs::Marker::ADD;
+                    marker.ns = "unobservable_cells";
+                    marker.header.frame_id = m_world_frame_id;
+                    marker.lifetime = ros::Duration(5.0);
+                    marker.id = sample_id + req.sample_size;
+                    marker.type = visualization_msgs::Marker::ARROW;
+                    marker.scale.x = 0.01;
+                    marker.scale.y = 0.03;
+                    marker.color.r = 1.0;
+                    marker.color.a = 1.0;
+                    marker.points.push_back(octomap::pointOctomapToMsg(poi));
+                    marker.points.push_back(octomap::pointOctomapToMsg(poi + normal.normalized() * 0.25));
+                    m_marker_pub.publish(marker);
+                }
             }
         }
     }

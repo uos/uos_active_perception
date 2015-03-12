@@ -35,9 +35,110 @@
 *********************************************************************/
 
 #include "observation_pose_sampler.h"
+#include "octree_regions.h"
 
 #include <stdexcept>
 
+struct ObservationPoseSampler::ObservationConstraints
+{
+    static const double EPS = 0.001;
+    double rxmin, rymin, rzmin, nx, ny, nz;
+    Interval b, r, a, x, y, z;
+
+    ObservationConstraints(const CameraConstraints & cc, octomath::Vector3 n, double h)
+        // init min ranges for single coordinates to 0
+        : rxmin(0)
+        , rymin(0)
+        , rzmin(0)
+        // Init normal and normal angle for degenerate case
+        , nx(0)
+        , ny(0)
+        , nz(1)
+        , b(-1, 1)
+        // Init range and coords using range constraints
+        , r(cc.range_min, cc.range_max)
+        , x(-cc.range_max, cc.range_max)
+        , y(-cc.range_max, cc.range_max)
+        , z(boost::numeric::intersect(Interval(-cc.range_max, cc.range_max),
+                                      Interval(cc.height_min, cc.height_max) - h))
+    {
+        // Init a, avoid boost::interval trig functions
+        double a1 = -std::cos(PI/2 - cc.pitch_min);
+        double a2 = -std::cos(PI/2 - cc.pitch_max);
+        a = (a1 < a2) ? Interval(a1, a2) : Interval(a2, a1);
+
+        if(n.norm() > EPS)
+        {
+            // Valid normal vector -- initialize fields and add b-constraint
+            n.normalize();
+            nx = n.x();
+            ny = n.y();
+            nz = n.z();
+            b = Interval(0, 1);
+        }
+        converge();
+    }
+
+    /** Update intervals of all variables; Returns whether some interval changed. */
+    bool update()
+    {
+        using namespace boost::numeric;
+
+        double wr = width(r),
+               wa = width(a),
+               wb = width(b),
+               wx = width(x),
+               wy = width(y),
+               wz = width(z);
+
+        // enforce range/normal-angle/coords
+        r = intersect(r, (nx*x + ny*y + nz*z) / b);
+        b = intersect(b, (nx*x + ny*y + nz*z) / r);
+        if(std::abs(nx) > EPS) x = intersect(x, (r*b - ny*y - nz*z) / nx);
+        if(std::abs(ny) > EPS) y = intersect(y, (r*b - nx*x - nz*z) / ny);
+        if(std::abs(nz) > EPS) z = intersect(z, (r*b - ny*y - nx*x) / nz);
+
+        // enforce range/coords
+        r = intersect(r, sqrt(square(x) + square(y) + square(z)));
+        Interval ans;
+        ans = sqrt(square(r) - square(y) - square(z));
+        x = intersect(x, hull(-ans, ans));
+        ans = sqrt(square(r) - square(x) - square(z));
+        y = intersect(y, hull(-ans, ans));
+        ans = sqrt(square(r) - square(x) - square(y));
+        z = intersect(z, hull(-ans, ans));
+
+        // enforce range/height/pitch
+        r = intersect(r, z/a);
+        a = intersect(a, z/r);
+        z = intersect(z, r*a);
+
+        // set single coord min ranges
+        rxmin = std::max(x.lower(),
+                         std::sqrt(std::max(0.0, std::pow(r.lower(), 2) - square(y).upper() - square(z).upper())));
+        rymin = std::max(y.lower(),
+                         std::sqrt(std::max(0.0, std::pow(r.lower(), 2) - square(x).upper() - square(z).upper())));
+        rzmin = std::max(z.lower(),
+                         std::sqrt(std::max(0.0, std::pow(r.lower(), 2) - square(x).upper() - square(y).upper())));
+
+        return std::abs(wr - width(r)) > EPS ||
+               std::abs(wa - width(a)) > EPS ||
+               std::abs(wb - width(b)) > EPS ||
+               std::abs(wx - width(x)) > EPS ||
+               std::abs(wy - width(y)) > EPS ||
+               std::abs(wz - width(z)) > EPS;
+    }
+
+    void converge()
+    {
+        while(update()) {}
+    }
+
+    bool isUnsolvable()
+    {
+        return (empty(b) || empty(r) || empty(a) || empty(x) || empty(y) || empty(z));
+    }
+};
 
 ObservationPoseSampler::ObservationPoseSampler(CameraConstraints const & cam_constraints, double range_tolerance, unsigned long int seed)
 :
@@ -48,66 +149,96 @@ ObservationPoseSampler::ObservationPoseSampler(CameraConstraints const & cam_con
     m_camera_constraints.range_max -= range_tolerance;
 }
 
-tf::Transform ObservationPoseSampler::genObservationSample(octomath::Vector3 const & poi)
-{
-    using boost::numeric::intersect;
+tf::Transform ObservationPoseSampler::genObservationSample
+(
+    octomath::Vector3 const & poi,
+    octomath::Vector3 normal
+){
+    ObservationConstraints ocs(m_camera_constraints, normal, poi.z());
+    if(ocs.isUnsolvable()) throw std::runtime_error("POI is unobservable (local inconsistency)");
 
-    // Hardware constraints
-    Interval r(m_camera_constraints.range_min, m_camera_constraints.range_max);
-    Interval dH(poi.z() - m_camera_constraints.height_max, poi.z() - m_camera_constraints.height_min);
-    Interval p(m_camera_constraints.pitch_min - m_camera_constraints.vfov / 2.0,
-               m_camera_constraints.pitch_max + m_camera_constraints.vfov / 2.0);
-    Interval sin_p = boost::numeric::sin(p);
-    // Possible view angles according to hardware constraints
-    sin_p = intersect(sin_p, dH / r);
-
-    if(boost::numeric::empty(sin_p))
+    // Prepare a randomized list of interval pointers for assignment.
+    std::vector<std::pair<Interval*, double*> > xyz(3);
+    // Assigning z first leads to fewer inconsistencies, so let's prefer that for now
+    // switch(static_cast<int>(m_rand_u01(m_rng)*3))
+    switch(2)
     {
-        throw std::runtime_error("POI is unobservable!");
+    case 0:
+        xyz[0] = std::make_pair(&ocs.x, &ocs.rxmin);
+        if(m_rand_u01(m_rng) < 0.5)
+        {
+            xyz[1] = std::make_pair(&ocs.y, &ocs.rymin);
+            xyz[2] = std::make_pair(&ocs.z, &ocs.rzmin);
+        }
+        else
+        {
+            xyz[1] = std::make_pair(&ocs.z, &ocs.rzmin);
+            xyz[2] = std::make_pair(&ocs.y, &ocs.rymin);
+        }
+        break;
+    case 1:
+        xyz[0] = std::make_pair(&ocs.y, &ocs.rymin);
+        if(m_rand_u01(m_rng) < 0.5)
+        {
+            xyz[1] = std::make_pair(&ocs.x, &ocs.rxmin);
+            xyz[2] = std::make_pair(&ocs.z, &ocs.rzmin);
+        }
+        else
+        {
+            xyz[1] = std::make_pair(&ocs.z, &ocs.rzmin);
+            xyz[2] = std::make_pair(&ocs.x, &ocs.rxmin);
+        }
+        break;
+    case 2:
+        xyz[0] = std::make_pair(&ocs.z, &ocs.rzmin);
+        if(m_rand_u01(m_rng) < 0.5)
+        {
+            xyz[1] = std::make_pair(&ocs.y, &ocs.rymin);
+            xyz[2] = std::make_pair(&ocs.x, &ocs.rxmin);
+        }
+        else
+        {
+            xyz[1] = std::make_pair(&ocs.x, &ocs.rxmin);
+            xyz[2] = std::make_pair(&ocs.y, &ocs.rymin);
+        }
+        break;
     }
 
-    // Select a distance and height (randomize selection order)
-    double distance, dHeight;
-    if(m_rand_u01(m_rng) < 0.5)
+    for(size_t i = 0; i < 3; ++i)
     {
-        // possible ranges that satisfy view distance, height and pitch constraints
-        r = intersect(r, dH / sin_p);
-        distance = r.lower() + m_rand_u01(m_rng) * (r.upper() - r.lower());
-        dH = intersect(dH, distance * sin_p);
-        dHeight = dH.lower() + m_rand_u01(m_rng) * (dH.upper() - dH.lower());
-    }
-    else
-    {
-        // possible height offsets that satisfy view distance, height and pitch constraints
-        dH = intersect(dH, r * sin_p);
-        dHeight = dH.lower() + m_rand_u01(m_rng) * (dH.upper() - dH.lower());
-        r = intersect(r, dHeight / sin_p);
-        distance = r.lower() + m_rand_u01(m_rng) * (r.upper() - r.lower());
+        Interval & iv = *(xyz[i].first);
+        double & rmin = *(xyz[i].second);
+
+        Interval ivneg(iv.lower(), std::min(iv.upper(), -rmin));
+        Interval ivpos(std::max(iv.lower(), rmin), iv.upper());
+        double wneg = width(ivneg);
+        double wpos = width(ivpos);
+        if(m_rand_u01(m_rng) < (wneg / (wneg+wpos)))
+        {
+            iv = Interval(ivneg.lower() + m_rand_u01(m_rng) * wneg);
+        }
+        else
+        {
+            iv = Interval(ivpos.lower() + m_rand_u01(m_rng) * wpos);
+        }
+        ocs.converge();
+        if(ocs.isUnsolvable()) throw std::runtime_error("POI is unobservable (global inconsistency)");
     }
 
-    // Create random position within feasible range and height
-    double direction = m_rand_u01(m_rng) * 2.0 * PI;
-    double x_offset = distance * std::cos(direction);
-    double y_offset = distance * std::sin(direction);
-    tf::Vector3 position(poi.x() + x_offset,
-                         poi.y() + y_offset,
-                         poi.z() - dHeight);
+    // Extract position
+    tf::Point position;
+    position.setX(poi.x() + ocs.x.lower());
+    position.setY(poi.y() + ocs.y.lower());
+    position.setZ(poi.z() + ocs.z.lower());
 
-    // Adjust camera pitch
-    double pitch = std::asin(dHeight / distance);
-    if(pitch > m_camera_constraints.pitch_max)
-    {
-        pitch = m_camera_constraints.pitch_max;
-    }
-    else if(pitch < m_camera_constraints.pitch_min)
-    {
-        pitch = m_camera_constraints.pitch_min;
-    }
+    // Extract pitch and yaw
+    double pitch = std::acos(ocs.a.lower()) - PI/2.0;
+    double yaw = std::atan2(-ocs.y.lower(), -ocs.x.lower());
 
     // Point the created pose towards the target voxel
     // We want to do intrinsic YPR which is equivalent to fixed axis RPY
     tf::Quaternion orientation;
-    orientation.setRPY(m_camera_constraints.roll, -pitch, PI + direction);
+    orientation.setRPY(m_camera_constraints.roll, -pitch, yaw);
 
     return tf::Transform(orientation, position);
 }

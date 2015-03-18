@@ -68,6 +68,11 @@ NextBestViewNode::NextBestViewNode() :
                                  &NextBestViewNode::pointCloudCb,
                                  this)),
     m_static_map_subscriber(),
+    m_marker_translator_subscriber(m_node_handle.subscribe(
+                                       "marker_in",
+                                       1,
+                                       &NextBestViewNode::markerTranslatorCb,
+                                       this)),
     m_get_bbox_percent_unseen_server(m_node_handle_pub.advertiseService(
                                          "/get_bbox_occupancy",
                                          &NextBestViewNode::getBboxOccupancyCb,
@@ -327,35 +332,6 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     boost::mutex::scoped_lock lock(m_map_mutex);
     octomath::Vector3 min, max;
     getAxisAlignedBounds(req.bbox, min, max);
-    double total_volume = (max.x() - min.x()) * (max.y() - min.y()) * (max.z() - min.z());
-    double free_volume = 0.0, occupied_volume = 0.0;
-    for(octomap::OcTree::leaf_bbx_iterator it = m_perception_map->getOccupancyMap().begin_leafs_bbx(min,max),
-        end = m_perception_map->getOccupancyMap().end_leafs_bbx();
-        it != end; ++it)
-    {
-        double side_len_half = it.getSize() / 2.0;
-        octomath::Vector3 vox_min = it.getCoordinate(), vox_max = it.getCoordinate();
-        vox_min.x() -= side_len_half;
-        vox_min.y() -= side_len_half;
-        vox_min.z() -= side_len_half;
-        vox_max.x() += side_len_half;
-        vox_max.y() += side_len_half;
-        vox_max.z() += side_len_half;
-        double v = getIntersectionVolume(min, max, vox_min, vox_max);
-        if(m_perception_map->getOccupancyMap().isNodeOccupied(*it))
-        {
-            occupied_volume += v;
-        }
-        else
-        {
-            free_volume += v;
-        }
-    }
-    res.free = free_volume;
-    res.occupied = occupied_volume;
-    res.unknown = total_volume - res.free - res.occupied;
-    res.total = total_volume;
-    res.cell_volume = std::pow(m_resolution, 3);
     octomap::OcTreeKey min_key = m_perception_map->getOccupancyMap().coordToKey(min);
     res.bbox_min.x = min_key[0];
     res.bbox_min.y = min_key[1];
@@ -364,6 +340,37 @@ bool NextBestViewNode::getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOcc
     res.bbox_max.x = max_key[0];
     res.bbox_max.y = max_key[1];
     res.bbox_max.z = max_key[2];
+
+    for(int x = min_key[0]; x <= max_key[0]; x++)
+    {
+        for(int y = min_key[1]; y <= max_key[1]; y++)
+        {
+            for(int z = min_key[2]; z <= max_key[2]; z++)
+            {
+                octomap::OcTreeKey key(x,y,z);
+                uos_active_perception_msgs::CellId cellid;
+                cellid.x = x;
+                cellid.y = y;
+                cellid.z = z;
+                if(octomap::OcTreeNode* node_ptr = m_perception_map->getOccupancyMap().search(key))
+                {
+                    if(m_perception_map->getOccupancyMap().isNodeOccupied(node_ptr))
+                    {
+                        res.occupied.cell_ids.push_back(cellid);
+                    }
+                    else
+                    {
+                        res.free.cell_ids.push_back(cellid);
+                    }
+                }
+                else
+                {
+                    res.unknown.cell_ids.push_back(cellid);
+                }
+            }
+        }
+    }
+    res.cell_volume = std::pow(m_resolution, 3);
     return true;
 }
 
@@ -886,6 +893,24 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
     m_perception_map->updateInnerOccupancy();
 
     ROS_INFO("next_best_view_node: Added 2d map walls to octomap");
+}
+
+void NextBestViewNode::markerTranslatorCb(visualization_msgs::Marker marker)
+{
+    marker.header.frame_id = m_world_frame_id;
+    marker.scale.x = m_resolution;
+    marker.scale.y = m_resolution;
+    marker.scale.z = m_resolution;
+    boost::mutex::scoped_lock lock(m_map_mutex);
+    for(size_t i = 0; i < marker.points.size(); ++i)
+    {
+        octomap::point3d p = m_perception_map->getOccupancyMap().keyToCoord(
+                             octomap::OcTreeKey(marker.points[i].x, marker.points[i].y, marker.points[i].z));
+        marker.points[i].x = p.x();
+        marker.points[i].y = p.y();
+        marker.points[i].z = p.z();
+    }
+    m_marker_pub.publish(marker);
 }
 
 bool NextBestViewNode::resetVolumesCb

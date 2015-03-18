@@ -265,6 +265,16 @@ public:
         return msg;
     }
 
+    static detection_t cellIdsMsgToDetection(const uos_active_perception_msgs::CellIds & msg)
+    {
+        detection_t out;
+        for(size_t k = 0; k < msg.cell_ids.size(); ++k)
+        {
+            out.insert(cellIdMsgToInt(msg.cell_ids[k]));
+        }
+        return out;
+    }
+
 
 private:
     std::vector<std::vector<unsigned int> > m_object_sets;

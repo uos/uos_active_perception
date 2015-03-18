@@ -67,6 +67,7 @@ private:
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     ros::Subscriber m_point_cloud_subscriber;
     ros::Subscriber m_static_map_subscriber;
+    ros::Subscriber m_marker_translator_subscriber;
     ros::ServiceServer m_get_bbox_percent_unseen_server;
     ros::ServiceServer m_get_observation_camera_poses_server;
     ros::ServiceServer m_evaluate_observation_camera_poses_server;
@@ -112,6 +113,8 @@ private:
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
 
     void staticMapCb(nav_msgs::OccupancyGrid const & map);
+
+    void markerTranslatorCb(visualization_msgs::Marker marker);
 
     bool getBboxOccupancyCb(uos_active_perception_msgs::GetBboxOccupancy::Request&,
                             uos_active_perception_msgs::GetBboxOccupancy::Response&);

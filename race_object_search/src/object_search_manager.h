@@ -27,6 +27,7 @@ public:
         m_node_handle_pub(),
         m_tf_listener(),
         m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/object_search_marker", 10000)),
+        m_map_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_node/marker_in", 10000)),
         m_observe_volumes_server(m_node_handle_pub,
                                  "observe_volumes",
                                  boost::bind(&ObjectSearchManager::observeVolumesCb, this, _1),
@@ -91,7 +92,7 @@ public:
 private:
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     tf::TransformListener m_tf_listener;
-    ros::Publisher m_marker_pub;
+    ros::Publisher m_marker_pub, m_map_marker_pub;
     actionlib::SimpleActionServer<race_object_search::ObserveVolumesAction> m_observe_volumes_server;
     TAgent m_agent;
     std::string m_world_frame_id;
@@ -151,17 +152,8 @@ private:
 
     struct RegionalProbabilityCellGain
     {
-         const MapRegionCollection & map_region_collection;
-         const std::vector<double> & cell_gains;
-
-         RegionalProbabilityCellGain
-         (
-                 const MapRegionCollection & map_region_collection,
-                 const std::vector<double> & cell_gains
-         ):
-             map_region_collection(map_region_collection),
-             cell_gains(cell_gains)
-         {}
+         MapRegionCollection map_region_collection;
+         std::vector<double> cell_gains;
 
          double operator ()(uint64_t const & cell) const
          {
@@ -208,6 +200,32 @@ private:
         }
     }
 
+    void pubMarker(const detection_t & cells, const std::string & ns, double r, double g, double b, double a)
+    {
+        static size_t id = 0;
+
+        visualization_msgs::Marker marker;
+        marker.ns = ns;
+        marker.id = id++;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.type = visualization_msgs::Marker::CUBE_LIST;
+        marker.lifetime = ros::Duration(10.0);
+        marker.color.r = r;
+        marker.color.g = g;
+        marker.color.b = b;
+        marker.color.a = a;
+        for(detection_t::iterator it = cells.begin(); it != cells.end(); ++it)
+        {
+            uos_active_perception_msgs::CellId cellid = ObservationPoseCollection::cellIdIntToMsg(*it);
+            geometry_msgs::Point p;
+            p.x = cellid.x;
+            p.y = cellid.y;
+            p.z = cellid.z;
+            marker.points.push_back(p);
+        }
+        m_map_marker_pub.publish(marker);
+    }
+
     // Callbacks
     void observeVolumesCb(race_object_search::ObserveVolumesGoalConstPtr const & goal_ptr)
     {
@@ -226,31 +244,33 @@ private:
             persistent_samples = ObservationPoseCollection::deserializePoses(m_ps_dir);
         }
 
-        double cell_volume = 0.0;
-        MapRegionCollection region_collection;
-        region_collection.regions.resize(goal.roi.size());
-        std::vector<double> unknown_roi_space(goal.roi.size(), 0.0);
-        std::vector<double> roi_probability_density(goal.roi.size());
-        std::vector<double> roi_cell_gain(goal.roi.size());
-        for(size_t i = 0; i < goal.roi.size(); ++i)
-        {
-            roi_probability_density[i] = 1.0 - std::pow(1.0 - goal.p[i], 1.0 / (goal.roi[i].dimensions.x *
-                                                                                goal.roi[i].dimensions.y *
-                                                                                goal.roi[i].dimensions.z));
+        // Unknown cell tracking
+        std::vector<detection_t> unknown_roi_cell_ids(goal.roi.size());
+        detection_t expected_view;
 
-            uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
-            get_bbox_occupancy.request.bbox = goal.roi[i];
-            while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+        // Construct regional probability cell gain
+        RegionalProbabilityCellGain rpcg;
+        {
+            std::vector<double> roi_cell_gain(goal.roi.size());
+            MapRegionCollection region_collection;
+            region_collection.regions.resize(goal.roi.size());
+            for(size_t i = 0; i < goal.roi.size(); ++i)
             {
-                logerror("get_bbox_occupancy service call failed, will try again");
-                ros::WallDuration(5).sleep();
+                uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
+                get_bbox_occupancy.request.bbox = goal.roi[i];
+                while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+                {
+                    logerror("get_bbox_occupancy service call failed, will try again");
+                    ros::WallDuration(5).sleep();
+                }
+                region_collection.regions[i].min = get_bbox_occupancy.response.bbox_min;
+                region_collection.regions[i].max = get_bbox_occupancy.response.bbox_max;
+                roi_cell_gain[i] = 1.0 - std::pow(1.0 - goal.p[i], 1.0 / region_collection.regions[i].cellCount());
             }
-            cell_volume = get_bbox_occupancy.response.cell_volume;
-            region_collection.regions[i].min = get_bbox_occupancy.response.bbox_min;
-            region_collection.regions[i].max = get_bbox_occupancy.response.bbox_max;
-            roi_cell_gain[i] = 1.0 - std::pow(1.0 - goal.p[i], 1.0 / region_collection.regions[i].cellCount());
+            rpcg.map_region_collection = region_collection;
+            rpcg.cell_gains = roi_cell_gain;
         }
-        RegionalProbabilityCellGain rpcg(region_collection, roi_cell_gain);
+
 
         while(ros::ok())
         {
@@ -261,9 +281,9 @@ private:
                 return;
             }
 
-            // evaluate actual information gain between iterations
+            // evaluate unknown cell difference to last iteration
+            detection_t unexpected_cells;
             double igain = 1.0, iprobability_sum = 1.0;
-            double gain_vol = 0.0;
             for(size_t i = 0; i < goal.roi.size(); ++i)
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
@@ -273,20 +293,29 @@ private:
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
                 }
-                iprobability_sum *= std::pow(1.0 - roi_probability_density[i],
-                                             get_bbox_occupancy.response.unknown);
-                igain *= std::pow(1.0 - roi_probability_density[i],
-                                  unknown_roi_space[i] - get_bbox_occupancy.response.unknown);
-                gain_vol += unknown_roi_space[i] - get_bbox_occupancy.response.unknown;
-                unknown_roi_space[i] = get_bbox_occupancy.response.unknown;
+                iprobability_sum *= std::pow(1.0 - rpcg.cell_gains[i],
+                                             get_bbox_occupancy.response.unknown.cell_ids.size());
+                igain *= std::pow(1.0 - rpcg.cell_gains[i],
+                                  unknown_roi_cell_ids[i].size() - get_bbox_occupancy.response.unknown.cell_ids.size());
+
+                detection_t unknown_cell_ids = ObservationPoseCollection::cellIdsMsgToDetection(
+                                               get_bbox_occupancy.response.unknown);
+                for(detection_t::iterator it = unknown_roi_cell_ids[i].begin();
+                    it != unknown_roi_cell_ids[i].end();
+                    ++it)
+                {
+                    if(!unknown_cell_ids.count(*it) && !expected_view.erase(*it)) unexpected_cells.insert(*it);
+                }
+                unknown_roi_cell_ids[i] = unknown_cell_ids;
             }
             double gain = 1.0 - igain;
             double probability_sum = 1.0 - iprobability_sum;
             if(iteration_counter > 0)
             {
                 logval("gain", gain);
-                logval("gainvol", gain_vol);
             }
+            pubMarker(expected_view, "missed_cells", 1.0, 0.0, 1.0, 0.5);
+            pubMarker(unexpected_cells, "unexpected_cells", 0.0, 1.0, 0.0, 0.5);
 
             iteration_counter++;
             m_file_events << iteration_counter << std::endl;
@@ -490,16 +519,13 @@ private:
             logval("expected_move_time", opc.getInitialTravelTime(best_pose_idx));
 
             double iegain = 1.0;
-            double egainvol = 0.0;
             for(detection_t::iterator it = opc.getPoses()[best_pose_idx].cell_id_sets[0].begin();
                 it != opc.getPoses()[best_pose_idx].cell_id_sets[0].end();
                 ++it)
             {
                 iegain *= (1.0 - rpcg(*it));
-                egainvol += cell_volume;
             }
             logval("expected_gain", 1.0 - iegain);
-            logval("egainvol", egainvol);
 
             // move the robot
             ros::Time st0 = ros::Time::now();
@@ -515,6 +541,9 @@ private:
                 logerror("failed to achieve target pose");
             }
             logval("actual_move_time", (ros::Time::now() - st0).toSec());
+
+            // save expected view
+            expected_view = opc.getPoses()[best_pose_idx].cell_id_sets[0];
 
             // update opc
             opc.setCurrentPose(best_pose_idx);

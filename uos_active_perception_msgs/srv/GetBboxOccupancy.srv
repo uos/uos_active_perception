@@ -2,10 +2,9 @@
 
 BoundingBox bbox
 ---
-float64 occupied
-float64 free
-float64 unknown
-float64 total
+CellIds occupied
+CellIds free
+CellIds unknown
 float64 cell_volume
 CellId bbox_min
 CellId bbox_max

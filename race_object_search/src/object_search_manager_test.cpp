@@ -114,6 +114,7 @@ int main(int argc, char** argv)
     std::vector<uos_active_perception_msgs::BoundingBox> boxes;
     std::vector<double> probs;
     bool reset = false;
+    bool clearall = false;
     bool nosearch = false;
     bool has_p = false;
     double min_p_succ = 0.0;
@@ -121,6 +122,8 @@ int main(int argc, char** argv)
     for(long i = 1; i < argc; ++i) {
         if(!strcmp(argv[i], "reset")) {
             reset = true;
+        } else if(!strcmp(argv[i], "clearall")) {
+            clearall = true;
         } else if(!strcmp(argv[i], "nosearch")) {
             nosearch = true;
         } else if(!strcmp(argv[i], "p")) {
@@ -174,10 +177,11 @@ int main(int argc, char** argv)
     }
 
     // reset regions if commanded to
-    if(reset) {
+    if(reset || clearall) {
         ros::ServiceClient c = n.serviceClient<uos_active_perception_msgs::ResetVolumes>("/reset_volumes");
         uos_active_perception_msgs::ResetVolumes srv;
         srv.request.volumes.insert(srv.request.volumes.end(), boxes.begin(), boxes.end());
+        srv.request.keep_occupied = !clearall;
         if(!c.exists()) {
             ROS_INFO("waiting for /reset_volumes");
             c.waitForExistence();

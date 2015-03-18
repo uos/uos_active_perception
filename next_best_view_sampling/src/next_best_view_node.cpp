@@ -757,18 +757,19 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
                                           m_camera_constraints);
 
     // Publish rviz map visualization
-    visualization_msgs::Marker marker = m_perception_map->genOccupancyMarker();
-    marker.header.frame_id = m_world_frame_id;
-    marker.header.stamp = ros::Time::now();
-    marker.id = 0;
-    marker.ns = "occupancy_map";
-    m_marker_pub.publish(marker);
-    marker = m_perception_map->genFringeMarker();
-    marker.header.frame_id = m_world_frame_id;
-    marker.header.stamp = ros::Time::now();
-    marker.id = 0;
-    marker.ns = "fringe_map";
-    m_marker_pub.publish(marker);
+    {
+        visualization_msgs::Marker marker = m_perception_map->genOccupancyMarker();
+        marker.header.frame_id = m_world_frame_id;
+        marker.id = 0;
+        marker.ns = "occupancy_map";
+        m_marker_pub.publish(marker);
+        marker = m_perception_map->genFringeMarker();
+        marker.header.frame_id = m_world_frame_id;
+        marker.header.stamp = ros::Time::now();
+        marker.id = 0;
+        marker.ns = "fringe_map";
+        m_marker_pub.publish(marker);
+    }
 
     // Publish updated active fringe
     if(!last_roi.elements.empty())
@@ -782,6 +783,37 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
         }
         #endif
         pubActiveFringe(active_fringe, active_fringe_normals);
+    }
+
+    // Publish camera constraint marker
+    {
+        using std::cos;
+        using std::sin;
+        visualization_msgs::Marker marker;
+        marker.type = visualization_msgs::Marker::LINE_LIST;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.color.r = 1.0;
+        marker.color.a = 1.0;
+        marker.scale.x = 0.005;
+        marker.header.frame_id = m_camera_constraints.frame_id;
+        marker.id = 0;
+        marker.ns = "camera_constraints";
+        double lr = m_camera_constraints.hfov / 2.0;
+        double td = m_camera_constraints.vfov / 2.0;
+        geometry_msgs::Point p;
+        marker.points.push_back(geometry_msgs::Point());
+        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(-lr), sin(-lr), sin(-td)), p);
+        marker.points.push_back(p);
+        marker.points.push_back(geometry_msgs::Point());
+        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(-lr), sin(-lr), sin(td)), p);
+        marker.points.push_back(p);
+        marker.points.push_back(geometry_msgs::Point());
+        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(lr), sin(lr), sin(-td)), p);
+        marker.points.push_back(p);
+        marker.points.push_back(geometry_msgs::Point());
+        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(lr), sin(lr), sin(td)), p);
+        marker.points.push_back(p);
+        m_marker_pub.publish(marker);
     }
 }
 

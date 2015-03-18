@@ -70,6 +70,12 @@ ActivePerceptionMap::ActivePerceptionMap(std::string const & prefix) :
     }
 }
 
+/** Integrates a point cloud in occupancy and fringe map.
+  * scan_pose: The frame of origin for the point cloud
+  * camera_pose: The frame of origin for the sensor according to ROS convention
+  * The reason we need both is that scan_pose may be an optical_frame with x pointing right and y pointing down,
+  * while we need camera_pose to follow ROS convention and have x pointing forward.
+  */
 void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                                               octomap::pose6d const & scan_pose,
                                               tf::Pose const & camera_pose,

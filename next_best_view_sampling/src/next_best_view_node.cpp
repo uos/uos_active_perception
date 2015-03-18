@@ -96,7 +96,7 @@ NextBestViewNode::NextBestViewNode() :
     m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000))
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
-    m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.1);
+    m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.01);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
 
     // Set camera constraints from parameters (Defaults: xtion on calvin)

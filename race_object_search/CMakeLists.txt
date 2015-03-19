@@ -40,7 +40,9 @@ rosbuild_add_executable(object_search_manager src/object_search_manager.h
                                               src/observation_pose_collection.cpp
                                               src/kmeans.cpp
                                               src/ros_serialization_helper.h
-                                              src/geometry.h)
+                                              src/geometry.h
+                                              src/search_plan.h
+                                              src/search_planner.h)
 rosbuild_add_executable(object_search_manager_test src/object_search_manager_test.cpp)
 rosbuild_add_executable(kmeans-test src/kmeans.cpp
                                     src/kmeans-test.cpp)

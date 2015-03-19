@@ -5,6 +5,7 @@
 #include "search_plan.h"
 #include "search_planner.h"
 #include "ros_serialization_helper.h"
+#include "geometry.h"
 
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
@@ -122,42 +123,14 @@ private:
          }
     };
 
-    struct MapRegion
-    {
-        uos_active_perception_msgs::CellId min, max;
-        bool contains(uos_active_perception_msgs::CellId cell) const
-        {
-            return min.x <= cell.x && cell.x <= max.x &&
-                   min.y <= cell.y && cell.y <= max.y &&
-                   min.z <= cell.z && cell.z <= max.z;
-        }
-        size_t cellCount()
-        {
-            return (max.x - min.x + 1) * (max.y - min.y + 1) * (max.z - min.z + 1);
-        }
-    };
-
-    struct MapRegionCollection
-    {
-        std::vector<MapRegion> regions;
-        size_t findRegion(uos_active_perception_msgs::CellId cell) const
-        {
-            for(size_t i = 0; i < regions.size(); ++i)
-            {
-                if(regions[i].contains(cell)) return i;
-            }
-            return -1;
-        }
-    };
-
     struct RegionalProbabilityCellGain
     {
-         MapRegionCollection map_region_collection;
+         geometry::MapRegionCollection map_region_collection;
          std::vector<double> cell_gains;
 
          double operator ()(uint64_t const & cell) const
          {
-             size_t idx = map_region_collection.findRegion(ObservationPoseCollection::cellIdIntToMsg(cell));
+             size_t idx = map_region_collection.findRegion(geometry::cellIdIntToMsg(cell));
              if(idx > cell_gains.size())
              {
                  ROS_WARN("Encountered cell that does not belong to any region");
@@ -200,7 +173,7 @@ private:
         }
     }
 
-    void pubMarker(const detection_t & cells, const std::string & ns, double r, double g, double b, double a)
+    void pubMarker(const geometry::detection_t & cells, const std::string & ns, double r, double g, double b, double a)
     {
         static size_t id = 0;
 
@@ -214,9 +187,9 @@ private:
         marker.color.g = g;
         marker.color.b = b;
         marker.color.a = a;
-        for(detection_t::iterator it = cells.begin(); it != cells.end(); ++it)
+        for(geometry::detection_t::iterator it = cells.begin(); it != cells.end(); ++it)
         {
-            uos_active_perception_msgs::CellId cellid = ObservationPoseCollection::cellIdIntToMsg(*it);
+            uos_active_perception_msgs::CellId cellid = geometry::cellIdIntToMsg(*it);
             geometry_msgs::Point p;
             p.x = cellid.x;
             p.y = cellid.y;
@@ -229,6 +202,8 @@ private:
     // Callbacks
     void observeVolumesCb(race_object_search::ObserveVolumesGoalConstPtr const & goal_ptr)
     {
+        using namespace geometry;
+
         ROS_INFO("Got a new goal!");
         size_t iteration_counter = 0;
         std::stringstream fname;
@@ -298,8 +273,7 @@ private:
                 igain *= std::pow(1.0 - rpcg.cell_gains[i],
                                   unknown_roi_cell_ids[i].size() - get_bbox_occupancy.response.unknown.cell_ids.size());
 
-                detection_t unknown_cell_ids = ObservationPoseCollection::cellIdsMsgToDetection(
-                                               get_bbox_occupancy.response.unknown);
+                detection_t unknown_cell_ids = cellIdsMsgToDetection(get_bbox_occupancy.response.unknown);
                 for(detection_t::iterator it = unknown_roi_cell_ids[i].begin();
                     it != unknown_roi_cell_ids[i].end();
                     ++it)

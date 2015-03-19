@@ -37,7 +37,7 @@ void ObservationPoseCollection::addPoses
                 cell_id_it != new_cvms[i].cell_id_sets[j].cell_ids.end();
                 ++cell_id_it)
             {
-                cell_keys.insert(cellIdMsgToInt(*cell_id_it));
+                cell_keys.insert(geometry::cellIdMsgToInt(*cell_id_it));
             }
             op.cell_id_sets.push_back(cell_keys);
         }

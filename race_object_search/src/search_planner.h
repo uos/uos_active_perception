@@ -100,6 +100,7 @@ public:
     }
 
 private:
+    typedef geometry::detection_t detection_t;
     class DetectionOptions
     {
     public:

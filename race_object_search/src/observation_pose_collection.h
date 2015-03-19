@@ -2,6 +2,7 @@
 #define OBSERVATION_POSE_COLLECTION_H
 
 #include "ros_serialization_helper.h"
+#include "geometry.h"
 
 #include <geometry_msgs/Pose.h>
 #include <tf/tf.h>
@@ -13,12 +14,10 @@
 #include <cassert>
 #include <stdint.h>
 
-typedef boost::unordered_set<uint64_t> detection_t;
-
 struct ObservationPose
 {
     tf::Pose pose;
-    std::vector<detection_t> cell_id_sets;
+    std::vector<geometry::detection_t> cell_id_sets;
     std::vector<uint32_t> object_set_ids;
     double view_distance;
 };
@@ -161,14 +160,14 @@ public:
         return true;
     }
 
-    detection_t observableUnion()
+    geometry::detection_t observableUnion()
     {
-        detection_t all;
+        geometry::detection_t all;
         for(size_t i = 0; i < m_observation_poses.size(); ++i)
         {
             for(size_t j = 0; j < m_observation_poses[i].cell_id_sets.size(); ++j)
             {
-                detection_t & ins = m_observation_poses[i].cell_id_sets[j];
+                geometry::detection_t & ins = m_observation_poses[i].cell_id_sets[j];
                 all.insert(ins.begin(), ins.end());
             }
         }
@@ -242,39 +241,6 @@ public:
         ros_serialization_helper::readSerialized(path + F_SAMPLES, poses);
         return poses;
     }
-
-    static uint64_t cellIdMsgToInt(const uos_active_perception_msgs::CellId & msg)
-    {
-        uint64_t id = 0;
-        id |= msg.x;
-        id <<= 16;
-        id |= msg.y;
-        id <<= 16;
-        id |= msg.z;
-        return id;
-    }
-
-    static uos_active_perception_msgs::CellId cellIdIntToMsg(uint64_t id)
-    {
-        uos_active_perception_msgs::CellId msg;
-        msg.z = id;
-        id >>= 16;
-        msg.y = id;
-        id >>= 16;
-        msg.x = id;
-        return msg;
-    }
-
-    static detection_t cellIdsMsgToDetection(const uos_active_perception_msgs::CellIds & msg)
-    {
-        detection_t out;
-        for(size_t k = 0; k < msg.cell_ids.size(); ++k)
-        {
-            out.insert(cellIdMsgToInt(msg.cell_ids[k]));
-        }
-        return out;
-    }
-
 
 private:
     std::vector<std::vector<unsigned int> > m_object_sets;

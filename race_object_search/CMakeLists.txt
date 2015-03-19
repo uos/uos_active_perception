@@ -39,9 +39,9 @@ rosbuild_add_executable(object_search_manager src/object_search_manager.h
                                               src/floating_kinect_agent.cpp
                                               src/observation_pose_collection.cpp
                                               src/kmeans.cpp
-                                              src/ros_serialization_helper.h)
+                                              src/ros_serialization_helper.h
+                                              src/geometry.h)
 rosbuild_add_executable(object_search_manager_test src/object_search_manager_test.cpp)
-rosbuild_add_executable(misc-test src/misc-test.cpp)
 rosbuild_add_executable(kmeans-test src/kmeans.cpp
                                     src/kmeans-test.cpp)
 rosbuild_add_executable(random_driver src/random_driver.cpp)

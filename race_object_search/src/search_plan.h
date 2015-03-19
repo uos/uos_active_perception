@@ -2,6 +2,7 @@
 #define SEARCH_PLAN_H
 
 #include "observation_pose_collection.h"
+#include "geometry.h"
 
 #include <visualization_msgs/Marker.h>
 #include <ros/publisher.h>
@@ -20,7 +21,7 @@ public:
     std::vector<double> etime;
     std::vector<double> pdone;
     std::vector<size_t> cam_pose_idx;
-    std::vector<detection_t> detected_cells;
+    std::vector<geometry::detection_t> detected_cells;
 
     SearchPlan(CELL_GAIN_LOOKUP const & cgl, ObservationPoseCollection const & opc)
         : last_idx(0)
@@ -28,7 +29,7 @@ public:
         , etime(std::vector<double>(1, 0.0))
         , pdone(std::vector<double>(1, 0.0))
         , cam_pose_idx(std::vector<size_t>(1, -1))
-        , detected_cells(std::vector<detection_t>(1))
+        , detected_cells(std::vector<geometry::detection_t>(1))
         , cgl(cgl)
         , opc(opc)
     {}
@@ -40,7 +41,7 @@ public:
         etime = std::vector<double>(1, 0.0);
         pdone = std::vector<double>(1, 0.0);
         cam_pose_idx = std::vector<size_t>(1, -1);
-        detected_cells = std::vector<detection_t>(1);
+        detected_cells = std::vector<geometry::detection_t>(1);
     }
 
     void pop()
@@ -209,6 +210,7 @@ public:
     }
 
 private:
+    typedef geometry::detection_t detection_t;
     CELL_GAIN_LOOKUP const & cgl;
     ObservationPoseCollection const & opc;
 

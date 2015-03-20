@@ -48,6 +48,10 @@ public:
         m_node_handle.param("relative_lookahead", m_relative_lookahead, 1.0);
         m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
         m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
+        m_node_handle.param("keep_planned_poses", m_keep_planned_poses, true);
+
+        m_use_static_poses = !m_ps_dir.empty();
+        if(m_use_static_poses) m_keep_planned_poses = false;
 
         if(!m_log_dir.empty()) {
             std::stringstream fname;
@@ -101,6 +105,8 @@ private:
     int m_local_sample_size;
     int m_global_sample_size;
     double m_ray_skip;
+    bool m_use_static_poses;
+    bool m_keep_planned_poses;
     // planning params
     std::string m_planning_mode;
     int m_depth_limit;
@@ -301,10 +307,27 @@ private:
             const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
             const tf::Pose cam_pose = m_agent.getCurrentCamPose();
 
-            size_t n_cells = 0;
-
             t0 = ros::WallTime::now();
-            if(m_ps_dir.empty() || (persistent_samples.empty() && iteration_counter == 1))
+            if(!persistent_samples.empty())
+            {
+                ROS_INFO("reevaluating pose candidates");
+                {
+                    uos_active_perception_msgs::EvaluateObservationCameraPoses pose_candidates_call;
+                    pose_candidates_call.request.camera_poses = persistent_samples;
+                    pose_candidates_call.request.ray_skip = m_ray_skip;
+                    pose_candidates_call.request.roi = goal.roi;
+                    while(!ros::service::call("/evaluate_observation_camera_poses", pose_candidates_call))
+                    {
+                        logerror("evaluate_observation_camera_poses service call failed");
+                        ros::Duration(5).sleep();
+                    }
+                    opc.addPoses(pose_candidates_call.response.camera_poses,
+                                 pose_candidates_call.response.target_points,
+                                 pose_candidates_call.response.cvms,
+                                 pose_candidates_call.response.object_sets);
+                }
+            }
+            if(!m_use_static_poses || (persistent_samples.empty() && iteration_counter == 1))
             {
                 opc = ObservationPoseCollection();
                 ROS_INFO("retrieving local pose candidates");
@@ -318,31 +341,26 @@ private:
                     tf::pointTFToMsg(m_agent.camPoseForRobotPose(robot_pose).getOrigin(),
                                      pose_candidates_call.request.observation_position.point);
                     pose_candidates_call.request.lock_height = false;
-                    if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
+                    while(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
                     {
                         logerror("get_observation_camera_poses service call failed (local samples)");
                         ros::Duration(5).sleep();
-                        continue;
                     }
                     opc.addPoses(pose_candidates_call.response.camera_poses,
                                  pose_candidates_call.response.target_points,
                                  pose_candidates_call.response.cvms,
                                  pose_candidates_call.response.object_sets);
-                    for(size_t i = 0; i < pose_candidates_call.response.roi_cell_counts.size(); ++i) {
-                        n_cells += pose_candidates_call.response.roi_cell_counts[i];
-                    }
                 }
                 ROS_INFO("retrieving global pose candidates");
                 {
                     uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
-                    pose_candidates_call.request.sample_size = m_global_sample_size;
+                    pose_candidates_call.request.sample_size = m_global_sample_size - persistent_samples.size();
                     pose_candidates_call.request.ray_skip = m_ray_skip;
                     pose_candidates_call.request.roi = goal.roi;
-                    if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
+                    while(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
                     {
                         logerror("get_observation_camera_poses service call failed (global samples)");
                         ros::Duration(5).sleep();
-                        continue;
                     }
                     opc.addPoses(pose_candidates_call.response.camera_poses,
                                  pose_candidates_call.response.target_points,
@@ -350,34 +368,10 @@ private:
                                  pose_candidates_call.response.object_sets);
                 }
             }
-            else
-            {
-                ROS_INFO("reevaluating pose candidates");
-                {
-                    uos_active_perception_msgs::EvaluateObservationCameraPoses pose_candidates_call;
-                    pose_candidates_call.request.camera_poses = persistent_samples;
-                    pose_candidates_call.request.ray_skip = m_ray_skip;
-                    pose_candidates_call.request.roi = goal.roi;
-                    if(!ros::service::call("/evaluate_observation_camera_poses", pose_candidates_call))
-                    {
-                        logerror("evaluate_observation_camera_poses service call failed");
-                        ros::Duration(5).sleep();
-                        continue;
-                    }
-                    opc.addPoses(pose_candidates_call.response.camera_poses,
-                                 pose_candidates_call.response.target_points,
-                                 pose_candidates_call.response.cvms,
-                                 pose_candidates_call.response.object_sets);
-                    for(size_t i = 0; i < pose_candidates_call.response.roi_cell_counts.size(); ++i) {
-                        n_cells += pose_candidates_call.response.roi_cell_counts[i];
-                    }
-                }
-            }
-
             logtime("nbv_sampling_time", t0);
             logval("nbv_sample_count", opc.getPoses().size());
 
-            if(m_ps_dir.empty() || persistent_samples.empty())
+            if(!m_use_static_poses || persistent_samples.empty())
             {
                 ROS_INFO("building travel time lookup tables");
                 t0 = ros::WallTime::now();
@@ -518,6 +512,17 @@ private:
 
             // save expected view
             expected_view = opc.getPoses()[best_pose_idx].cell_id_sets[0];
+
+            // save all poses that are part of the current plan.
+            // index 0 is initial pose, index 1 is current target, so save poses beginning from index 2.
+            if(m_keep_planned_poses && plan.size() > 2)
+            {
+                persistent_samples.resize(plan.size() - 2);
+                for(size_t i = 2; i < plan.size(); ++i)
+                {
+                    tf::poseTFToMsg(opc.getPoses()[plan[i]].pose, persistent_samples[i-2]);
+                }
+            }
 
             // update opc
             opc.setCurrentPose(best_pose_idx);

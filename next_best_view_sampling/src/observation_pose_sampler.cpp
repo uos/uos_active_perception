@@ -155,7 +155,7 @@ tf::Transform ObservationPoseSampler::genObservationSample
     octomath::Vector3 normal
 ){
     ObservationConstraints ocs(m_camera_constraints, normal, poi.z());
-    if(ocs.isUnsolvable()) throw std::runtime_error("POI is unobservable (local inconsistency)");
+    if(ocs.isUnsolvable()) throw UnobservableError();
 
     // Prepare a randomized list of interval pointers for assignment.
     std::vector<std::pair<Interval*, double*> > xyz(3);
@@ -222,7 +222,7 @@ tf::Transform ObservationPoseSampler::genObservationSample
             iv = Interval(ivpos.lower() + m_rand_u01(m_rng) * wpos);
         }
         ocs.converge();
-        if(ocs.isUnsolvable()) throw std::runtime_error("POI is unobservable (global inconsistency)");
+        if(ocs.isUnsolvable()) throw SamplingError();
     }
 
     // Extract position

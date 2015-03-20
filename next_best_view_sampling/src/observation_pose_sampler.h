@@ -49,6 +49,11 @@
 class ObservationPoseSampler
 {
 public:
+    /** Thrown when it is impossible for the camera to observe the target */
+    class UnobservableError : public std::exception {};
+    /** Thrown when sampling lead to inconsistency; In this case, trying again may work. */
+    class SamplingError : public std::exception {};
+
     /**
       ASSUMPTION: Camera constraints are defined in the world frame.
       */

@@ -264,6 +264,8 @@ std::vector<octomap::point3d> NextBestViewNode::getActiveFringe(
         roi_fringe_centers = map.genBoundaryFringeCenters(min, max);
         active_fringe.insert(active_fringe.end(), roi_fringe_centers.begin(), roi_fringe_centers.end());
     }
+    // filter unobservable cells
+
     return active_fringe;
 }
 
@@ -617,7 +619,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
 
     std::vector<tf::Pose> samples;
     samples.reserve(req.sample_size);
-    for(int sample_id = 0; sample_id < req.sample_size; ++sample_id)
+    for(int sample_id = 0; !active_fringe.empty() && sample_id < req.sample_size; ++sample_id)
     {
         if(observation_position_set)
         {
@@ -625,19 +627,24 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
         }
         else
         {
-            octomap::point3d & poi = active_fringe[boost::uniform_int<>(0, active_fringe.size() - 1)(rng)];
+            size_t fringeid = boost::uniform_int<>(0, active_fringe.size() - 1)(rng);
+            octomap::point3d & poi = active_fringe[fringeid];
             octomath::Vector3 normal = map->getFringeNormal(poi, roi);
             try
             {
                 samples.push_back(ops.genObservationSample(poi, normal));
             }
-            catch (std::runtime_error e)
+            catch(ObservationPoseSampler::UnobservableError& e)
             {
-                ROS_WARN_STREAM("Skipped unobservable cell: " << e.what());
+                active_fringe.erase(active_fringe.begin() + fringeid);
+                --sample_id;
+            }
+            catch(ObservationPoseSampler::SamplingError& e)
+            {
                 {
                     visualization_msgs::Marker marker;
                     marker.action = visualization_msgs::Marker::ADD;
-                    marker.ns = "unobservable_cells";
+                    marker.ns = "sampling_errors";
                     marker.id = sample_id;
                     marker.header.frame_id = m_world_frame_id;
                     marker.lifetime = ros::Duration(5.0);
@@ -652,7 +659,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                 }{
                     visualization_msgs::Marker marker;
                     marker.action = visualization_msgs::Marker::ADD;
-                    marker.ns = "unobservable_cells";
+                    marker.ns = "sampling_errors";
                     marker.header.frame_id = m_world_frame_id;
                     marker.lifetime = ros::Duration(5.0);
                     marker.id = sample_id + req.sample_size;
@@ -665,6 +672,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                     marker.points.push_back(octomap::pointOctomapToMsg(poi + normal.normalized() * 0.25));
                     m_marker_pub.publish(marker);
                 }
+                --sample_id;
             }
         }
     }

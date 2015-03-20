@@ -79,10 +79,6 @@ public:
     octomap::OcTree const & getOccupancyMap() const;
     octomap::OcTree const & getFringeMap() const;
     void setResolution(double const & resolution);
-    void estimateRayGain(octomap::point3d const & camera,
-                         octomap::point3d const & end,
-                         OcTreeBoxSet const & roi,
-                         octomap::KeySet & discovered_keys) const;
     void estimateRayGainObjectAware(octomap::point3d const & camera,
                                     octomap::point3d const & end,
                                     OcTreeBoxSet const & roi,

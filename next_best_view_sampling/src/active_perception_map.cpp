@@ -262,33 +262,6 @@ void ActivePerceptionMap::setResolution(double const & resolution)
     m_fringe_map.setResolution(resolution);
 }
 
-void ActivePerceptionMap::estimateRayGain
-(
-        octomap::point3d const & camera,
-        octomap::point3d const & end,
-        OcTreeBoxSet const & roi,
-        octomap::KeySet & discovered_keys) const
-{
-    octomath::Vector3 direction = end - camera;
-    double length = direction.norm();
-
-    for(RayIterator ray(m_occupancy_map, camera, direction); ray.distanceFromOrigin() < length; ray.next())
-    {
-        if(discovered_keys.count(ray.getKey())) continue; // We have already seen this, so skip ahead
-        if(octomap::OcTreeNode * node_ptr = m_occupancy_map.search(ray.getKey()))
-        {
-            if(m_occupancy_map.isNodeOccupied(node_ptr))
-            {
-                break;
-            }
-        }
-        else if(roi.elements.empty() || roi.getContainingBoxId(ray.getKey()))
-        {
-            discovered_keys.insert(ray.getKey());
-        }
-    }
-}
-
 void ActivePerceptionMap::estimateRayGainObjectAware
 (
         octomap::point3d const & camera,

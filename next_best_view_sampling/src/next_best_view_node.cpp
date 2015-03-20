@@ -404,7 +404,8 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
     double inclination_max =  m_camera_constraints.vfov / 2.0;
     double ray_length = m_camera_constraints.range_max - m_camera_range_tolerance;
     // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment = std::acos(1 - (std::pow(m_resolution, 2) / (2.0 * std::pow(ray_length, 2))));
+    double angle_increment = std::acos(1.0 - (std::pow(m_resolution, 2) /
+                                              (2.0 * std::pow(m_camera_constraints.range_max, 2))));
 
     // fill roi_cell_counts of answer
     unsigned int roi_cell_count = roi.cellCount();

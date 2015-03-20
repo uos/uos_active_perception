@@ -98,7 +98,7 @@ NextBestViewNode::NextBestViewNode() :
                                        &NextBestViewNode::loadMapCb,
                                        this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 10000))
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 20000))
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.04);
     m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.01);

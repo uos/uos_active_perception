@@ -82,7 +82,18 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                                               CameraConstraints const & camera_constraints)
 {
     // update occupancy map
-    m_occupancy_map.insertPointCloud(scan, octomap::point3d(0, 0, 0), scan_pose, camera_constraints.range_max, true);
+    octomap::KeySet touched_keys;
+    for(octomap::Pointcloud::const_iterator it = scan.begin(); it != scan.end(); ++it)
+    {
+        double dist = it->norm();
+        if(camera_constraints.range_min < dist && dist < camera_constraints.range_max)
+        {
+            octomap::point3d p = scan_pose.transform(*it);
+            m_occupancy_map.updateNode(p, true, true);
+            touched_keys.insert(m_occupancy_map.coordToKey(p));
+        }
+    }
+
     // Detect space that should have been seen but was not (exceeding sensor max range).
     // This space is assumed to be empty and updated in the occupancy map.
     double azimuth_min = -camera_constraints.hfov / 2.0;
@@ -106,12 +117,9 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
                 ray.distanceFromOrigin() < camera_constraints.range_max;
                 ray.next())
             {
-                if(octomap::OcTreeNode* node_ptr = m_occupancy_map.search(ray.getKey()))
+                if(touched_keys.count(ray.getKey()))
                 {
-                    if(m_occupancy_map.isNodeOccupied(node_ptr))
-                    {
-                        break;
-                    }
+                    break;
                 }
                 else
                 {

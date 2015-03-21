@@ -93,6 +93,7 @@ public:
     visualization_msgs::Marker genOccupancyMarker() const;
     visualization_msgs::Marker genFringeMarker() const;
     bool serializeToFiles(const std::string & prefix);
+    double rayAngleStep(const double & range) const;
 
 private:
     static const std::string F_OCCUPANCY_MAP, F_FRINGE_MAP;

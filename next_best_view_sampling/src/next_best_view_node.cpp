@@ -404,10 +404,7 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
     double azimuth_max =  m_camera_constraints.hfov / 2.0;
     double inclination_min = -m_camera_constraints.vfov / 2.0;
     double inclination_max =  m_camera_constraints.vfov / 2.0;
-    double ray_length = m_camera_constraints.range_max - m_camera_range_tolerance;
-    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment = std::acos(1.0 - (std::pow(m_resolution, 2) /
-                                              (2.0 * std::pow(m_camera_constraints.range_max, 2))));
+    double angle_increment = map.rayAngleStep(m_camera_constraints.range_max);
 
     // fill roi_cell_counts of answer
     unsigned int roi_cell_count = roi.cellCount();
@@ -448,9 +445,8 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
                 {
                     continue;
                 }
-                tf::Vector3 ray_end_in_cam(ray_length * std::cos(azimuth),
-                                           ray_length * std::sin(azimuth),
-                                           ray_length * std::sin(inclination));
+                tf::Vector3 ray_end_in_cam = CameraConstraints::sphericalToCartesian(
+                                             m_camera_constraints.range_max, inclination, azimuth);
                 octomap::point3d ray_end = octomap::pointTfToOctomap(sample(ray_end_in_cam));
                 map.estimateRayGainObjectAware(cam_point, ray_end, roi, object_boxes, object_sets, discovery_field);
             }
@@ -460,10 +456,10 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
         // Fetch target point
         octomap::point3d target_point_octomap;
         map.getOccupancyMap().castRay(cam_point,
-                                      octomap::pointTfToOctomap(sample(tf::Vector3(ray_length, 0.0, 0.0))) - cam_point,
+                                      octomap::pointTfToOctomap(sample(tf::Vector3(1.0, 0.0, 0.0))) - cam_point,
                                       target_point_octomap,
                                       true,
-                                      ray_length);
+                                      m_camera_constraints.range_max);
 
         // Write pose candidate to answer
         geometry_msgs::Pose camera_pose_msg;
@@ -803,8 +799,6 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
 
     // Publish camera constraint marker
     {
-        using std::cos;
-        using std::sin;
         visualization_msgs::Marker marker;
         marker.type = visualization_msgs::Marker::LINE_LIST;
         marker.action = visualization_msgs::Marker::ADD;
@@ -818,16 +812,16 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
         double td = m_camera_constraints.vfov / 2.0;
         geometry_msgs::Point p;
         marker.points.push_back(geometry_msgs::Point());
-        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(-lr), sin(-lr), sin(-td)), p);
+        tf::pointTFToMsg(CameraConstraints::sphericalToCartesian(m_camera_constraints.range_max,  td,  lr), p);
         marker.points.push_back(p);
         marker.points.push_back(geometry_msgs::Point());
-        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(-lr), sin(-lr), sin(td)), p);
+        tf::pointTFToMsg(CameraConstraints::sphericalToCartesian(m_camera_constraints.range_max, -td,  lr), p);
         marker.points.push_back(p);
         marker.points.push_back(geometry_msgs::Point());
-        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(lr), sin(lr), sin(-td)), p);
+        tf::pointTFToMsg(CameraConstraints::sphericalToCartesian(m_camera_constraints.range_max,  td, -lr), p);
         marker.points.push_back(p);
         marker.points.push_back(geometry_msgs::Point());
-        tf::pointTFToMsg(m_camera_constraints.range_max * tf::Vector3(cos(lr), sin(lr), sin(td)), p);
+        tf::pointTFToMsg(CameraConstraints::sphericalToCartesian(m_camera_constraints.range_max, -td, -lr), p);
         marker.points.push_back(p);
         m_marker_pub.publish(marker);
     }

@@ -100,18 +100,14 @@ void ActivePerceptionMap::integratePointCloud(octomap::Pointcloud const & scan,
     double azimuth_max =  camera_constraints.hfov / 2.0;
     double inclination_min = -camera_constraints.vfov / 2.0;
     double inclination_max =  camera_constraints.vfov / 2.0;
-    // Find the right discretization of ray angles so that each octree voxel at max range is hit by one ray.
-    double angle_increment =
-            std::acos(1.0 - (std::pow(m_occupancy_map.getResolution(), 2) /
-                             (2.0 * std::pow(camera_constraints.range_max, 2))));
-    octomath::Vector3 scan_origin = scan_pose.trans();
+    double angle_increment = rayAngleStep(camera_constraints.range_max);
+    octomath::Vector3 scan_origin = octomap::pointTfToOctomap(camera_pose.getOrigin());
     for(double azimuth = azimuth_min; azimuth <= azimuth_max; azimuth += angle_increment)
     {
         for(double inclination = inclination_min; inclination <= inclination_max; inclination += angle_increment)
         {
-            tf::Vector3 ray_end_in_cam(camera_constraints.range_max * std::cos(azimuth),
-                                       camera_constraints.range_max * std::sin(azimuth),
-                                       camera_constraints.range_max * std::sin(inclination));
+            tf::Vector3 ray_end_in_cam = CameraConstraints::sphericalToCartesian(
+                                         camera_constraints.range_max, inclination, azimuth);
             octomath::Vector3 ray_dir = octomap::pointTfToOctomap(camera_pose(ray_end_in_cam)) - scan_origin;
             for(RayIterator ray(m_occupancy_map, scan_origin, ray_dir);
                 ray.distanceFromOrigin() < camera_constraints.range_max;
@@ -548,6 +544,12 @@ std::vector<octomap::OcTreeKey> ActivePerceptionMap::getBoundaryVoxels
     }
 
     return boundary;
+}
+
+/** Find the right discretization of ray angles so that each octree voxel at range is hit by one ray. */
+double ActivePerceptionMap::rayAngleStep(const double & range) const
+{
+    return std::acos(1.0 - (std::pow(m_occupancy_map.getResolution(), 2) / (2.0 * std::pow(range, 2))));
 }
 
 void ActivePerceptionMap::deleteMapVolume

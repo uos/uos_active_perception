@@ -37,6 +37,8 @@
 #ifndef CAMERA_CONSTRAINTS_H
 #define CAMERA_CONSTRAINTS_H
 
+#include <tf/transform_datatypes.h>
+
 #include <string>
 
 struct CameraConstraints
@@ -64,6 +66,12 @@ struct CameraConstraints
   , range_max(0.0)
   , roll(0.0)
   {}
+
+  static tf::Vector3 sphericalToCartesian(const double & range, const double & elevation, const double & azimuth)
+  {
+      using namespace std;
+      return range * tf::Vector3(cos(elevation) * cos(azimuth), cos(elevation) * sin(azimuth), sin(elevation));
+  }
 };
 
 #endif // CAMERA_CONSTRAINTS_H

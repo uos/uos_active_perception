@@ -178,7 +178,7 @@ private:
         }
 
         // Test for goal state (pdone_goal condition)
-        if(pdone >= pdone_goal) {
+        if(pdone > pdone_goal) {
             best_sequence = sequence;
             best_etime = etime;
             best_pdone = pdone;

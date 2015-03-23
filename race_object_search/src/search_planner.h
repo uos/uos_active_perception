@@ -22,12 +22,19 @@ public:
         , opc(opc)
     {}
 
+    /** Get view pose sequence from last planning operation */
+    std::vector<size_t> getSequence() { return best_sequence; }
+
+    /** Get success probability from last planning operation */
+    double getPdone() { return best_pdone; }
+
+    /** Get expected run time from last planning operation */
+    double getEtime() { return best_etime; }
+
     bool makePlan(size_t const arg_depth_limit,
                   double const arg_pdone_goal,
                   double const arg_max_rel_branch_cost,
-                  long const timeout_msecs,
-                  std::vector<size_t> & result_sequence,
-                  double & result_etime)
+                  long const timeout_msecs)
     {
         opc_subset.resize(opc.getPoses().size());
         for(size_t i = 0; i < opc_subset.size(); ++i) {
@@ -50,27 +57,19 @@ public:
         best_sequence.clear();
         best_etime = std::numeric_limits<double>::infinity();
 
-        std::cout << "Starting recursive search..." << std::endl;
-        bool finished = makePlanRecursive(0, 0.0, 0.0);
-
-        result_sequence = best_sequence;
-        result_etime = best_etime;
-        return finished;
+        return makePlanRecursive(0, 0.0, 0.0);
     }
 
-    bool makeGreedy(std::vector<size_t> & result_sequence,
-                    double & result_etime)
+    bool makeGreedy()
     {
-        return makePlan(0, 1.0, 2.0, 0, result_sequence, result_etime);
+        return makePlan(0, 1.0, 2.0, 0);
     }
 
     bool optimalOrder(size_t const arg_depth_limit,
                       double const arg_pdone_goal,
                       double const arg_max_rel_branch_cost,
                       long const timeout_msecs,
-                      std::vector<size_t> const & input_sequence,
-                      std::vector<size_t> & result_sequence,
-                      double & result_etime)
+                      std::vector<size_t> const & input_sequence)
     {
         opc_subset.clear();
         opc_subset.insert(opc_subset.end(), input_sequence.begin() + 1, input_sequence.end());
@@ -92,11 +91,7 @@ public:
         best_etime = std::numeric_limits<double>::infinity();
 
         std::cout << "Starting recursive optimal ordering..." << std::endl;
-        bool finished = makePlanRecursive(0, 0.0, 0.0);
-
-        result_sequence = best_sequence;
-        result_etime = best_etime;
-        return finished;
+        return makePlanRecursive(0, 0.0, 0.0);
     }
 
 private:
@@ -169,6 +164,7 @@ private:
     std::vector<size_t> sequence;
     std::vector<size_t> best_sequence;
     double best_etime;
+    double best_pdone;
     double max_rel_branch_cost;
     boost::posix_time::ptime timeout;
 
@@ -185,7 +181,7 @@ private:
         if(pdone >= pdone_goal) {
             best_sequence = sequence;
             best_etime = etime;
-            std::cout << "found new optimum with etime " << etime << std::endl;
+            best_pdone = pdone;
             return true;
         }
 
@@ -210,7 +206,7 @@ private:
         if(memory[stage].expansion_map.empty()) {
             best_sequence = sequence;
             best_etime = etime;
-            std::cout << "found new optimum with etime " << etime << std::endl;
+            best_pdone = pdone;
             return true;
         }
 

@@ -430,12 +430,11 @@ private:
                 ROS_INFO("entering planning phase (search)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
-                double etime;
                 bool finished = spl.makePlan(m_depth_limit,
                                              pdone_goal * m_relative_lookahead,
                                              m_max_rel_branch_cost,
-                                             m_planning_timeout * 1000,
-                                             plan, etime);
+                                             m_planning_timeout * 1000);
+                plan = spl.getSequence();
                 if(!finished)
                 {
                     logerror("planning timed out");
@@ -445,13 +444,13 @@ private:
             {
                 ROS_INFO("entering planning phase (greedy-reorder)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
-                double etime;
-                spl.makeGreedy(plan, etime);
+                spl.makeGreedy();
                 bool finished = spl.optimalOrder(m_depth_limit,
                                                  success_probability * m_relative_lookahead,
                                                  m_max_rel_branch_cost,
                                                  m_planning_timeout * 1000,
-                                                 plan, plan, etime);
+                                                 spl.getSequence());
+                plan = spl.getSequence();
                 if(!finished)
                 {
                     logerror("planning timed out");

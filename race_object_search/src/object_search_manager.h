@@ -440,6 +440,27 @@ private:
                     logerror("planning timed out");
                 }
             }
+            else if(m_planning_mode == "id")
+            {
+                ROS_INFO("entering planning phase (iterative deepening)");
+                ros::WallTime endtime = t0 + ros::WallDuration(m_planning_timeout);
+                SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
+                double pdone_goal = 0.0;
+                double max_pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
+                size_t depth = 0;
+                double remaining_time = (endtime - ros::WallTime::now()).toSec();
+                while(pdone_goal < max_pdone_goal && remaining_time > 0)
+                {
+                    if(spl.makePlan(depth, pdone_goal, m_max_rel_branch_cost, remaining_time * 1000))
+                    {
+                        plan = spl.getSequence();
+                        if(spl.getPdone() <= pdone_goal) break;
+                    }
+                    pdone_goal = spl.getPdone();
+                    ++depth;
+                    remaining_time = (endtime - ros::WallTime::now()).toSec();
+                }
+            }
             else if(m_planning_mode == "greedy-reorder")
             {
                 ROS_INFO("entering planning phase (greedy-reorder)");
@@ -471,6 +492,7 @@ private:
             }
 
             // log and publish some plan details
+            logval("plan_size", plan.size());
             SearchPlan<RegionalProbabilityCellGain> sp(rpcg, opc);
             sp.pushSequence(plan, 1, plan.size());
             sp.deleteMarker(m_world_frame_id, m_marker_pub, "plan", marker_count);

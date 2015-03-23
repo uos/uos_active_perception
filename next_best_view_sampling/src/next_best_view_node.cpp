@@ -791,7 +791,7 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
         #if(PUB_FRINGE_NORMAL_MARKERS)
         for(size_t i = 0; i < active_fringe.size(); ++i)
         {
-            active_fringe_normals.push_back(m_perception_map.getFringeNormal(active_fringe[i], last_roi));
+            active_fringe_normals.push_back(m_perception_map->getFringeNormal(active_fringe[i], last_roi));
         }
         #endif
         pubActiveFringe(active_fringe, active_fringe_normals);

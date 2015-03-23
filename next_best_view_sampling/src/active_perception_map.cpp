@@ -316,13 +316,14 @@ void ActivePerceptionMap::estimateRayGainObjectAware
 octomath::Vector3 ActivePerceptionMap::getFringeNormal(octomap::point3d const & p, OcTreeBoxSet const & roi)
 {
     octomap::OcTreeKey key = m_occupancy_map.coordToKey(p);
-    octomap::point3d roi_sum(0.0, 0.0, 0.0);
+    octomap::point3d roi_sum = p;
     octomap::point3d outside_sum(0.0, 0.0, 0.0);
-    size_t roi_n = 0;
+    size_t roi_n = 1;
     size_t outside_n = 0;
     for(int i = -1; i <= 1; ++i) for(int j = -1; j <= 1; ++j) for(int k = -1; k <= 1; ++k)
     {
         octomap::OcTreeKey neighbor(key[0]+i, key[1]+j, key[2]+k);
+        if(neighbor == key) continue;
         octomap::OcTreeNode * nnode = m_occupancy_map.search(neighbor);
         if(nnode)
         {
@@ -347,7 +348,6 @@ octomath::Vector3 ActivePerceptionMap::getFringeNormal(octomap::point3d const & 
         }
     }
     assert(outside_n > 0);
-    assert(roi_n > 0);
     return (outside_sum * (1.0 / outside_n)) - (roi_sum * (1.0 / roi_n));
 }
 

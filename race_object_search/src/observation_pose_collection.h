@@ -120,6 +120,12 @@ public:
 
     bool sanityCheck()
     {
+        if(m_initial_travel_time_lut.size() != m_observation_poses.size()
+           || m_travel_time_lut.size() < getTtLutIdx(m_observation_poses.size(), 0))
+        {
+            ROS_ERROR("Sanity check failed (TT LUT Dimensions)");
+        }
+
         size_t ii, jj, kk;
         double failtime = 0.0;
         for(size_t i = 0; i < m_observation_poses.size(); ++i)
@@ -174,26 +180,35 @@ public:
         return all;
     }
 
-    /** Remove target pose, set initial tt lut to start there, and keep all lookups intact */
-    void setCurrentPose(size_t rm)
+    void clearPoses()
     {
-        // Update pose set and initial tt
-        std::vector<ObservationPose> oldposes = m_observation_poses;
         m_observation_poses.clear();
+    }
+
+    /** Remove target pose, set initial tt lut to start there, and keep all lookups intact.
+      * Returns a vector of poses to be reevaluated and then reinserted to match up with travel time lookups.
+      * Leaves the internal pose set empty.
+      */
+    std::vector<geometry_msgs::Pose> setCurrentPose(size_t rm)
+    {
+        // Update initial tt and generate poses for reevaluation
+        std::vector<geometry_msgs::Pose> newposes;
         m_initial_travel_time_lut.clear();
         std::vector<size_t> oldidx;
-        for(size_t i = 0; i < oldposes.size(); ++i)
+        for(size_t i = 0; i < m_observation_poses.size(); ++i)
         {
             if(i != rm)
             {
-                m_observation_poses.push_back(oldposes[i]);
+                geometry_msgs::Pose p;
+                tf::poseTFToMsg(m_observation_poses[i].pose, p);
+                newposes.push_back(p);
                 m_initial_travel_time_lut.push_back(getTravelTime(rm, i));
                 oldidx.push_back(i);
             }
         }
         // Update tt lut for new indices
         std::vector<double> new_tt_lut = m_travel_time_lut;
-        for(size_t i = 0; i < m_observation_poses.size(); ++i)
+        for(size_t i = 0; i < newposes.size(); ++i)
         {
             for(size_t k = 0; k < i; ++k)
             {
@@ -201,6 +216,8 @@ public:
             }
         }
         m_travel_time_lut = new_tt_lut;
+        m_observation_poses.clear();
+        return newposes;
     }
 
     /** Serializes poses and lookups to three files */
@@ -220,9 +237,7 @@ public:
     bool loadSerializedLookups(const std::string & path)
     {
         if(ros_serialization_helper::readSerialized(path + F_INITIAL_TT, m_initial_travel_time_lut)
-           && ros_serialization_helper::readSerialized(path + F_TT_LUT, m_travel_time_lut)
-           && m_initial_travel_time_lut.size() == m_observation_poses.size()
-           && m_travel_time_lut.size() >= getTtLutIdx(m_observation_poses.size(), 0))
+           && ros_serialization_helper::readSerialized(path + F_TT_LUT, m_travel_time_lut))
         {
             return true;
         }

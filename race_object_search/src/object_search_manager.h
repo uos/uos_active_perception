@@ -220,9 +220,23 @@ private:
         // persistence buffers
         std::vector<geometry_msgs::Pose> persistent_samples;
         ObservationPoseCollection opc;
-        if(!m_ps_dir.empty())
+        if(m_use_static_poses)
         {
             persistent_samples = ObservationPoseCollection::deserializePoses(m_ps_dir);
+            if(!persistent_samples.empty())
+            {
+                if(opc.loadSerializedLookups(m_ps_dir))
+                {
+                    ROS_INFO_STREAM("Starting with " << persistent_samples.size() << " persistent samples.");
+                }
+                else
+                {
+                    ROS_ERROR("Found persistent samples but no persistent lookup tables. Bailing out.");
+                    m_observe_volumes_server.setAborted();
+                    return;
+                }
+            }
+
         }
 
         // Unknown cell tracking
@@ -307,6 +321,7 @@ private:
             const tf::Pose robot_pose = m_agent.getCurrentRobotPose();
             const tf::Pose cam_pose = m_agent.getCurrentCamPose();
 
+            opc.clearPoses();
             t0 = ros::WallTime::now();
             if(!persistent_samples.empty())
             {
@@ -390,7 +405,7 @@ private:
                 opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
                 logtime("mutual_tt_lut_time", t0);
 
-                if(!m_ps_dir.empty())
+                if(m_use_static_poses)
                 {
                     opc.serializeToFiles(m_ps_dir);
                     ROS_INFO_STREAM("Set " << opc.getPoses().size() << " persistent samples.");
@@ -534,9 +549,9 @@ private:
             // save expected view
             expected_view = opc.getPoses()[best_pose_idx].cell_id_sets[0];
 
-            // save all poses that are part of the current plan.
+            // save all poses that are part of the current plan (not necessary if using static poses).
             // index 0 is initial pose, index 1 is current target, so save poses beginning from index 2.
-            if(m_keep_planned_poses && plan.size() > 2)
+            if(!m_use_static_poses && m_keep_planned_poses && plan.size() > 2)
             {
                 persistent_samples.resize(plan.size() - 2);
                 for(size_t i = 2; i < plan.size(); ++i)
@@ -545,8 +560,11 @@ private:
                 }
             }
 
-            // update opc
-            opc.setCurrentPose(best_pose_idx);
+            // if using static poses, update opc and make all samples persistent for the next iteration
+            if(m_use_static_poses)
+            {
+                persistent_samples = opc.setCurrentPose(best_pose_idx);
+            }
 
             m_file_events.flush();
             m_file_vals.flush();

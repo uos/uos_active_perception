@@ -89,12 +89,12 @@ NextBestViewNode::NextBestViewNode() :
                                        "/reset_volumes",
                                        &NextBestViewNode::resetVolumesCb,
                                        this)),
-    m_write_map_server(m_node_handle_pub.advertiseService(
-                                       "/write_map",
+    m_write_map_server(m_node_handle.advertiseService(
+                                       "write_map",
                                        &NextBestViewNode::saveMapCb,
                                        this)),
-    m_load_map_server(m_node_handle_pub.advertiseService(
-                                       "/load_map",
+    m_load_map_server(m_node_handle.advertiseService(
+                                       "load_map",
                                        &NextBestViewNode::loadMapCb,
                                        this)),
     m_tf_listener(),

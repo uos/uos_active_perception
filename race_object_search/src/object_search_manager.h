@@ -307,9 +307,21 @@ private:
             if(iteration_counter > 0)
             {
                 logval("gain", gain);
+                double imissed = 1.0;
+                for(detection_t::iterator it = expected_view.begin(); it != expected_view.end(); ++it)
+                {
+                    imissed *= 1.0 - rpcg(*it);
+                }
+                logval("missed", 1.0 - imissed);
+                pubMarker(expected_view, "missed_cells", 1.0, 0.0, 1.0, 0.5);
+                double iunexpected = 1.0;
+                for(detection_t::iterator it = unexpected_cells.begin(); it != unexpected_cells.end(); ++it)
+                {
+                    iunexpected *= 1.0 - rpcg(*it);
+                }
+                logval("unexpected", 1.0 - iunexpected);
+                pubMarker(unexpected_cells, "unexpected_cells", 0.0, 1.0, 0.0, 0.5);
             }
-            pubMarker(expected_view, "missed_cells", 1.0, 0.0, 1.0, 0.5);
-            pubMarker(unexpected_cells, "unexpected_cells", 0.0, 1.0, 0.0, 0.5);
 
             iteration_counter++;
             m_file_events << iteration_counter << std::endl;

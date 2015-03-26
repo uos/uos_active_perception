@@ -121,7 +121,7 @@ public:
     bool sanityCheck()
     {
         if(m_initial_travel_time_lut.size() != m_observation_poses.size()
-           || m_travel_time_lut.size() < getTtLutIdx(m_observation_poses.size(), 0))
+           || (m_observation_poses.size() > 0 && m_travel_time_lut.size() < getTtLutIdx(m_observation_poses.size(), 0)))
         {
             ROS_ERROR("Sanity check failed (TT LUT Dimensions)");
         }

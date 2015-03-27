@@ -177,10 +177,12 @@ def base(gui=True):
     evman.initRviz(gui)
     signal.pause()
 
-def iros0215_nomap(N=20, gui=False):
-    script = "iros0215_nomap"
-    print "*** %s ***" % script
-    scriptdir = "%s/%s" % (os.getcwd(), script)
+def runtrials_nomap(name, configs, N=20, gui=False):
+    """
+    configs = [(name, search_kwargs, test_kwargs), ...]
+    """
+    print "*** %s ***" % name
+    scriptdir = "%s/%s" % (os.getcwd(), name)
     if os.path.exists(scriptdir):
         print "WARNING: directory %s already exists, skipping script" % scriptdir
         return False
@@ -189,30 +191,19 @@ def iros0215_nomap(N=20, gui=False):
     for n in range(N):
         psd = "%s/psd" % scriptdir
         os.mkdir(psd)
-        # --- GREEDY ---
-        print "# Evaluating n=%i greedy" % n
-        logdir = "%s/greedy_%i" % (scriptdir, n)
-        os.mkdir(logdir)
-        evman.initBaseSystem(gui)
-        evman.initRviz(gui)
-        xypose = evman.setCamera()
-        evman.initMapping(logdir)
-        evman.initSearchMan(psd=psd, pm="search", dl=0, log=logdir)
-        evman.recordRosbag(logdir)
-        evman.runTest()
-        evman.shutdown()
-        # --- PLANNING ---
-        print "# Evaluating n=%i planning" % n
-        logdir = "%s/planning_%i" % (scriptdir, n)
-        os.mkdir(logdir)
-        evman.initBaseSystem(gui)
-        evman.initRviz(gui)
-        evman.setCamera(xypose)
-        evman.initMapping(logdir)
-        evman.initSearchMan(psd=psd, pm="search", dl=50, la=0.8, bl=1.5, log=logdir)
-        evman.recordRosbag(logdir)
-        evman.runTest()
-        evman.shutdown()
+        xypose = None
+        for cname, search_kwargs, test_kwargs in configs:
+            print "# Evaluating n=%i %s" % (n, cname)
+            logdir = "%s/%s_%i" % (scriptdir, cname, n)
+            os.mkdir(logdir)
+            evman.initBaseSystem(gui)
+            evman.initRviz(gui)
+            xypose = evman.setCamera(xypose)
+            evman.initMapping(logdir)
+            evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
+            evman.recordRosbag(logdir)
+            evman.runTest(**test_kwargs)
+            evman.shutdown()
         # --- CLEANUP ---
         try:
             shutil.rmtree(psd)
@@ -221,10 +212,12 @@ def iros0215_nomap(N=20, gui=False):
     evman.shutdown()
     return True
 
-def iros0215_withmap(N=20, gui=False):
-    script = "iros0215_withmap"
-    print "*** %s ***" % script
-    scriptdir = "%s/%s" % (os.getcwd(), script)
+def runtrials_withmap(name, configs, N=20, gui=False):
+    """
+    configs = [(name, search_kwargs, test_kwargs), ...]
+    """
+    print "*** %s ***" % name
+    scriptdir = "%s/%s" % (os.getcwd(), name)
     if os.path.exists(scriptdir):
         print "WARNING: directory %s already exists, skipping script" % scriptdir
         return False
@@ -241,30 +234,19 @@ def iros0215_withmap(N=20, gui=False):
     for n in range(N):
         psd = "%s/psd" % scriptdir
         os.mkdir(psd)
-        # --- GREEDY ---
-        print "# Evaluating n=%i greedy" % n
-        logdir = "%s/greedy_%i" % (scriptdir, n)
-        os.mkdir(logdir)
-        evman.resetGzworld()
-        xypose = evman.setCamera()
-        evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
-        evman.initSearchMan(psd=psd, pm="search", dl=0, log=logdir)
-        evman.recordRosbag(logdir)
-        evman.runTest()
-        evman.stopRosbag()
-        evman.stopSearchMan()
-        # --- PLANNING ---
-        print "# Evaluating n=%i planning" % n
-        logdir = "%s/planning_%i" % (scriptdir, n)
-        os.mkdir(logdir)
-        evman.resetGzworld()
-        evman.setCamera(xypose)
-        evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
-        evman.initSearchMan(psd=psd, pm="search", dl=50, la=0.8, bl=1.5, log=logdir)
-        evman.recordRosbag(logdir)
-        evman.runTest()
-        evman.stopRosbag()
-        evman.stopSearchMan()
+        xypose = None
+        for cname, search_kwargs, test_kwargs in configs:
+            print "# Evaluating n=%i %s" % (n, cname)
+            logdir = "%s/%s_%i" % (scriptdir, cname, n)
+            os.mkdir(logdir)
+            evman.resetGzworld()
+            xypose = evman.setCamera(xypose)
+            evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
+            evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
+            evman.recordRosbag(logdir)
+            evman.runTest(**test_kwargs)
+            evman.stopRosbag()
+            evman.stopSearchMan()
         # --- CLEANUP ---
         try:
             shutil.rmtree(psd)
@@ -272,6 +254,20 @@ def iros0215_withmap(N=20, gui=False):
             print "WARNING: Expected to see persistent_samples, but there were none!"
     evman.shutdown()
     return True
+
+def iros0215_nomap(N=20, gui=False):
+    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5}, {})]
+    return runtrials_nomap("iros0215_nomap", configs, N=N, gui=gui)
+
+def iros0215_withmap(N=20, gui=False):
+    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5}, {})]
+    return runtrials_withmap("iros0215_withmap", configs, N=N, gui=gui)
+
+def only_id_1(N=20, gui=False):
+    configs = [("id", {"pm":"id", "bl":2.0, "to":10}, {})]
+    return runtrials_withmap("only_id_1", configs, N=N, gui=gui)
 
 def main():
     gui = False
@@ -291,6 +287,10 @@ def main():
             n = int(sys.argv[i])
             i += 1
             iros0215_withmap(N=n, gui=gui)
+        elif arg == "only_id_1":
+            n = int(sys.argv[i])
+            i += 1
+            only_id_1(N=n, gui=gui)
         else:
             print "UNKNOWN COMMAND:", arg
 

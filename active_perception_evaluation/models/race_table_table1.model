@@ -1,0 +1,133 @@
+<gazebo version="1.0">
+  <model name="race_table_70x70" static="true">
+  <!-- real table height: 0.73 m to table surface -->
+  <link name="surface">
+    <inertial mass="15.0">
+      <inertia ixx="0.2134666666666667" ixy="0" ixz="0" iyy="0.2666666666666667" iyz="0" izz="0.053466666666666676"/>
+    </inertial>
+    <!--<origin pose="0 0 0.71 0 0 0"/>-->
+    <origin pose="0 0 0.66 0 0 0"/>
+
+    <collision name="collision">
+      <!--<origin pose="0 0 -0.295 0 0 0"/>-->
+      <geometry>
+        <!--<box size="0.7 0.7 0.04"/>-->
+        <box size="0.7 0.7 0.14"/>
+        <!--<box size="0.7 0.7 0.73"/>-->
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <geometry>
+        <!--<box size="0.7 0.7 0.04"/>-->
+        <box size="0.7 0.7 0.14"/>
+      </geometry>
+      <!--<material script="Gazebo/Wood"/>-->
+      <material script="Gazebo/White"/>
+    </visual>
+  </link>
+
+  <joint name="front_left_leg_joint" type="revolute">
+    <parent link="surface"/>
+    <child link="front_left_leg"/>
+    <axis xyz="0 0 1">
+      <limit lower="0.0000" upper="0.0000"/>
+    </axis>
+  </joint>
+
+  <link name="front_left_leg">
+    <inertial mass="1.0">
+      <inertia ixx="0.038633333" ixy="0" ixz="0" iyy="0.038633333" iyz="0" izz="0.0002"/>
+    </inertial>
+    <origin pose="0.33 0.33 0.35 0 0 0"/>
+    <collision name="collision">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+      <material script="Gazebo/Grey"/>
+    </visual>
+  </link>
+
+  <joint name="front_right_leg_joint" type="revolute">
+    <parent link="surface"/>
+    <child link="front_right_leg"/>
+    <axis xyz="0 0 1">
+      <limit lower="0.0000" upper="0.0000"/>
+    </axis>
+  </joint>
+
+  <link name="front_right_leg">
+    <inertial mass="1.0">
+      <inertia ixx="0.038633333" ixy="0" ixz="0" iyy="0.038633333" iyz="0" izz="0.0002"/>
+    </inertial>
+    <origin pose="0.33 -0.33 0.35 0 0 0"/>
+    <collision name="collision">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+      <material script="Gazebo/Grey"/>
+    </visual>
+  </link>
+
+  <joint name="back_right_leg_joint" type="revolute">
+    <parent link="surface"/>
+    <child link="back_right_leg"/>
+    <axis xyz="0 0 1">
+      <limit lower="0.0000" upper="0.0000"/>
+    </axis>
+  </joint>
+
+  <link name="back_right_leg">
+    <inertial mass="1.0">
+      <inertia ixx="0.038633333" ixy="0" ixz="0" iyy="0.038633333" iyz="0" izz="0.0002"/>
+    </inertial>
+    <origin pose="-0.33 -0.33 0.35 0 0 0"/>
+    <collision name="collision">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+      <material script="Gazebo/Grey"/>
+    </visual>
+  </link>
+
+  <joint name="back_left_leg_joint" type="revolute">
+    <parent link="surface"/>
+    <child link="back_left_leg"/>
+    <axis xyz="0 0 1">
+      <limit lower="0.0000" upper="0.0000"/>
+    </axis>
+  </joint>
+
+  <link name="back_left_leg">
+    <inertial mass="1.0">
+      <inertia ixx="0.038633333" ixy="0" ixz="0" iyy="0.038633333" iyz="0" izz="0.0002"/>
+    </inertial>
+    <origin pose="-0.33 0.33 0.35 0 0 0"/>
+    <collision name="collision">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+    </collision>
+    <visual name="visual">
+      <geometry>
+        <cylinder radius="0.02" length="0.70"/>
+      </geometry>
+      <material script="Gazebo/Grey"/>
+    </visual>
+  </link>
+</model>
+</gazebo>

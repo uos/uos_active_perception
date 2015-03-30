@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="ns" default="false"/>
+  <arg name="namespace" default=""/> <!--Has to include the '/' at the beginning!!-->
+  <arg name="chair1" default="true" />
+  <arg name="chair4" default="true" />
+  <!--Environment objects-->
+
+  <!--Tables-->
+  <param name="table_description" textfile="$(find active_perception_evaluation)/models/race_table2.model" />
+  <param name="table_description_70x70" textfile="$(find active_perception_evaluation)/models/race_table_70x70.model" />
+  <param name="table_description_table1" textfile="$(find active_perception_evaluation)/models/race_table_table1.model" />
+  <param name="table_description_140x70" textfile="$(find active_perception_evaluation)/models/race_table_140x70.model" />
+  <param name="table_description_counter1" textfile="$(find active_perception_evaluation)/models/race_table_counter1.model" />
+
+  <node name="spawn_table4" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description_140x70 -gazebo_namespace $(arg namespace)/gazebo -x -5.88 -y 5.19 -z 0.001 -Y 0.00 -model race_table4" respawn="false" output="screen" />
+  <node name="spawn_table6" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description -gazebo_namespace $(arg namespace)/gazebo -x -0.54 -y 4.79 -z 0.001 -Y 1.57 -model race_table6" respawn="false" output="screen" />
+  <node name="spawn_table7" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description -gazebo_namespace $(arg namespace)/gazebo -x -1.36 -y 4.79 -z 0.001 -Y 1.57 -model race_table7" respawn="false" output="screen" />
+  <node name="spawn_table8" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description_140x70 -gazebo_namespace $(arg namespace)/gazebo -x -4.46 -y 5.19 -z 0.001 -Y 0.00 -model race_table8" respawn="false" output="screen" />
+
+  <!--Counter-->
+  <node name="spawn_counter1" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description_counter1 -gazebo_namespace $(arg namespace)/gazebo -x -6.98 -y -0.13 -z 0.001 -Y 1.57 -model race_counter1" respawn="false" output="screen" />
+  <!--Table 1-->
+  <node name="spawn_table1" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description_table1 -gazebo_namespace $(arg namespace)/gazebo -x -4.55 -y 1.29 -z 0.001 -Y 1.57 -model race_table1" respawn="false" output="screen" />
+  <!--Table 2-->
+  <node name="spawn_table2" pkg="gazebo" type="spawn_model" args="-gazebo -param table_description_table1 -gazebo_namespace $(arg namespace)/gazebo -x -2.00 -y 1.29 -z 0.001 -Y 1.57 -model race_table2" respawn="false" output="screen" />
+
+  <!--Chairs-->
+  <param name="chair_description" textfile="$(find active_perception_evaluation)/models/race_chair1.model" />
+
+  <node if="$(arg chair1)" name="spawn_chair1" pkg="gazebo" type="spawn_model" args="-gazebo -param chair_description -gazebo_namespace $(arg namespace)/gazebo -x -5.23 -y 1.23 -z 0.001 -Y 1.57 -model race_chair1" respawn="false" output="screen" />
+  <node name="spawn_chair2" pkg="gazebo" type="spawn_model" args="-gazebo -param chair_description -gazebo_namespace $(arg namespace)/gazebo -x -3.96 -y 1.22 -z 0.001 -Y -1.57 -model 	race_chair2" respawn="false" output="screen" />
+  <node  name="spawn_chair3" pkg="gazebo" type="spawn_model" args="-gazebo -param chair_description -gazebo_namespace $(arg namespace)/gazebo -x -2.04 -y 1.86 -z 0.001 -Y 0.00 -model race_chair3" respawn="false" output="screen" />
+  <node if="$(arg chair4)" name="spawn_chair4" pkg="gazebo" type="spawn_model" args="-gazebo -param chair_description -gazebo_namespace $(arg namespace)/gazebo -x -2.06 -y 0.60 -z 0.001 -Y 3.14 -model race_chair4" respawn="false" output="screen" />
+
+  <!--Boards-->
+  <param name="board_description" textfile="$(find active_perception_evaluation)/models/race_board.model" />
+  <node name="spawn_board1" pkg="gazebo" type="spawn_model" args="-gazebo -param board_description -gazebo_namespace $(arg namespace)/gazebo -x -4.60 -y 3.70 -z 0.001 -Y 0.00 -model race_board1" respawn="false" output="screen" />
+
+</launch>

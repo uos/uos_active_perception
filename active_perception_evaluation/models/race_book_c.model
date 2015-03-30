@@ -1,0 +1,26 @@
+<gazebo version="1.0">
+<model name="race_bookTest1_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <inertial mass="0.4">
+      <origin pose="0 0 0.085 0 0 0"/>
+      <inertia ixx="0.001088333" ixy="0" ixz="0" iyy="0.001424166" iyz="0" izz="0.000470833"/>
+    </inertial>
+    <collision name="geom">
+      <origin pose="0 0 0.085 0 0 0"/>
+      <geometry>
+        <box size="0.11 0.045 0.175"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <!--from http://www.top3dmodels.com/hobbies/books-3d-model-->
+        <mesh filename="race_book_c/book_c.dae" scale="1 1 1"/>
+      </geometry>
+      <!--<material script="Gazebo/Wood"/>-->
+      <!--<material script="Gazebo/BlueGlow"/>-->
+    </visual>
+  </link>
+</model>
+</gazebo>

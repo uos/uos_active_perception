@@ -1,0 +1,25 @@
+<gazebo version="1.0">
+<model name="race_flowers1_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <inertial mass="0.5">
+      <origin pose="0 0 0.15 0 0 0"/>
+      <!--<inertia ixx="0.003903123" ixy="0" ixz="0" iyy="0.003903123" iyz="0" izz="0.00030625"/>-->
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <collision name="geom">
+      <origin pose="0 0 0.15 0 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.30"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <mesh filename="flowers/flowers1.dae" scale="1 1 1"/>
+      </geometry>
+      <!--<material script="Gazebo/Grey"/>-->
+    </visual>
+  </link>
+</model>
+</gazebo>

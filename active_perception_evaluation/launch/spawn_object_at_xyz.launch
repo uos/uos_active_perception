@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="x" default="-4.77"/>
+<arg name="y" default="1.52"/>
+<arg name="z" default="0.75"/>
+<arg name="roll" default="0"/>
+<arg name="pitch" default="0"/>
+<arg name="yaw" default="0"/>
+
+<arg name="urdf" default="false"/>
+<arg name="model" default="race_spoon1"/>
+<arg name="model_name" default="$(arg model)"/>
+
+    <group if="$(arg urdf)"> 
+          <param name="$(arg model)" command="$(find xacro)/xacro.py '$(find active_perception_evaluation)/urdf/race_coffee_cup.urdf.xacro'" />
+        <node name="spawn_$(arg model_name)" pkg="gazebo" type="spawn_model"
+        args="-urdf -param $(arg model) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -model $(arg model_name)" respawn="false" output="screen" />
+
+    </group>
+
+    <group unless="$(arg urdf)"> 
+        <param name="$(arg model)" textfile="$(find active_perception_evaluation)/models/$(arg model).model" />
+        <node name="spawn_$(arg model_name)" pkg="gazebo" type="spawn_model" args="-gazebo -param $(arg model) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg roll) -P $(arg pitch) -Y $(arg yaw) -model $(arg model_name)" respawn="false" output="screen" />
+    </group>
+
+</launch>

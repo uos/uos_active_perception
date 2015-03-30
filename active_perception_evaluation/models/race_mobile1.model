@@ -1,0 +1,25 @@
+<gazebo version="1.0">
+<model name="race_mobile1_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0.01 0 0 0"/>
+    <inertial mass="0.5">
+      <origin pose="0 0 0.01 0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <collision name="geom">
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <mesh filename="mobile/mobile.dae" scale="1 1 1"/>
+        <!--<box size="0.10 0.05 0.02"/>-->
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <box size="0.10 0.05 0.02"/>
+      </geometry>
+      <!--<material script="Gazebo/Gold"/>-->
+    </visual>
+  </link>
+</model>
+</gazebo>

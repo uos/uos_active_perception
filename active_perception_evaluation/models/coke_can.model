@@ -1,0 +1,23 @@
+<gazebo version="1.0">
+<model name="coke_can_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0.05 0.00 0 0"/>
+    <inertial mass="0.3">
+      <origin pose="0 0 0.00 0.00 0 0"/>
+      <inertia ixx="0.0004275" ixy="0" ixz="0" iyy="0.0004275" iyz="0" izz="0.000135"/>
+    </inertial>
+    <collision name="geom">
+      <origin pose="0 0 0.013 0 0 0"/>
+      <geometry>
+        <cylinder radius="0.03" length="0.125"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 -0.23 0 0 0"/>
+      <geometry>
+        <mesh filename="coke_can.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+  </link>
+</model>
+</gazebo>

@@ -1,0 +1,30 @@
+<gazebo version="1.0">
+<model name="race_knife1_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <inertial mass="0.1">
+      <origin pose="0 0 0.007 1.57 0 1.57"/>
+      <!--<inertia ixx="0.000338233" ixy="0" ixz="0" iyy="0.000338233" iyz="0" izz="0.0000098"/>-->
+      <!--<inertia ixx="0.000339867" ixy="0" ixz="0" iyy="0.000339867" iyz="0" izz="0.000013067"/>-->
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <collision name="geom">
+      <!--<origin pose="0 0 0.007 1.57 0 0"/>-->
+      <!--<origin pose="0 0 0.007 1.57 0 1.57"/>-->
+      <origin pose="0 0 0 0 1.57 0"/>
+      <geometry>
+        <!--<cylinder radius="0.014" length="0.20"/>-->
+        <box size="0.028 0.028 0.20"/>
+        <!--<mesh filename="knife/knife1.dae" scale="1 1 1"/>-->
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0.01 0 0 0"/>
+      <geometry>
+        <mesh filename="knife/knife1.dae" scale="1 1 1"/>
+      </geometry>
+      <!--<material script="Gazebo/TurquoiseGlow"/>-->
+    </visual>
+  </link>
+</model>
+</gazebo>

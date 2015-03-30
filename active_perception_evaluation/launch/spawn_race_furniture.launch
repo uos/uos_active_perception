@@ -1,9 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-  <include file="$(find race_gazebo_worlds)/launch/spawn_scenario_items.launch">
-    <arg name="furniture" value="true" />
-  </include>
+  <include file="$(find active_perception_evaluation)/launch/spawn_race_models.launch" />
 
   <!-- MODELS -->
   <param name="model_bookshelf" textfile="$(find gazebo)/gazebo/share/gazebo-1.0.2/models/bookshelf.model" />

@@ -1,0 +1,27 @@
+<gazebo version="1.0">
+<model name="race_chair1_model" static="true">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <inertial mass="5.0">
+      <origin pose="0 0 0.5 0 0 0"/>
+      <inertia ixx="0.4640000" ixy="0" ixz="0" iyy="0.4810000" iyz="0" izz="0.001300"/>
+    </inertial>
+    <collision name="geom">
+      <!--<origin pose="0 0 0.225 0 0 0"/>-->
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <!--<box size="0.4 0.4 0.9"/>-->
+        <!--<box size="0.4 0.4 0.45"/>-->
+        <mesh filename="race_chair1.dae" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0 0 0 0"/>
+      <geometry>
+        <mesh filename="race_chair1.dae" scale="1 1 1"/>
+      </geometry>
+      <material script="Gazebo/Wood"/>
+    </visual>
+  </link>
+</model>
+</gazebo>

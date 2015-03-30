@@ -1,0 +1,36 @@
+<robot
+  xmlns:xacro="http://ros.org/wiki/xacro"
+  name="race_mug3">
+
+  <include filename="$(find race_gazebo_worlds)/urdf/common.xacro" />
+
+  <xacro:property name="cup_radius" value="0.04" />
+  <xacro:property name="cup_height" value="0.10" />
+  <xacro:property name="cup_mass" value="0.300" />
+
+  <link name="body">
+    <xacro:cylinder_inertial radius="${cup_radius}" length="${cup_height}"
+      mass="${cup_mass}" origin="0 0 ${cup_height/2 - 0.01}" />
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <!--<cylinder radius="0.04" length="0.1"/>-->
+        <mesh filename="package://race_gazebo_worlds/Media/models/race_mug3.dae" scale="1 1 1" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 ${cup_height/2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${cup_radius}" length="${cup_height}"/>
+        <!--<mesh filename="package://race_gazebo_worlds/Media/models/race_mug3.dae" scale="1 1 1" />-->
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="body">
+    <material>Gazebo/WhiteGlow</material>
+  </gazebo>
+
+</robot>

@@ -1,0 +1,26 @@
+<gazebo version="1.0">
+<model name="race_peppermill1" static="false">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <!--<inertial mass="0.5">-->
+    <inertial mass="0.350">
+      <origin pose="0 0 0.137 0 0 0"/>
+      <inertia ixx="0.003299292" ixy="0" ixz="0" iyy="0.003299292" iyz="0" izz="0.00034225"/>
+      <!--<inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>-->
+    </inertial>
+    <collision name="geom">
+      <origin pose="0 0 0.137 0 0 0"/>
+      <geometry>
+        <cylinder radius="0.037" length="0.274"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <origin pose="0 0 0.137 0 0 0"/>
+      <geometry>
+        <cylinder radius="0.037" length="0.274"/>
+      </geometry>
+      <material script="Gazebo/Red"/>
+    </visual>
+  </link>
+</model>
+</gazebo>

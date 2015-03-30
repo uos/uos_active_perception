@@ -1,0 +1,29 @@
+<gazebo version="1.0">
+<model name="race_iphone5_model" static="false">
+  <link name="body">
+    <origin pose="0 0 0 0 0 0"/>
+    <inertial mass="0.112">
+      <origin pose="0 0 0.0038 0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <collision name="geom">
+      <!--<origin pose="0 0 0.0038 0 0 0"/>-->
+      <origin pose="0 0 0.0149 0 0 0"/>
+      <geometry>
+        <!--<box size="0.1238 0.0586 0.0076"/>-->
+        <!--<mesh filename="mobile/mobile.dae" scale="1 1 1"/>-->
+        <box size="0.1238 0.0586 0.0298"/>
+      </geometry>
+    </collision>
+    <visual name="visual1">
+      <!--<origin pose="0 0 0.0038 -1.57 0 -1.57"/>-->
+      <origin pose="-0.0619 0 0.0260 -1.57 -1.57 -1.57"/>
+      <geometry>
+        <!--from http://www.videocopilot.net/blog/2012/09/new-tutorial-free-iphone-5-model/-->
+        <mesh filename="mobile/mobile.dae" scale="1 1 1"/>
+      </geometry>
+      <!--<material script="Gazebo/Grey"/>-->
+    </visual>
+  </link>
+</model>
+</gazebo>

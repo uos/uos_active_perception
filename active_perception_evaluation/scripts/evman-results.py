@@ -8,6 +8,7 @@ Created on Wed Jan 14 15:18:39 2015
 
 import numpy as np
 import os
+import sys
 import common
 
 class SearchRunSeries:
@@ -59,8 +60,43 @@ def iros0215(N=20):
     print "> NBV Sampling: %.2f (std: %.2f)" % (np.mean(allTNbv), np.std(allTNbv))
     print "> Trans. Times: %.2f (std: %.2f)" % (np.mean(allTLut), np.std(allTLut))
 
+def evaluate(names):
+    trials = []
+    maxn = sys.maxint
+    for name in names:
+        t = []
+        for n in xrange(sys.maxint):
+            logdir = "%s/%s_%i" % (os.getcwd(), name, n)
+            if not os.path.exists(logdir):
+                maxn = min(maxn, n)
+                print "*** %s: %s" % (name, n)
+                break
+            t.append(common.SearchRun(logdir))
+        trials.append(t)
+
+    series = [SearchRunSeries(t[:maxn]) for t in trials]
+
+    if len(series) == 2:
+        eTMoveDiff = series[0].eTMove - series[1].eTMove
+    allTNbv = np.concatenate([s.tNbv for s in series])
+    allTLut = np.concatenate([s.tLut for s in series])
+
+    for i, name in enumerate(names):
+        print "# Results %s:" % name
+        print ">    mean eTMove: %.2f (std: %.2f)" % (np.mean(series[i].eTMove), np.std(series[i].eTMove))
+        print ">     mean eTCpu: %.2f (std: %.2f)" % (np.mean(series[i].eTCpu), np.std(series[i].eTCpu))
+        print "> mean tPlanning: %.2f (std: %.2f)" % (np.mean(series[i].tPlanning), np.std(series[i].tPlanning))
+    if len(series) == 2:
+        print "# Extreme diffs (%s - %s):" % (names[0], names[1])
+        print ">  max: %.2f at %i" % (np.max(eTMoveDiff), np.argmax(eTMoveDiff))
+        print ">  min: %.2f at %i" % (np.min(eTMoveDiff), np.argmin(eTMoveDiff))
+        print ">", np.argsort(eTMoveDiff)
+    print "# Average times:"
+    print "> NBV Sampling: %.2f (std: %.2f)" % (np.mean(allTNbv), np.std(allTNbv))
+    print "> Trans. Times: %.2f (std: %.2f)" % (np.mean(allTLut), np.std(allTLut))
+
 def main():
-    iros0215()
+    evaluate(sys.argv[1:])
 
 if __name__=="__main__":
     main()

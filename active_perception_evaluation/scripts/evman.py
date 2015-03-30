@@ -269,6 +269,18 @@ def only_id_1(N=20, gui=False):
     configs = [("id", {"pm":"id", "bl":2.0, "to":10}, {})]
     return runtrials_withmap("only_id_1", configs, N=N, gui=gui)
 
+def multi_id(N=20, gui=False):
+    configs = [("id1", {"pm":"id", "bl":1.5, "to":5}, {}),
+               ("id2", {"pm":"id", "bl":1.5, "to":10}, {}),
+               ("id3", {"pm":"id", "bl":1.5, "to":20}, {}),
+               ("id4", {"pm":"id", "bl":2.0, "to":5}, {}),
+               ("id5", {"pm":"id", "bl":2.0, "to":10}, {}),
+               ("id6", {"pm":"id", "bl":2.0, "to":20}, {}),
+               ("id7", {"pm":"id", "bl":3.0, "to":5}, {}),
+               ("id8", {"pm":"id", "bl":3.0, "to":10}, {}),
+               ("id9", {"pm":"id", "bl":3.0, "to":20}, {})]
+    return runtrials_withmap("multi_id", configs, N=N, gui=gui)
+
 def main():
     gui = False
     i = 1
@@ -291,6 +303,10 @@ def main():
             n = int(sys.argv[i])
             i += 1
             only_id_1(N=n, gui=gui)
+        elif arg == "multi_id":
+            n = int(sys.argv[i])
+            i += 1
+            multi_id(N=n, gui=gui)
         else:
             print "UNKNOWN COMMAND:", arg
 

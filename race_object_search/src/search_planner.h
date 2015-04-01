@@ -34,7 +34,8 @@ public:
     bool makePlan(size_t const arg_depth_limit,
                   double const arg_pdone_goal,
                   double const arg_max_rel_branch_cost,
-                  long const timeout_msecs)
+                  long const timeout_msecs,
+                  bool arg_use_domination)
     {
         opc_subset.resize(opc.getPoses().size());
         for(size_t i = 0; i < opc_subset.size(); ++i) {
@@ -48,6 +49,7 @@ public:
         } else {
             timeout = boost::date_time::not_a_date_time;
         }
+        use_domination = arg_use_domination;
         if(memory.empty()) {
             memory.resize(1000);
         }
@@ -62,7 +64,7 @@ public:
 
     bool makeGreedy()
     {
-        return makePlan(0, 1.0, 2.0, 0);
+        return makePlan(0, 1.0, 2.0, 0, false);
     }
 
     bool optimalOrder(size_t const arg_depth_limit,
@@ -81,6 +83,7 @@ public:
         } else {
             timeout = boost::date_time::not_a_date_time;
         }
+        use_domination = false;
         if(memory.empty()) {
             memory.resize(input_sequence.size());
         }
@@ -147,7 +150,15 @@ private:
         }
     };
 
-    typedef std::multimap<double, std::pair<size_t, double> > expansion_map_t; // cost -> (pose, etime)
+    struct ExpansionOption
+    {
+        size_t opc_subset_idx;
+        double etime;
+        double gain;
+        double duration;
+    };
+
+    typedef std::multimap<double, ExpansionOption> expansion_map_t;
 
     struct SearchStateMemory
     {
@@ -167,6 +178,7 @@ private:
     double best_pdone;
     double max_rel_branch_cost;
     boost::posix_time::ptime timeout;
+    bool use_domination;
 
     bool makePlanRecursive(size_t const stage,
                            double const pdone,
@@ -190,15 +202,17 @@ private:
         for(size_t i = 0; i < opc_subset.size(); ++i) {
             size_t const & pose_idx = opc_subset[i];
             if(!memory[stage].detec_opts.detectables[i].empty()) {
-                double const & gain = memory[stage].detec_opts.gain[i];
-                double duration = opc.getTravelTime(sequence[stage], pose_idx);
-                double greedy_cost = duration / gain;
-                double new_etime = etime + (1.0 - pdone) * duration;
+                ExpansionOption expop;
+                expop.opc_subset_idx = i;
+                expop.gain = memory[stage].detec_opts.gain[i];
+                expop.duration = opc.getTravelTime(sequence[stage], pose_idx);
+                expop.etime = etime + (1.0 - pdone) * expop.duration;
+                double greedy_cost = expop.duration / expop.gain;
                 // Even if all poses are reachable from the start pose, some pairs of poses may be unconnected.
                 // This is illogical and possibly due to map updates between subsequent calls of make_plan.
                 // The easiest thing is to just filter these cases here.
-                assert(duration < std::numeric_limits<double>::infinity());
-                memory[stage].expansion_map.insert(std::make_pair(greedy_cost, std::make_pair(i, new_etime)));
+                assert(expop.duration < std::numeric_limits<double>::infinity());
+                memory[stage].expansion_map.insert(std::make_pair(greedy_cost, expop));
             }
         }
 
@@ -216,8 +230,10 @@ private:
         }
 
         // Work through agenda
+        std::vector<const ExpansionOption*> potentially_dominating;
+        potentially_dominating.reserve(memory[stage].expansion_map.size());
         double cutoff = memory[stage].expansion_map.begin()->first * max_rel_branch_cost;
-        for(expansion_map_t::iterator it = memory[stage].expansion_map.begin();
+        for(typename expansion_map_t::iterator it = memory[stage].expansion_map.begin();
             it != memory[stage].expansion_map.end();
             ++it)
         {
@@ -225,20 +241,33 @@ private:
                 // cutoff for branches that just seem too bad
                 break;
             }
-            size_t const & opc_subset_idx = it->second.first;
-            double const & new_etime = it->second.second;
-            if(new_etime > best_etime) {
+            ExpansionOption const & expop = it->second;
+            if(expop.etime > best_etime) {
                 // new_etime > best_etime => This branch is hopeless and can be skipped
                 continue;
             }
+
+            // Check for strict domination
+            size_t dom_idx = 0;
+            for(; dom_idx < potentially_dominating.size(); ++dom_idx)
+            {
+                if(potentially_dominating[dom_idx]->gain > expop.gain &&
+                   potentially_dominating[dom_idx]->duration < expop.duration)
+                {
+                    break;
+                }
+            }
+            if(dom_idx < potentially_dominating.size()) continue;
+            if(use_domination) potentially_dominating.push_back(&expop);
+
             // Apply view pose and prepare memory for next stage
-            sequence.push_back(opc_subset[opc_subset_idx]);
+            sequence.push_back(opc_subset[expop.opc_subset_idx]);
             memory[stage+1].detec_opts.assignEqualSize(memory[stage].detec_opts);
-            memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[opc_subset_idx], cgl);
+            memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[expop.opc_subset_idx], cgl);
             // Explore next stage
             makePlanRecursive(stage + 1,
-                              pdone + (1.0 - pdone) * memory[stage].detec_opts.gain[opc_subset_idx],
-                              new_etime);
+                              pdone + (1.0 - pdone) * memory[stage].detec_opts.gain[expop.opc_subset_idx],
+                              expop.etime);
             if(timeout != boost::date_time::not_a_date_time &&
                boost::posix_time::microsec_clock::local_time() > timeout) {
                 return false;

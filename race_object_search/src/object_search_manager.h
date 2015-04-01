@@ -49,6 +49,7 @@ public:
         m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
         m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
         m_node_handle.param("keep_planned_poses", m_keep_planned_poses, true);
+        m_node_handle.param("use_domination", m_use_domination, false);
 
         m_use_static_poses = !m_ps_dir.empty();
         if(m_use_static_poses) m_keep_planned_poses = false;
@@ -113,6 +114,7 @@ private:
     double m_relative_lookahead;
     double m_max_rel_branch_cost;
     double m_planning_timeout;
+    bool m_use_domination;
 
     // logging and evaluation data files
     std::string m_ps_dir;
@@ -460,7 +462,8 @@ private:
                 bool finished = spl.makePlan(m_depth_limit,
                                              pdone_goal * m_relative_lookahead,
                                              m_max_rel_branch_cost,
-                                             m_planning_timeout * 1000);
+                                             m_planning_timeout * 1000,
+                                             m_use_domination);
                 plan = spl.getSequence();
                 if(!finished)
                 {
@@ -478,7 +481,7 @@ private:
                 double remaining_time = (endtime - ros::WallTime::now()).toSec();
                 while(pdone_goal < max_pdone_goal && remaining_time > 0)
                 {
-                    if(spl.makePlan(depth, pdone_goal, m_max_rel_branch_cost, remaining_time * 1000))
+                    if(spl.makePlan(depth, pdone_goal, m_max_rel_branch_cost, remaining_time * 1000, m_use_domination))
                     {
                         plan = spl.getSequence();
                         if(spl.getPdone() <= pdone_goal) break;

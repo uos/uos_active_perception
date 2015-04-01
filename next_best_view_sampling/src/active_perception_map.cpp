@@ -546,10 +546,10 @@ std::vector<octomap::OcTreeKey> ActivePerceptionMap::getBoundaryVoxels
     return boundary;
 }
 
-/** Find the right discretization of ray angles so that each octree voxel at range is hit by one ray. */
+/** Find the right discretization of ray angles so that the arc length between steps equals the voxel edge length. */
 double ActivePerceptionMap::rayAngleStep(const double & range) const
 {
-    return std::acos(1.0 - (std::pow(m_occupancy_map.getResolution(), 2) / (2.0 * std::pow(range, 2))));
+    return m_occupancy_map.getResolution() / range;
 }
 
 void ActivePerceptionMap::deleteMapVolume

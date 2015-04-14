@@ -84,7 +84,7 @@ uos_active_perception_msgs::BoundingBox makeShelf2()
     box.pose_stamped.pose.position.y = 11.2;
     box.pose_stamped.pose.position.z = 0.58;
     box.dimensions.x = 0.3;
-    box.dimensions.y = 0.8;
+    box.dimensions.y = 2.7;
     box.dimensions.z = 1.15;
     return box;
 }
@@ -96,7 +96,7 @@ uos_active_perception_msgs::BoundingBox makeShelf3()
     box.pose_stamped.pose.position.y = 11.2;
     box.pose_stamped.pose.position.z = 0.58;
     box.dimensions.x = 0.3;
-    box.dimensions.y = 0.8;
+    box.dimensions.y = 2.7;
     box.dimensions.z = 1.15;
     return box;
 }

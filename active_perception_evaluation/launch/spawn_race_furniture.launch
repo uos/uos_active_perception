@@ -17,10 +17,10 @@
               -P 0
               -Y 3.14" />
               
-  <!-- SPAWN SHELF 2 -->
-  <node name="spawn_bookshelf_322" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+  <!-- SPAWN SHELF 2.1 -->
+  <node name="spawn_bookshelf_3221" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
         args="-gazebo -param model_bookshelf
-              -model bookshelf_322
+              -model bookshelf_3221
               -x -12.59
               -y 1
               -z 0
@@ -28,15 +28,55 @@
               -P 0
               -Y 1.57" />
               
-  <!-- SPAWN SHELF 2 -->
-  <node name="spawn_bookshelf_323" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+  <!-- SPAWN SHELF 2.2 -->
+  <node name="spawn_bookshelf_3222" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
         args="-gazebo -param model_bookshelf
-              -model bookshelf_323
+              -model bookshelf_3222
+              -x -12.59
+              -y 1.92
+              -z 0
+              -R 0
+              -P 0
+              -Y 1.57" />
+  <!-- SPAWN SHELF 2.3 -->
+  <node name="spawn_bookshelf_3223" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_3223
+              -x -12.59
+              -y 0.08
+              -z 0
+              -R 0
+              -P 0
+              -Y 1.57" />
+              
+  <!-- SPAWN SHELF 3.1 -->
+  <node name="spawn_bookshelf_3231" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_3231
               -x -8.78
               -y 1
               -z 0
               -R 0
               -P 0
               -Y 4.71" />
-    
+  <!-- SPAWN SHELF 3.2 -->
+  <node name="spawn_bookshelf_3232" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_3232
+              -x -8.78
+              -y 1.92
+              -z 0
+              -R 0
+              -P 0
+              -Y 4.71" />
+  <!-- SPAWN SHELF 3.3 -->
+  <node name="spawn_bookshelf_3233" pkg="gazebo" type="spawn_model"  respawn="false" output="screen"
+        args="-gazebo -param model_bookshelf
+              -model bookshelf_3233
+              -x -8.78
+              -y 0.08
+              -z 0
+              -R 0
+              -P 0
+              -Y 4.71" />
 </launch>

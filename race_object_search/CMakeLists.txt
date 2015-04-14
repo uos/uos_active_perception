@@ -47,3 +47,5 @@ rosbuild_add_executable(object_search_manager_test src/object_search_manager_tes
 rosbuild_add_executable(kmeans-test src/kmeans.cpp
                                     src/kmeans-test.cpp)
 rosbuild_add_executable(random_driver src/random_driver.cpp)
+rosbuild_add_executable(nbv_sampling_evaluator src/nbv_sampling_evaluator.cpp
+                                               src/observation_pose_collection.cpp)

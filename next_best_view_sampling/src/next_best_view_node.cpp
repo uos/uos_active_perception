@@ -681,7 +681,7 @@ bool NextBestViewNode::getObservationCameraPosesCb(uos_active_perception_msgs::G
                 req.ray_skip,
                 req.timeout,
                 req.omit_cvm,
-                false);
+                req.keep_blind_poses);
 
     // Fill response fields
     res.camera_poses = eval_res.camera_poses;

@@ -8,6 +8,7 @@
 # - lockt_height: Only relevant when observation_point is set: Whether camera height should
 #                 be locked (true) or free  (false) for sampling.
 # - omit_cvm: If set to true, no conditional visibility maps are included in the response (reduces msg size). 
+# - keep_blind_poses If set to true, allows view poses in the response that see no cells
 # - objects: List of bounding boxes for moveable objects in the scene.
 #
 # Response:
@@ -27,6 +28,7 @@ float32 ray_skip
 geometry_msgs/PointStamped observation_position
 bool lock_height
 bool omit_cvm
+bool keep_blind_poses
 BoundingBox[] objects
 ---
 uint32[] roi_cell_counts

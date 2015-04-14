@@ -53,6 +53,7 @@ private:
             pose_candidates_call.request.sample_size = m_global_sample_size;
             pose_candidates_call.request.ray_skip = m_ray_skip;
             pose_candidates_call.request.roi = goal.roi;
+            pose_candidates_call.request.keep_blind_poses = true;
             ros::WallTime t0 = ros::WallTime::now();
             if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
             {

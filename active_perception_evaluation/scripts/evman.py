@@ -80,14 +80,14 @@ class Evman:
             self.logMapping.close()
             self.procMapping = None
 
-    def initSearchMan(self, psd="", pm="search", dl=0, la=0.8, bl=1.8, to=60, lss=0, gss=200, rs=0, log=os.getcwd()):
+    def initSearchMan(self, psd="", pm="search", dl=0, la=0.8, bl=1.8, to=60, lss=0, gss=200, rs=0, log=os.getcwd(), ud="false"):
         if not self.procMapping:
             print "> WARNING: Running SearchMan without Mapping"
             self.initMapping()
         print "> Starting SearchMan"
-        params = (psd, pm, dl, la, bl, to, log, lss, gss, rs)
+        params = (psd, pm, dl, la, bl, to, log, lss, gss, rs, ud)
         self.logSearchMan = open('%s/evman_searchman.log' % log, 'w')
-        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f" % params
+        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f _use_dominance:=%s" % params
         self.procSearchMan = subprocess.Popen("exec " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.logSearchMan, stderr=self.logSearchMan)
         time.sleep(10)
 
@@ -281,34 +281,16 @@ def multi_id(N=20, gui=False):
                ("id9", {"pm":"id", "bl":3.0, "to":20}, {})]
     return runtrials_withmap("multi_id", configs, N=N, gui=gui)
 
+def test_ud(N=20, gui=False):
+    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
+               ("id1", {"pm":"id", "bl":1.5, "to":5, "ud":"true"}, {}),
+               ("id5", {"pm":"id", "bl":2.0, "to":10, "ud":"true"}, {}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5, "ud":"true"}, {})]
+    return runtrials_withmap("test_ud", configs, N=N, gui=gui)
+
 def main():
-    gui = False
-    i = 1
-    while i < len(sys.argv):
-        arg = sys.argv[i]
-        i += 1
-        if arg == "gui":
-            gui = not gui
-        elif arg == "base":
-            base(gui=gui)
-        elif arg == "iros0215_nomap":
-            n = int(sys.argv[i])
-            i += 1
-            iros0215_nomap(N=n, gui=gui)
-        elif arg == "iros0215_withmap":
-            n = int(sys.argv[i])
-            i += 1
-            iros0215_withmap(N=n, gui=gui)
-        elif arg == "only_id_1":
-            n = int(sys.argv[i])
-            i += 1
-            only_id_1(N=n, gui=gui)
-        elif arg == "multi_id":
-            n = int(sys.argv[i])
-            i += 1
-            multi_id(N=n, gui=gui)
-        else:
-            print "UNKNOWN COMMAND:", arg
+    for cmd in sys.argv[1:]:
+        eval(cmd)
 
 CAM_POINTS = """9.147	10.5173	27.0398
 11.1854	10.276	48.3509

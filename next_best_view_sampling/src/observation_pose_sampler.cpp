@@ -62,9 +62,10 @@ struct ObservationPoseSampler::ObservationConstraints
         , z(boost::numeric::intersect(Interval(-cc.range_max, cc.range_max),
                                       Interval(cc.height_min, cc.height_max) - h))
     {
-        // Init a, avoid boost::interval trig functions
-        double a1 = -std::cos(PI/2 - cc.pitch_min);
-        double a2 = -std::cos(PI/2 - cc.pitch_max);
+        // Init a, avoid boost::interval trig functions.
+        // Extend pitch limit to allow target to be at the border of the FOV
+        double a1 = -std::cos(PI/2 - (cc.pitch_min - cc.vfov / 2.0));
+        double a2 = -std::cos(PI/2 - (cc.pitch_max + cc.vfov / 2.0));
         a = (a1 < a2) ? Interval(a1, a2) : Interval(a2, a1);
 
         if(n.norm() > EPS)
@@ -234,6 +235,10 @@ tf::Transform ObservationPoseSampler::genObservationSample
     // Extract pitch and yaw
     double pitch = std::acos(ocs.a.lower()) - PI/2.0;
     double yaw = std::atan2(-ocs.y.lower(), -ocs.x.lower());
+
+    // Limit pitch to sensor limits
+    if(pitch < m_camera_constraints.pitch_min) pitch = m_camera_constraints.pitch_min;
+    if(pitch > m_camera_constraints.pitch_max) pitch = m_camera_constraints.pitch_max;
 
     // Point the created pose towards the target voxel
     // We want to do intrinsic YPR which is equivalent to fixed axis RPY

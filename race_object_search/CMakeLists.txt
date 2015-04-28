@@ -7,7 +7,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-set(ROS_BUILD_TYPE RelWithDebInfo)
+set(ROS_BUILD_TYPE Release)
 
 rosbuild_find_ros_package(actionlib_msgs)
 include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
@@ -48,4 +48,7 @@ rosbuild_add_executable(kmeans-test src/kmeans.cpp
                                     src/kmeans-test.cpp)
 rosbuild_add_executable(random_driver src/random_driver.cpp)
 rosbuild_add_executable(nbv_sampling_evaluator src/nbv_sampling_evaluator.cpp
-                                               src/observation_pose_collection.cpp)
+                                               src/pr2_agent.cpp
+                                               src/floating_kinect_agent.cpp
+                                               src/observation_pose_collection.cpp
+                                               src/kmeans.cpp)

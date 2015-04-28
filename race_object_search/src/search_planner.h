@@ -31,11 +31,15 @@ public:
     /** Get expected run time from last planning operation */
     double getEtime() { return best_etime; }
 
+    /** Returns true when branches were cut off during last search run */
+    bool branchCutoffOccurred() { return branch_cutoff_occurred; }
+
     bool makePlan(size_t const arg_depth_limit,
                   double const arg_pdone_goal,
                   double const arg_max_rel_branch_cost,
                   long const timeout_msecs,
-                  bool arg_use_domination)
+                  bool arg_use_domination,
+                  double etime_bound = std::numeric_limits<double>::infinity())
     {
         opc_subset.resize(opc.getPoses().size());
         for(size_t i = 0; i < opc_subset.size(); ++i) {
@@ -57,7 +61,8 @@ public:
         sequence.clear();
         sequence.push_back(-1);
         best_sequence.clear();
-        best_etime = std::numeric_limits<double>::infinity();
+        best_etime = etime_bound;
+        branch_cutoff_occurred = false;
 
         return makePlanRecursive(0, 0.0, 0.0);
     }
@@ -92,6 +97,7 @@ public:
         sequence.push_back(-1);
         best_sequence.clear();
         best_etime = std::numeric_limits<double>::infinity();
+        branch_cutoff_occurred = false;
 
         std::cout << "Starting recursive optimal ordering..." << std::endl;
         return makePlanRecursive(0, 0.0, 0.0);
@@ -179,6 +185,7 @@ private:
     double max_rel_branch_cost;
     boost::posix_time::ptime timeout;
     bool use_domination;
+    bool branch_cutoff_occurred;
 
     bool makePlanRecursive(size_t const stage,
                            double const pdone,
@@ -187,6 +194,11 @@ private:
         if(memory.size() <= stage+1) {
             std::cout << "available memory exceeded. returning to previous stage" << std::endl;
             return true;
+        }
+
+        // Test for timeout
+        if(timeout != boost::date_time::not_a_date_time && timeout <= boost::posix_time::microsec_clock::local_time()) {
+            return false;
         }
 
         // Test for goal state (pdone_goal condition)
@@ -239,6 +251,7 @@ private:
         {
             if(it->first > cutoff) {
                 // cutoff for branches that just seem too bad
+                branch_cutoff_occurred = true;
                 break;
             }
             ExpansionOption const & expop = it->second;
@@ -248,16 +261,16 @@ private:
             }
 
             // Check for strict domination
-            size_t dom_idx = 0;
-            for(; dom_idx < potentially_dominating.size(); ++dom_idx)
+            bool found_dominating = false;
+            for(size_t dom_idx = 0; !found_dominating && dom_idx < potentially_dominating.size(); ++dom_idx)
             {
                 if(potentially_dominating[dom_idx]->gain > expop.gain &&
                    potentially_dominating[dom_idx]->duration < expop.duration)
                 {
-                    break;
+                    found_dominating = true;
                 }
             }
-            if(dom_idx < potentially_dominating.size()) continue;
+            if(found_dominating) continue;
             if(use_domination) potentially_dominating.push_back(&expop);
 
             // Apply view pose and prepare memory for next stage
@@ -265,13 +278,10 @@ private:
             memory[stage+1].detec_opts.assignEqualSize(memory[stage].detec_opts);
             memory[stage+1].detec_opts.removeCells(memory[stage].detec_opts.detectables[expop.opc_subset_idx], cgl);
             // Explore next stage
-            makePlanRecursive(stage + 1,
-                              pdone + (1.0 - pdone) * memory[stage].detec_opts.gain[expop.opc_subset_idx],
-                              expop.etime);
-            if(timeout != boost::date_time::not_a_date_time &&
-               boost::posix_time::microsec_clock::local_time() > timeout) {
-                return false;
-            }
+            bool not_timed_out = makePlanRecursive(stage + 1,
+                                    pdone + (1.0 - pdone) * memory[stage].detec_opts.gain[expop.opc_subset_idx],
+                                    expop.etime);
+            if(!not_timed_out) return false;
             // Remove the explored pose
             sequence.pop_back();
             if(stage >= depth_limit) {

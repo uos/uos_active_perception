@@ -473,7 +473,7 @@ private:
             else if(m_planning_mode == "id")
             {
                 ROS_INFO("entering planning phase (iterative deepening)");
-                ros::WallTime endtime = t0 + ros::WallDuration(m_planning_timeout);
+                ros::WallTime endtime = ros::WallTime::now() + ros::WallDuration(m_planning_timeout);
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double pdone_goal = 0.0;
                 double max_pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
@@ -490,6 +490,35 @@ private:
                     ++depth;
                     remaining_time = (endtime - ros::WallTime::now()).toSec();
                 }
+            }
+            else if(m_planning_mode == "iw")
+            {
+                ROS_INFO("entering planning phase (iterative widening)");
+                ros::WallTime endtime = ros::WallTime::now() + ros::WallDuration(m_planning_timeout);
+                SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
+                double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
+                double etime_bound = std::numeric_limits<double>::infinity();
+                double last_iteration_time = 0;
+                double rbc = 1.0;
+                for(; rbc <= m_max_rel_branch_cost; rbc += 0.1)
+                {
+                    double remaining_time = (endtime - ros::WallTime::now()).toSec();
+                    if(remaining_time < last_iteration_time) break;
+                    ros::WallTime start = ros::WallTime::now();
+                    if(spl.makePlan(m_depth_limit,
+                                    pdone_goal * m_relative_lookahead,
+                                    rbc,
+                                    remaining_time * 1000,
+                                    m_use_domination,
+                                    etime_bound))
+                    {
+                        plan = spl.getSequence();
+                        if(!spl.branchCutoffOccurred()) break;
+                        etime_bound = spl.getEtime();
+                    }
+                    last_iteration_time = (ros::WallTime::now() - start).toSec();
+                }
+                logval("max_rbc", rbc);
             }
             else if(m_planning_mode == "greedy-reorder")
             {

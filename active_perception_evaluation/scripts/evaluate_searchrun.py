@@ -40,6 +40,8 @@ def main():
     for trial_nr, trial in enumerate(trials):
         color = common.graphColors(len(trials))[trial_nr]
         print "\nEvaluating trial: ", trial.label
+        print "eTMove:", trial.eTMove
+        print "eTCpu:", trial.eTCpu
 
         # plot pdone vs timeline
         pylab.subplot(nplots, 1, 1)

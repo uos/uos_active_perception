@@ -14,12 +14,13 @@ import common
 
 def main():
 
-    files = ["/home/thorsten/ros_fuerte/race/uos_active_perception/race_object_search/config/maps/nbveval.csv",
-             "/home/thorsten/ros_fuerte/race/uos_active_perception/race_object_search/config/maps/nbveval75.csv"]
+    files = ["/home/thorsten/Desktop/eval_newmap/blub/nbveval0o.csv",
+             "/home/thorsten/Desktop/eval_newmap/blub/nbveval0f.csv"]
     colors = common.graphColors(len(files))
-    labels = ["0.0", "0.75"]
+    labels = ["unfiltered", "reachable"]
     showtime = False
-    relmax = 17226
+    relmax = 17204
+    maxx = 600
 
     setup()
     for i in range(len(files)):
@@ -35,11 +36,13 @@ def main():
     pylab.legend(loc="lower right")
     pylab.tight_layout()
     pylab.ylim(0.0, pylab.ylim()[1])
+    if maxx:
+        pylab.xlim(0.0, maxx)
     pylab.show()
 
 def setup():
     # Common sizes: (10, 7.5) and (12, 9)
-    pylab.figure(facecolor="white", figsize=(6, 3))
+    pylab.figure(facecolor="white", figsize=(10.6, 6))
     # Remove the plot frame lines. They are unnecessary chartjunk.
     ax = pylab.subplot(111)
     ax.spines["top"].set_visible(False)
@@ -85,8 +88,8 @@ def plotfile(path, color, label, showtime, relmax=1):
     pylab.plot(x, means, ls="-", lw=2.0, color=color, label=label)
     upper = (means + stds)
     lower = (means - stds)
-    pylab.plot(x, upper, ls="-", lw=2.0, color="grey")
-    pylab.plot(x, lower, ls="-", lw=2.0, color="grey")
+    pylab.plot(x, upper, ls="-", lw=1.0, color="grey")
+    pylab.plot(x, lower, ls="-", lw=1.0, color="grey")
     pylab.fill_between(x, upper, lower, color=[color[0], color[1], color[2], 0.3])
 
 if __name__=="__main__":

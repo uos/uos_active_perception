@@ -177,9 +177,9 @@ def base(gui=True):
     evman.initRviz(gui)
     signal.pause()
 
-def runtrials_nomap(name, configs, N=20, gui=False):
+def runtrials_nomap(name, configs, test, N=20, gui=False):
     """
-    configs = [(name, search_kwargs, test_kwargs), ...]
+    configs = [(name, search_kwargs), ...]
     """
     print "*** %s ***" % name
     scriptdir = "%s/%s" % (os.getcwd(), name)
@@ -192,7 +192,7 @@ def runtrials_nomap(name, configs, N=20, gui=False):
         psd = "%s/psd" % scriptdir
         os.mkdir(psd)
         xypose = None
-        for cname, search_kwargs, test_kwargs in configs:
+        for cname, search_kwargs in configs:
             print "# Evaluating n=%i %s" % (n, cname)
             logdir = "%s/%s_%i" % (scriptdir, cname, n)
             os.mkdir(logdir)
@@ -202,7 +202,7 @@ def runtrials_nomap(name, configs, N=20, gui=False):
             evman.initMapping(logdir)
             evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
             evman.recordRosbag(logdir)
-            evman.runTest(**test_kwargs)
+            evman.runTest(**test)
             evman.shutdown()
         # --- CLEANUP ---
         try:
@@ -212,9 +212,9 @@ def runtrials_nomap(name, configs, N=20, gui=False):
     evman.shutdown()
     return True
 
-def runtrials_withmap(name, configs, N=20, gui=False):
+def runtrials_withmap(name, configs, test, N=20, gui=False):
     """
-    configs = [(name, search_kwargs, test_kwargs), ...]
+    configs = [(name, search_kwargs), ...]
     """
     print "*** %s ***" % name
     scriptdir = "%s/%s" % (os.getcwd(), name)
@@ -235,7 +235,7 @@ def runtrials_withmap(name, configs, N=20, gui=False):
         psd = "%s/psd" % scriptdir
         os.mkdir(psd)
         xypose = None
-        for cname, search_kwargs, test_kwargs in configs:
+        for cname, search_kwargs in configs:
             print "# Evaluating n=%i %s" % (n, cname)
             logdir = "%s/%s_%i" % (scriptdir, cname, n)
             os.mkdir(logdir)
@@ -244,7 +244,7 @@ def runtrials_withmap(name, configs, N=20, gui=False):
             evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
             evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
             evman.recordRosbag(logdir)
-            evman.runTest(**test_kwargs)
+            evman.runTest(**test)
             evman.stopRosbag()
             evman.stopSearchMan()
         # --- CLEANUP ---
@@ -256,37 +256,44 @@ def runtrials_withmap(name, configs, N=20, gui=False):
     return True
 
 def iros0215_nomap(N=20, gui=False):
-    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
-               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5}, {})]
-    return runtrials_nomap("iros0215_nomap", configs, N=N, gui=gui)
+    configs = [("greedy"  , {"pm":"search", "dl":0}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5})]
+    return runtrials_nomap("iros0215_nomap", configs, {}, N=N, gui=gui)
 
 def iros0215_withmap(N=20, gui=False):
-    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
-               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5}, {})]
-    return runtrials_withmap("iros0215_withmap", configs, N=N, gui=gui)
+    configs = [("greedy"  , {"pm":"search", "dl":0}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5})]
+    return runtrials_withmap("iros0215_withmap", configs, {}, N=N, gui=gui)
 
 def only_id_1(N=20, gui=False):
-    configs = [("id", {"pm":"id", "bl":2.0, "to":10}, {})]
-    return runtrials_withmap("only_id_1", configs, N=N, gui=gui)
+    configs = [("id", {"pm":"id", "bl":2.0, "to":10})]
+    return runtrials_withmap("only_id_1", configs, {}, N=N, gui=gui)
 
 def multi_id(N=20, gui=False):
-    configs = [("id1", {"pm":"id", "bl":1.5, "to":5}, {}),
-               ("id2", {"pm":"id", "bl":1.5, "to":10}, {}),
-               ("id3", {"pm":"id", "bl":1.5, "to":20}, {}),
-               ("id4", {"pm":"id", "bl":2.0, "to":5}, {}),
-               ("id5", {"pm":"id", "bl":2.0, "to":10}, {}),
-               ("id6", {"pm":"id", "bl":2.0, "to":20}, {}),
-               ("id7", {"pm":"id", "bl":3.0, "to":5}, {}),
-               ("id8", {"pm":"id", "bl":3.0, "to":10}, {}),
-               ("id9", {"pm":"id", "bl":3.0, "to":20}, {})]
-    return runtrials_withmap("multi_id", configs, N=N, gui=gui)
+    configs = [("id1", {"pm":"id", "bl":1.5, "to":5}),
+               ("id2", {"pm":"id", "bl":1.5, "to":10}),
+               ("id3", {"pm":"id", "bl":1.5, "to":20}),
+               ("id4", {"pm":"id", "bl":2.0, "to":5}),
+               ("id5", {"pm":"id", "bl":2.0, "to":10}),
+               ("id6", {"pm":"id", "bl":2.0, "to":20}),
+               ("id7", {"pm":"id", "bl":3.0, "to":5}),
+               ("id8", {"pm":"id", "bl":3.0, "to":10}),
+               ("id9", {"pm":"id", "bl":3.0, "to":20})]
+    return runtrials_withmap("multi_id", configs, {}, N=N, gui=gui)
 
 def test_ud(N=20, gui=False):
-    configs = [("greedy"  , {"pm":"search", "dl":0}, {}),
-               ("id1", {"pm":"id", "bl":1.5, "to":5, "ud":"true"}, {}),
-               ("id5", {"pm":"id", "bl":2.0, "to":10, "ud":"true"}, {}),
-               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5, "ud":"true"}, {})]
-    return runtrials_withmap("test_ud", configs, N=N, gui=gui)
+    configs = [("greedy"  , {"pm":"search", "dl":0}),
+               ("id1", {"pm":"id", "bl":1.5, "to":5, "ud":"true"}),
+               ("id5", {"pm":"id", "bl":2.0, "to":10, "ud":"true"}),
+               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5, "ud":"true"})]
+    return runtrials_withmap("test_ud", configs, {}, N=N, gui=gui)
+
+def compare_iw(N=20, gui=False):
+    configs = [("greedy", {"pm":"search", "dl":0}),
+               ("iw5", {"pm":"iw", "dl":50, "ud":"true", "la":1.0, "bl":5.0, "to":5}),
+               ("static_ud", {"pm":"search", "dl":50, "ud":"true", "la":1.0, "bl":1.2, "to":60}),
+               ("static_n", {"pm":"search", "dl":50, "ud":"false", "la":1.0, "bl":1.2, "to":60})]
+    return runtrials_nomap("only_iw_5", configs, {}, N=N, gui=gui)
 
 def main():
     for cmd in sys.argv[1:]:

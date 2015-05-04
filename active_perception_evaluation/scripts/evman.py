@@ -87,7 +87,7 @@ class Evman:
         print "> Starting SearchMan"
         params = (psd, pm, dl, la, bl, to, log, lss, gss, rs, ud)
         self.logSearchMan = open('%s/evman_searchman.log' % log, 'w')
-        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f _use_dominance:=%s" % params
+        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f _use_domination:=%s" % params
         self.procSearchMan = subprocess.Popen("exec " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.logSearchMan, stderr=self.logSearchMan)
         time.sleep(10)
 
@@ -293,7 +293,7 @@ def compare_iw(N=20, gui=False):
                ("iw5", {"pm":"iw", "dl":50, "ud":"true", "la":1.0, "bl":5.0, "to":5}),
                ("static_ud", {"pm":"search", "dl":50, "ud":"true", "la":1.0, "bl":1.2, "to":60}),
                ("static_n", {"pm":"search", "dl":50, "ud":"false", "la":1.0, "bl":1.2, "to":60})]
-    return runtrials_nomap("only_iw_5", configs, {}, N=N, gui=gui)
+    return runtrials_nomap("compare_iw", configs, {}, N=N, gui=gui)
 
 def main():
     for cmd in sys.argv[1:]:

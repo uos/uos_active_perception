@@ -19,7 +19,12 @@ def main():
 
     print "Evaluating", sys.argv[1:]
 
-    trials = [common.SearchRun(d) for d in sys.argv[1:]]
+    trials = []
+    for arg in sys.argv[1:]:
+        if arg.startswith("--plan:"):
+            trials.append(common.SearchPlan(arg[7:]))
+        else:
+            trials.append(common.SearchRun(arg))
 
     # Set up plot
     nplots = 2

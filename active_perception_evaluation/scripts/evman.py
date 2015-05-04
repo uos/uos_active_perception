@@ -80,14 +80,14 @@ class Evman:
             self.logMapping.close()
             self.procMapping = None
 
-    def initSearchMan(self, psd="", pm="search", dl=0, la=0.8, bl=1.8, to=60, lss=0, gss=200, rs=0, log=os.getcwd(), ud="false"):
+    def initSearchMan(self, psd="", pm="search", dl="default", la=1.0, bl="default", to=-1, lss=0, gss=200, rs=0, log=os.getcwd(), ud="false", po="false"):
         if not self.procMapping:
             print "> WARNING: Running SearchMan without Mapping"
             self.initMapping()
         print "> Starting SearchMan"
-        params = (psd, pm, dl, la, bl, to, log, lss, gss, rs, ud)
+        params = (psd, pm, dl, la, bl, to, log, lss, gss, rs, ud, po)
         self.logSearchMan = open('%s/evman_searchman.log' % log, 'w')
-        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%i _relative_lookahead:=%f _max_rel_branch_cost:=%f _planning_timeout:=%f _log_dir:=%s _local_sample_size:=%i _global_sample_size:=%i _ray_skip:=%f _use_domination:=%s" % params
+        cmd = "rosrun race_object_search object_search_manager _world_frame_id:=/map _robot:=floating_kinect _persistent_sample_dir:=%s _planning_mode:=%s _depth_limit:=%s _relative_lookahead:=%s _max_rel_branch_cost:=%s _planning_timeout:=%s _log_dir:=%s _local_sample_size:=%s _global_sample_size:=%s _ray_skip:=%s _use_domination:=%s _plan_only:=%s" % params
         self.procSearchMan = subprocess.Popen("exec " + cmd, shell=True, preexec_fn=os.setsid, stdout=self.logSearchMan, stderr=self.logSearchMan)
         time.sleep(10)
 
@@ -212,7 +212,7 @@ def runtrials_nomap(name, configs, test, N=20, gui=False):
     evman.shutdown()
     return True
 
-def runtrials_withmap(name, configs, test, N=20, gui=False):
+def runtrials_withmap(name, configs, test, N=20, gui=False, rosbag=True):
     """
     configs = [(name, search_kwargs), ...]
     """
@@ -243,7 +243,8 @@ def runtrials_withmap(name, configs, test, N=20, gui=False):
             xypose = evman.setCamera(xypose)
             evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
             evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
-            evman.recordRosbag(logdir)
+            if rosbag:
+                evman.recordRosbag(logdir)
             evman.runTest(**test)
             evman.stopRosbag()
             evman.stopSearchMan()
@@ -294,6 +295,42 @@ def compare_iw(N=20, gui=False):
                ("static_ud", {"pm":"search", "dl":50, "ud":"true", "la":1.0, "bl":1.2, "to":60}),
                ("static_n", {"pm":"search", "dl":50, "ud":"false", "la":1.0, "bl":1.2, "to":60})]
     return runtrials_nomap("compare_iw", configs, {}, N=N, gui=gui)
+
+def thesis_planonly(N=20, gui=False):
+    configs = [("greedy", {"pm":"search", "dl":0, "la":1.0, "po":"true"}),
+               ("optimal",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":"default", "po":"true"}),
+               ("optimal_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":"default", "po":"true"}),
+               ("phi1",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi2",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.2, "po":"true"}),
+               ("phi3",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi4",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.4, "po":"true"}),
+               ("phi5",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"true"}),
+               ("phi10",   {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
+               ("phi1_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi2_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.2, "po":"true"}),
+               ("phi3_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi4_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.4, "po":"true"}),
+               ("phi5_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.5, "po":"true"}),
+               ("phi10_ud",{"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
+               ("dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
+               ("phi1_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi1_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi1_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi1_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi1_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi1_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
+               ("phi3_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi3_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi3_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi3_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi3_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
+               ("phi3_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"})]
+    return runtrials_withmap("thesis_planonly", configs, {}, N=N, gui=gui, rosbag=False)
 
 def main():
     for cmd in sys.argv[1:]:

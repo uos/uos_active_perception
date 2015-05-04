@@ -39,17 +39,34 @@ public:
         m_node_handle.param("log_dir", m_log_dir, std::string(""));
         m_node_handle.param("persistent_sample_dir", m_ps_dir, std::string(""));
         // sampling params
-        m_node_handle.param("local_sample_size", m_local_sample_size, 100);
+        m_node_handle.param("local_sample_size", m_local_sample_size, 0);
         m_node_handle.param("global_sample_size", m_global_sample_size, 200);
-        m_node_handle.param("ray_skip", m_ray_skip, 0.75);
+        m_node_handle.param("ray_skip", m_ray_skip, 0.0);
         // planning params
-        m_node_handle.param("planning_mode", m_planning_mode, std::string("simple"));
-        m_node_handle.param("depth_limit", m_depth_limit, 5);
+        m_node_handle.param("planning_mode", m_planning_mode, std::string("search"));
+        m_node_handle.param("depth_limit", m_depth_limit, std::numeric_limits<int>::max());
         m_node_handle.param("relative_lookahead", m_relative_lookahead, 1.0);
-        m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, 1.8);
-        m_node_handle.param("planning_timeout", m_planning_timeout, 20.0);
+        m_node_handle.param("max_rel_branch_cost", m_max_rel_branch_cost, std::numeric_limits<double>::infinity());
+        m_node_handle.param("planning_timeout", m_planning_timeout, -1.0);
         m_node_handle.param("keep_planned_poses", m_keep_planned_poses, true);
         m_node_handle.param("use_domination", m_use_domination, false);
+        m_node_handle.param("plan_only", m_plan_only, false);
+
+        std::cout << "Parameters:" << std::endl;
+        std::cout << "world_frame_id " << m_world_frame_id << std::endl;
+        std::cout << "log_dir " << m_log_dir << std::endl;
+        std::cout << "persistent_sample_dir " << m_ps_dir << std::endl;
+        std::cout << "local_sample_size " << m_local_sample_size << std::endl;
+        std::cout << "global_sample_size " << m_global_sample_size << std::endl;
+        std::cout << "ray_skip " << m_ray_skip << std::endl;
+        std::cout << "planning_mode " << m_planning_mode << std::endl;
+        std::cout << "depth_limit " << m_depth_limit << std::endl;
+        std::cout << "relative_lookahead " << m_relative_lookahead << std::endl;
+        std::cout << "max_rel_branch_cost " << m_max_rel_branch_cost << std::endl;
+        std::cout << "planning_timeout " << m_planning_timeout << std::endl;
+        std::cout << "keep_planned_poses " << m_keep_planned_poses << std::endl;
+        std::cout << "use_domination " << m_use_domination << std::endl;
+        std::cout << "plan_only " << m_plan_only << std::endl;
 
         m_use_static_poses = !m_ps_dir.empty();
         if(m_use_static_poses) m_keep_planned_poses = false;
@@ -115,6 +132,7 @@ private:
     double m_max_rel_branch_cost;
     double m_planning_timeout;
     bool m_use_domination;
+    bool m_plan_only;
 
     // logging and evaluation data files
     std::string m_ps_dir;
@@ -414,6 +432,7 @@ private:
                 }
                 size_t n_pruned = opc.pruneUnreachablePoses();
                 logval("unreachable_poses_pruned", n_pruned);
+                logval("reachable_poses", opc.getPoses().size());
 
                 t0 = ros::WallTime::now();
                 opc.prepareTravelTimeLut(m_agent, m_world_frame_id);
@@ -574,6 +593,14 @@ private:
                 iegain *= (1.0 - rpcg(*it));
             }
             logval("expected_gain", 1.0 - iegain);
+
+            // termination criterion
+            if(m_plan_only)
+            {
+                loginfo("termination criterion: plan only mode");
+                m_observe_volumes_server.setSucceeded();
+                return;
+            }
 
             // move the robot
             ros::Time st0 = ros::Time::now();

@@ -51,7 +51,7 @@ private:
       */
     double static pathCostToDriveTime(const double path_cost)
     {
-        return 0.0015513931248 * path_cost + 7.97932567664;
+        return 0.00154359040949 * path_cost + 5.94000921233;
     }
 
     // read as ros parameter

@@ -191,7 +191,8 @@ private:
         }
     }
 
-    void logval(const std::string & what, double val)
+    template<typename T>
+    void logval(const std::string & what, T val)
     {
         ROS_INFO_STREAM("value of " << what << ": " << val);
         if(m_file_vals.is_open()) {
@@ -473,21 +474,18 @@ private:
 
             t0 = ros::WallTime::now();
             std::vector<size_t> plan;
+            bool plan_finished = false;
             if(m_planning_mode == "search")
             {
                 ROS_INFO("entering planning phase (search)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
-                bool finished = spl.makePlan(m_depth_limit,
+                plan_finished = spl.makePlan(m_depth_limit,
                                              pdone_goal * m_relative_lookahead,
                                              m_max_rel_branch_cost,
                                              m_planning_timeout * 1000,
                                              m_use_domination);
                 plan = spl.getSequence();
-                if(!finished)
-                {
-                    logerror("planning timed out");
-                }
             }
             else if(m_planning_mode == "id")
             {
@@ -503,6 +501,7 @@ private:
                     if(spl.makePlan(depth, pdone_goal, m_max_rel_branch_cost, remaining_time * 1000, m_use_domination))
                     {
                         plan = spl.getSequence();
+                        plan_finished = true;
                         if(spl.getPdone() <= pdone_goal) break;
                     }
                     pdone_goal = spl.getPdone();
@@ -532,6 +531,7 @@ private:
                                     etime_bound))
                     {
                         plan = spl.getSequence();
+                        plan_finished = true;
                         if(!spl.branchCutoffOccurred()) break;
                         etime_bound = spl.getEtime();
                     }
@@ -544,22 +544,26 @@ private:
                 ROS_INFO("entering planning phase (greedy-reorder)");
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
                 spl.makeGreedy();
-                bool finished = spl.optimalOrder(m_depth_limit,
+                plan_finished = spl.optimalOrder(m_depth_limit,
                                                  success_probability * m_relative_lookahead,
                                                  m_max_rel_branch_cost,
                                                  m_planning_timeout * 1000,
                                                  spl.getSequence());
                 plan = spl.getSequence();
-                if(!finished)
-                {
-                    logerror("planning timed out");
-                }
             }
             else
             {
                 ROS_ERROR_STREAM("unknown planning mode: " << m_planning_mode);
             }
-            logtime("planning_time", t0);
+
+            if(plan_finished)
+            {
+                logtime("planning_time", t0);
+            }
+            else
+            {
+                logval("planning_time", "timeout");
+            }
 
             // termination criterion
             if(plan.size() < 2)
@@ -608,8 +612,10 @@ private:
                                         opc.getPoses()[best_pose_idx].view_distance))
             {
                 // wait for acquisition
-                ROS_INFO_STREAM("waiting " << m_agent.getAcquisitionTime() << " s for data acquisition...");
-                ros::Duration(m_agent.getAcquisitionTime()).sleep();
+                // HACK: Add 5s time to work around stupid gazebo kinect bug
+                double wait_time = m_agent.getAcquisitionTime() + 5;
+                ROS_INFO_STREAM("waiting " << wait_time << " s for data acquisition...");
+                ros::Duration(wait_time).sleep();
             }
             else
             {

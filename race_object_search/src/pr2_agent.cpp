@@ -35,12 +35,12 @@ Pr2Agent::Pr2Agent(tf::TransformListener & tf_listener, const std::string & worl
     m_lift_torso_client("/torso_controller/position_joint_action", true)
 {
     // acquisition_time should include the complete timespan needed to obtain and integrate sensor data once the
-    // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 8.0 here)
+    // observation pose has been reached. (in gazebo with sensor_motion_filter use at least 5.0 here)
     if(!ros::param::has("~acquisition_time"))
     {
         ROS_WARN("Sensor acquisition time not set. Using default!");
     }
-    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 10.0);
+    ros::param::param<double>("~acquisition_time", ACQUISITION_TIME, 5.0);
     ROS_INFO_STREAM("Sensor acquisition time: " << ACQUISITION_TIME);
 }
 

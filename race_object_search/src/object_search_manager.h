@@ -492,22 +492,30 @@ private:
                 ROS_INFO("entering planning phase (iterative deepening)");
                 ros::WallTime endtime = ros::WallTime::now() + ros::WallDuration(m_planning_timeout);
                 SearchPlanner<RegionalProbabilityCellGain> spl(rpcg, opc);
-                double pdone_goal = 0.0;
-                double max_pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
-                size_t depth = 0;
-                double remaining_time = (endtime - ros::WallTime::now()).toSec();
-                while(pdone_goal < max_pdone_goal && remaining_time > 0)
+                double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
+                double etime_bound = std::numeric_limits<double>::infinity();
+                double last_iteration_time = 0;
+                int dl = 0;
+                for(; dl <= m_depth_limit; ++dl)
                 {
-                    if(spl.makePlan(depth, pdone_goal, m_max_rel_branch_cost, remaining_time * 1000, m_use_domination))
+                    double remaining_time = (endtime - ros::WallTime::now()).toSec();
+                    if(remaining_time < last_iteration_time) break;
+                    ros::WallTime start = ros::WallTime::now();
+                    if(spl.makePlan(dl,
+                                    pdone_goal * m_relative_lookahead,
+                                    m_max_rel_branch_cost,
+                                    remaining_time * 1000,
+                                    m_use_domination,
+                                    etime_bound))
                     {
                         plan = spl.getSequence();
                         plan_finished = true;
-                        if(spl.getPdone() <= pdone_goal) break;
+                        if(plan.size() - 1 <= dl) break;
+                        etime_bound = spl.getEtime();
                     }
-                    pdone_goal = spl.getPdone();
-                    ++depth;
-                    remaining_time = (endtime - ros::WallTime::now()).toSec();
+                    last_iteration_time = (ros::WallTime::now() - start).toSec();
                 }
+                logval("max_dl", dl);
             }
             else if(m_planning_mode == "iw")
             {

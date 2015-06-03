@@ -51,6 +51,7 @@ public:
         m_node_handle.param("keep_planned_poses", m_keep_planned_poses, true);
         m_node_handle.param("use_domination", m_use_domination, false);
         m_node_handle.param("plan_only", m_plan_only, false);
+        m_node_handle.param("additional_acquisition_time", m_additional_acquisition_time, 5.0);
 
         std::cout << "Parameters:" << std::endl;
         std::cout << "world_frame_id " << m_world_frame_id << std::endl;
@@ -67,6 +68,7 @@ public:
         std::cout << "keep_planned_poses " << m_keep_planned_poses << std::endl;
         std::cout << "use_domination " << m_use_domination << std::endl;
         std::cout << "plan_only " << m_plan_only << std::endl;
+        std::cout << "additional_acquisition_time" << m_additional_acquisition_time << std::endl;
 
         m_use_static_poses = !m_ps_dir.empty();
         if(m_use_static_poses) m_keep_planned_poses = false;
@@ -131,6 +133,7 @@ private:
     double m_relative_lookahead;
     double m_max_rel_branch_cost;
     double m_planning_timeout;
+    double m_additional_acquisition_time;
     bool m_use_domination;
     bool m_plan_only;
 
@@ -495,8 +498,8 @@ private:
                 double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
                 double etime_bound = std::numeric_limits<double>::infinity();
                 double last_iteration_time = 0;
-                int dl = 0;
-                for(; dl <= m_depth_limit; ++dl)
+                unsigned int dl = 0;
+                for(; dl <= static_cast<unsigned int>(m_depth_limit); ++dl)
                 {
                     double remaining_time = (endtime - ros::WallTime::now()).toSec();
                     if(remaining_time < last_iteration_time) break;
@@ -620,8 +623,7 @@ private:
                                         opc.getPoses()[best_pose_idx].view_distance))
             {
                 // wait for acquisition
-                // HACK: Add 5s time to work around stupid gazebo kinect bug
-                double wait_time = m_agent.getAcquisitionTime() + 5;
+                double wait_time = m_agent.getAcquisitionTime() + m_additional_acquisition_time;
                 ROS_INFO_STREAM("waiting " << wait_time << " s for data acquisition...");
                 ros::Duration(wait_time).sleep();
             }

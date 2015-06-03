@@ -177,7 +177,7 @@ def base(gui=True):
     evman.initRviz(gui)
     signal.pause()
 
-def runtrials_nomap(name, configs, test, N=20, gui=False):
+def runtrials_nomap(name, configs, test, N=20, gui=False, rosbag=True):
     """
     configs = [(name, search_kwargs), ...]
     """
@@ -201,7 +201,8 @@ def runtrials_nomap(name, configs, test, N=20, gui=False):
             xypose = evman.setCamera(xypose)
             evman.initMapping(logdir)
             evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
-            evman.recordRosbag(logdir)
+            if rosbag:
+                evman.recordRosbag(logdir)
             evman.runTest(**test)
             evman.shutdown()
         # --- CLEANUP ---
@@ -223,14 +224,19 @@ def runtrials_withmap(name, configs, test, N=20, gui=False, rosbag=True):
         return False
     os.mkdir(scriptdir)
     evman = init(scriptdir)
-    # --- INITIAL MAP ---
     evman.initBaseSystem(gui)
     evman.initRviz(gui)
     evman.initMapping(scriptdir)
-    evman.initSearchMan(dl=0, log=scriptdir)
-    evman.runTest()
-    evman.stopSearchMan()
-    evman.call("rosservice call /next_best_view_node/write_map %s/" % scriptdir)
+    # --- INITIAL MAP ---
+    mapdir = "%s/map" % os.getcwd()
+    if os.path.exists(mapdir):
+        print "Found map directory, skipping map creation"
+    else:
+        os.mkdir(mapdir)
+        evman.initSearchMan(dl=0, log=scriptdir)
+        evman.runTest()
+        evman.stopSearchMan()
+        evman.call("rosservice call /next_best_view_node/write_map %s/" % mapdir)
     for n in range(N):
         psd = "%s/psd" % scriptdir
         os.mkdir(psd)
@@ -241,7 +247,7 @@ def runtrials_withmap(name, configs, test, N=20, gui=False, rosbag=True):
             os.mkdir(logdir)
             evman.resetGzworld()
             xypose = evman.setCamera(xypose)
-            evman.call("rosservice call /next_best_view_node/load_map %s/" % scriptdir)
+            evman.call("rosservice call /next_best_view_node/load_map %s/" % mapdir)
             evman.initSearchMan(psd=psd, log=logdir, **search_kwargs)
             if rosbag:
                 evman.recordRosbag(logdir)
@@ -266,71 +272,119 @@ def iros0215_withmap(N=20, gui=False):
                ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5})]
     return runtrials_withmap("iros0215_withmap", configs, {}, N=N, gui=gui)
 
-def only_id_1(N=20, gui=False):
-    configs = [("id", {"pm":"id", "bl":2.0, "to":10})]
-    return runtrials_withmap("only_id_1", configs, {}, N=N, gui=gui)
+def thesis_nomap(N=20, gui=False):
+    configs = [("greedy", {"pm":"search", "dl":0, "la":1.0, "po":"false"}),
+               ("phi3_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi5_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"false", "to":1}),
+               ("phi5_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"false", "to":0.5}),
+               ("phi3_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":1}),
+               ("phi3_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":0.5}),
+               ("phi1_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"false", "to":1}),
+               ("phi1_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"false", "to":0.5}),
+               ("dl2_iw10",    {"pm":"iw", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl2_iw5",     {"pm":"iw", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("dl4_iw10",    {"pm":"iw", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl4_iw5",     {"pm":"iw", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("iw10",    {"pm":"iw", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("iw5",     {"pm":"iw", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("phi3_dl2_ud",    {"pm":"search", "dl":2, "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi5_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.5, "po":"false", "to":1}),
+               ("phi5_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.5, "po":"false", "to":0.5}),
+               ("phi3_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":1}),
+               ("phi3_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":0.5}),
+               ("phi1_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.1, "po":"false", "to":1}),
+               ("phi1_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.1, "po":"false", "to":0.5}),
+               ("dl2_iw10_ud",    {"pm":"iw", "dl":2, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl2_iw5_ud",     {"pm":"iw", "dl":2, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("dl4_iw10_ud",    {"pm":"iw", "dl":4, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl4_iw5_ud",     {"pm":"iw", "dl":4, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("iw10_ud",    {"pm":"iw", "dl":"default", "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("iw5_ud",     {"pm":"iw", "dl":"default", "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5})]
+    return runtrials_nomap("thesis_nomap", configs, {}, N=N, gui=gui, rosbag=False)
 
-def multi_id(N=20, gui=False):
-    configs = [("id1", {"pm":"id", "bl":1.5, "to":5}),
-               ("id2", {"pm":"id", "bl":1.5, "to":10}),
-               ("id3", {"pm":"id", "bl":1.5, "to":20}),
-               ("id4", {"pm":"id", "bl":2.0, "to":5}),
-               ("id5", {"pm":"id", "bl":2.0, "to":10}),
-               ("id6", {"pm":"id", "bl":2.0, "to":20}),
-               ("id7", {"pm":"id", "bl":3.0, "to":5}),
-               ("id8", {"pm":"id", "bl":3.0, "to":10}),
-               ("id9", {"pm":"id", "bl":3.0, "to":20})]
-    return runtrials_withmap("multi_id", configs, {}, N=N, gui=gui)
-
-def test_ud(N=20, gui=False):
-    configs = [("greedy"  , {"pm":"search", "dl":0}),
-               ("id1", {"pm":"id", "bl":1.5, "to":5, "ud":"true"}),
-               ("id5", {"pm":"id", "bl":2.0, "to":10, "ud":"true"}),
-               ("planning", {"pm":"search", "dl":50, "la":0.8, "bl":1.5, "ud":"true"})]
-    return runtrials_withmap("test_ud", configs, {}, N=N, gui=gui)
-
-def compare_iw(N=20, gui=False):
-    configs = [("greedy", {"pm":"search", "dl":0}),
-               ("iw5", {"pm":"iw", "dl":50, "ud":"true", "la":1.0, "bl":5.0, "to":5}),
-               ("static_ud", {"pm":"search", "dl":50, "ud":"true", "la":1.0, "bl":1.2, "to":60}),
-               ("static_n", {"pm":"search", "dl":50, "ud":"false", "la":1.0, "bl":1.2, "to":60})]
-    return runtrials_nomap("compare_iw", configs, {}, N=N, gui=gui)
-
-def thesis_planonly(N=20, gui=False):
-    configs = [("greedy", {"pm":"search", "dl":0, "la":1.0, "po":"true"}),
-               ("optimal",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":"default", "po":"true"}),
-               ("optimal_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":"default", "po":"true"}),
-               ("phi1",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi2",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.2, "po":"true"}),
-               ("phi3",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi4",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.4, "po":"true"}),
-               ("phi5",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"true"}),
-               ("phi10",   {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
-               ("phi1_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi2_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.2, "po":"true"}),
-               ("phi3_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi4_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.4, "po":"true"}),
-               ("phi5_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.5, "po":"true"}),
-               ("phi10_ud",{"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
-               ("dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":2.0, "po":"true"}),
-               ("phi1_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi1_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi1_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi1_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi1_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi1_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.1, "po":"true"}),
-               ("phi3_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi3_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi3_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi3_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi3_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"}),
-               ("phi3_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.3, "po":"true"})]
-    return runtrials_withmap("thesis_planonly", configs, {}, N=N, gui=gui, rosbag=False)
+def thesis_withmap(N=20, gui=False):
+    configs = [("po_greedy", {"pm":"search", "dl":0, "la":1.0, "po":"true"}),
+               ("po_phi1",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi2",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.2, "po":"true", "to":600}),
+               ("po_phi3",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi4",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("po_phi5",    {"pm":"search", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_phi1_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi2_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.2, "po":"true", "to":600}),
+               ("po_phi3_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi4_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("po_phi5_ud", {"pm":"search", "dl":"default", "ud":"true",  "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.5, "po":"true", "to":600}),
+               ("po_phi1_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi1_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi1_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi1_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi1_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi1_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.1, "po":"true", "to":600}),
+               ("po_phi3_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi3_dl4",    {"pm":"search", "dl":4, "ud":"false", "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi3_dl6",    {"pm":"search", "dl":6, "ud":"false", "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi4_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("po_phi4_dl3",    {"pm":"search", "dl":3, "ud":"false", "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("po_phi3_dl2_ud", {"pm":"search", "dl":2, "ud":"true",  "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi3_dl4_ud", {"pm":"search", "dl":4, "ud":"true",  "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi3_dl6_ud", {"pm":"search", "dl":6, "ud":"true",  "la":1.0, "bl":1.3, "po":"true", "to":600}),
+               ("po_phi4_dl2_ud",    {"pm":"search", "dl":2, "ud":"true", "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("po_phi4_dl3_ud",    {"pm":"search", "dl":3, "ud":"true", "la":1.0, "bl":1.4, "po":"true", "to":600}),
+               ("greedy", {"pm":"search", "dl":0, "la":1.0, "po":"false"}),
+               ("phi2_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.2, "po":"false", "to":60}),
+               ("phi3_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi3_dl3",    {"pm":"search", "dl":3, "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi4_dl2",    {"pm":"search", "dl":2, "ud":"false", "la":1.0, "bl":1.4, "po":"false", "to":60}),
+               ("phi4_dl3",    {"pm":"search", "dl":3, "ud":"false", "la":1.0, "bl":1.4, "po":"false", "to":60}),
+               ("phi3_dl6_ud",    {"pm":"search", "dl":6, "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi5_id30",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"false", "to":3}),
+               ("phi5_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"false", "to":1}),
+               ("phi5_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.5, "po":"false", "to":0.5}),
+               ("phi3_id30",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":3}),
+               ("phi3_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":1}),
+               ("phi3_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.3, "po":"false", "to":0.5}),
+               ("phi1_id30",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"false", "to":3}),
+               ("phi1_id10",    {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"false", "to":1}),
+               ("phi1_id5",     {"pm":"id", "dl":"default", "ud":"false", "la":1.0, "bl":1.1, "po":"false", "to":0.5}),
+               ("dl2_iw30",    {"pm":"iw", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("dl2_iw10",    {"pm":"iw", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl2_iw5",     {"pm":"iw", "dl":2, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("dl4_iw30",    {"pm":"iw", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("dl4_iw10",    {"pm":"iw", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl4_iw5",     {"pm":"iw", "dl":4, "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("iw30",    {"pm":"iw", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("iw10",    {"pm":"iw", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("iw5",     {"pm":"iw", "dl":"default", "ud":"false", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("phi2_dl2_ud",    {"pm":"search", "dl":2, "ud":"true", "la":1.0, "bl":1.2, "po":"false", "to":60}),
+               ("phi3_dl2_ud",    {"pm":"search", "dl":2, "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi3_dl3_ud",    {"pm":"search", "dl":3, "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":60}),
+               ("phi4_dl2_ud",    {"pm":"search", "dl":2, "ud":"true", "la":1.0, "bl":1.4, "po":"false", "to":60}),
+               ("phi4_dl3_ud",    {"pm":"search", "dl":3, "ud":"true", "la":1.0, "bl":1.4, "po":"false", "to":60}),
+               ("phi5_id30_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.5, "po":"false", "to":3}),
+               ("phi5_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.5, "po":"false", "to":1}),
+               ("phi5_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.5, "po":"false", "to":0.5}),
+               ("phi3_id30_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":3}),
+               ("phi3_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":1}),
+               ("phi3_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.3, "po":"false", "to":0.5}),
+               ("phi1_id30_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.1, "po":"false", "to":3}),
+               ("phi1_id10_ud",    {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.1, "po":"false", "to":1}),
+               ("phi1_id5_ud",     {"pm":"id", "dl":"default", "ud":"true", "la":1.0, "bl":1.1, "po":"false", "to":0.5}),
+               ("dl2_iw30_ud",    {"pm":"iw", "dl":2, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("dl2_iw10_ud",    {"pm":"iw", "dl":2, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl2_iw5_ud",     {"pm":"iw", "dl":2, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("dl4_iw30_ud",    {"pm":"iw", "dl":4, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("dl4_iw10_ud",    {"pm":"iw", "dl":4, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("dl4_iw5_ud",     {"pm":"iw", "dl":4, "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5}),
+               ("iw30_ud",    {"pm":"iw", "dl":"default", "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":3}),
+               ("iw10_ud",    {"pm":"iw", "dl":"default", "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":1}),
+               ("iw5_ud",     {"pm":"iw", "dl":"default", "ud":"true", "la":1.0, "bl":2.0, "po":"false", "to":0.5})]
+    return runtrials_withmap("thesis_withmap", configs, {}, N=N, gui=gui, rosbag=False)
 
 def main():
     for cmd in sys.argv[1:]:

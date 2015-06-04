@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<robot name="wine_glass"
+  xmlns:xi="http://www.w3.org/2001/XInclude"
+  xmlns:gazebo="http://playerstage.sourceforge.net/gazebo/xmlschema/#gz"
+  xmlns:model="http://playerstage.sourceforge.net/gazebo/xmlschema/#model"
+  xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+  xmlns:body="http://playerstage.sourceforge.net/gazebo/xmlschema/#body"
+  xmlns:geom="http://playerstage.sourceforge.net/gazebo/xmlschema/#geom"
+  xmlns:joint="http://playerstage.sourceforge.net/gazebo/xmlschema/#joint"
+  xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+  xmlns:rendering="http://playerstage.sourceforge.net/gazebo/xmlschema/#rendering"
+  xmlns:renderable="http://playerstage.sourceforge.net/gazebo/xmlschema/#renderable"
+  xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+  xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <property name="glass_radius" value="0.048" />
+  <property name="glass_height" value="0.207" />
+  <property name="glass_mass" value="0.2" />
+
+  <property name="M_PI" value="3.1415926535897931" />
+
+  <xacro:macro name="cylinder_inertial" params="radius length mass origin">
+    <inertial>
+      <mass value="${mass}" />
+      <origin xyz="${origin}" />
+      <inertia ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0" 
+        iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0" 
+        izz="${0.5 * mass * radius * radius}" />
+    </inertial>
+  </xacro:macro>
+
+  <!-- for debugging urdf: -->
+  <!-- <link name="base_footprint">
+    <inertial>
+      <mass value="1.0" />
+      <origin xyz="0 0 0" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0"
+        iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wine_joint" type="fixed">
+    <parent link="base_footprint" />
+    <child link="wine_glass_link" />
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint> -->
+
+  <link name="wine_glass_link">
+    <visual>
+      <origin xyz="0 0 0" />
+      <geometry>
+        <mesh filename="package://gazebo_worlds/meshes/000.580.67.obj" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual> 
+    <collision>
+      <origin xyz="0 0 ${glass_height/2}" />
+      <geometry>
+        <cylinder radius="${glass_radius}" length="${glass_height}" />
+      </geometry>
+    </collision>
+    <xacro:cylinder_inertial radius="${glass_radius}" length="${glass_height}" mass="${glass_mass}" origin="0 0 ${glass_height/2}" />
+  </link>
+
+  <!-- <gazebo reference="wine_glass_link">
+    <material>Gazebo/LightWood</material>
+    <mu1>50.0</mu1>
+    <mu2>50.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>1.0</kd>
+  </gazebo> -->
+</robot>

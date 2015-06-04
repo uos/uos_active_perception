@@ -1,0 +1,7 @@
+# map_server config file
+image: tams_demo.png
+resolution: 0.05
+origin: [-13.0, -4.5, 0.0]  # x, y, yaw
+occupied_thresh: 0.8
+free_thresh: 0.2
+negate: 0

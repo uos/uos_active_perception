@@ -1,0 +1,5 @@
+digraph G {
+node [shape=box];
+"plate" [label="plate"];
+node [shape=ellipse, color=blue, fontcolor=blue];
+}

@@ -1,6 +1,6 @@
 <robot
   xmlns:xacro="http://ros.org/wiki/xacro"
-  name="race_mug3">
+  name="race_mug_hot">
 
   <include filename="$(find active_perception_evaluation)/urdf/common.xacro" />
 
@@ -30,7 +30,7 @@
   </link>
 
   <gazebo reference="body">
-    <material>Gazebo/WhiteGlow</material>
+    <material>Gazebo/RedGlow</material>
   </gazebo>
 
 </robot>

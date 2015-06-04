@@ -1,0 +1,107 @@
+<robot name="race_tray">
+
+  <link name="plate">
+    <inertial>
+      <origin xyz="0.0 0.0 0.005" /> 
+      <mass value="0.5" />
+      <inertia  ixx="1" ixy="0.0"  ixz="0.0"  iyy="1" iyz="0.0"  izz="1" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.005" /> 
+      <geometry>
+        <box size="0.3 0.3 0.01" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.005" /> 
+      <geometry>
+        <box size="0.3 0.3 0.01" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="pl_ha" type="fixed">
+    <parent link="plate"/>
+    <child link="handle"/>
+  </joint>
+
+  <link name="handle">
+    <inertial>
+      <origin xyz="0 0 -0.1" /> 
+      <mass value="0.2" />
+      <inertia  ixx="1" ixy="0.0"  ixz="0.0"  iyy="1" iyz="0.0"  izz="1" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.1" /> 
+      <geometry>
+        <cylinder length="0.2" radius="0.03" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.1" /> 
+      <geometry>
+        <cylinder length="0.2" radius="0.03" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="ha_foot1" type="fixed">
+    <parent link="handle"/>
+    <child link="foot1"/>
+  </joint>
+
+  <link name="foot1">
+    <inertial>
+      <origin xyz="-0.0 -0.0 -0.195" rpy="0 0 0.79" /> 
+      <mass value="0.1" />
+      <inertia  ixx="1" ixy="0.0"  ixz="0.0"  iyy="1" iyz="0.0"  izz="1" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.0 -0.0 -0.195" rpy="0 0 0.79" />
+      <geometry>
+        <box size="-0.4 -0.01 0.01"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.195" />
+      <geometry>
+        <!--Collision shape is defined in foot2-->
+        <box size="0.005 0.005 0.005" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="ha_foot2" type="fixed">
+    <parent link="handle"/>
+    <child link="foot2"/>
+  </joint>
+
+  <link name="foot2">
+    <inertial>
+      <origin xyz="-0.0 -0.0 -0.195" rpy="0 0 2.36" /> 
+      <mass value="0.1" />
+      <inertia  ixx="1" ixy="0.0"  ixz="0.0"  iyy="1" iyz="0.0"  izz="1" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.0 -0.0 -0.195" rpy="0 0 2.36" />
+      <geometry>
+        <box size="-0.4 -0.01 0.01"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.195" /> 
+      <geometry>
+        <!--Define a box of the shape of the plate-->
+        <box size="0.3 0.3 0.01" />
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="plate">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="handle">
+    <material>Gazebo/Red</material>
+  </gazebo>
+
+</robot>

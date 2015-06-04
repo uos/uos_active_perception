@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<robot name="race_tray"
+  xmlns:xi="http://www.w3.org/2001/XInclude"
+  xmlns:gazebo="http://playerstage.sourceforge.net/gazebo/xmlschema/#gz"
+  xmlns:model="http://playerstage.sourceforge.net/gazebo/xmlschema/#model"
+  xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+  xmlns:body="http://playerstage.sourceforge.net/gazebo/xmlschema/#body"
+  xmlns:geom="http://playerstage.sourceforge.net/gazebo/xmlschema/#geom"
+  xmlns:joint="http://playerstage.sourceforge.net/gazebo/xmlschema/#joint"
+  xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+  xmlns:rendering="http://playerstage.sourceforge.net/gazebo/xmlschema/#rendering"
+  xmlns:renderable="http://playerstage.sourceforge.net/gazebo/xmlschema/#renderable"
+  xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+  xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <property name="radius" value="0.048" />
+  <property name="origin" value="0 0 0" />
+  <property name="height" value="0.01" />
+  <property name="length" value="0.300" />
+  <property name="mass" value="0.1" />
+  <property name="M_PI" value="3.1415926535897931" />
+
+  <xacro:macro name="plate" params="length height mass origin">
+    <inertial>
+      <mass value="${mass}" />
+      <origin xyz="${origin}" />
+      <inertia ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0" 
+        iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0" 
+        izz="${0.5 * mass * radius * radius}" />
+    </inertial>
+
+  <link name="plate">
+    <inertial>
+      <origin xyz="0 0 0" /> 
+      <mass value="0.6" />
+      <inertia  ixx="0.06" ixy="0.0"  ixz="0.0"  iyy="0.06" iyz="0.0"  izz="0.06" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <box size="0.3 0.3 0.01" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0"/>
+      <geometry>
+        <box size="0.3 0.3 0.01" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="pl_ha" type="continuous">
+    <parent link="plate"/>
+    <child link="handle"/>
+  </joint>
+
+  <link name="handle">
+    <inertial>
+      <origin xyz="0 0 -0.1" /> 
+      <mass value="0.1" />
+      <inertia  ixx="0.01" ixy="0.0"  ixz="0.0"  iyy="0.01" iyz="0.0"  izz="0.01" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.1" /> 
+      <geometry>
+        <cylinder length="0.2" radius="0.03" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.1" /> 
+      <geometry>
+        <cylinder length="0.2" radius="0.03" />
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="plate">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <!--
+     -<material name="tray_material">
+     -  [><texture filename="...texture file..." /><]
+     -  <color rgba="255 255 0 0"/>
+     -</material>
+     -->
+
+</robot>

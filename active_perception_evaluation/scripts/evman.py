@@ -107,7 +107,7 @@ class Evman:
             self.initBaseSystem()
         print "> Starting Rviz"
         fnull = open(os.devnull, 'w')
-        self.procRviz = subprocess.Popen("exec rosrun rviz rviz -d /home/thorsten/ros_fuerte/race/uos_active_perception/race_object_search/config/object_search.vcg", shell=True, preexec_fn=os.setsid, stdout=fnull, stderr=fnull)
+        self.procRviz = subprocess.Popen("exec rosrun rviz rviz -d $(rospack find race_object_search)/config/object_search.vcg", shell=True, preexec_fn=os.setsid, stdout=fnull, stderr=fnull)
         time.sleep(5)
 
     def stopRviz(self):

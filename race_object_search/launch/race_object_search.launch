@@ -1,23 +1,19 @@
 <?xml version="1.0" ?>
 <launch>
   <arg name="sim" default="false" />
+  <arg name="fk" default="false" />
+  <arg name="map" default="race_inflated" />
   <arg name="log_dir" default="" />
 
   <include file="$(find race_object_search)/launch/object_search_prerequisites_pr2.launch">
     <arg name="sim" value="$(arg sim)" />
-    <arg name="fk" value="false" />
-    <arg name="map" value="race_inflated" />
+    <arg name="fk" value="$(arg fk)" />
+    <arg name="map" value="$(arg map)" />
   </include>
-  <node name="object_search_manager" pkg="race_object_search" type="object_search_manager" output="screen" respawn="true">
-    <param name="world_frame_id" type="string" value="/map" />
-    <param     if="$(arg sim)" name="acquisition_time" type="double" value="9.0" />
-    <param unless="$(arg sim)" name="acquisition_time" type="double" value="2.0" />
-    <param name="robot" type="string" value="pr2" />
-    <param name="log_dir" type="string" value="$(arg log_dir)" />
-    <!-- planning params -->
-    <param name="planning_mode" type="string" value="search" />
-    <param name="depth_limit" type="int" value="5" />
-    <param name="max_rel_branch_cost" type="double" value="1.8" />
-    <param name="planning_timeout" type="double" value="20" />
-  </node>
+  <include file="$(find race_object_search)/launch/object_search_manager.launch">
+    <arg name="sim" value="$(arg sim)" />
+    <arg name="log_dir" value="$(arg log_dir)" />
+    <arg     if="$(arg fk)" name="robot" value="floating_kinect" />
+    <arg unless="$(arg fk)" name="robot" value="pr2" />
+  </include>
 </launch>

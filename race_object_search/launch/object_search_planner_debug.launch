@@ -1,8 +1,0 @@
-<?xml version="1.0" ?>
-<launch>
-  <node name="point_head_continuous" pkg="point_head_continuous" type="point_head_continuous" output="screen" respawn="true" />
-  <node name="object_search_planner" pkg="race_object_search" type="object_search_planner" output="screen" respawn="false" launch-prefix="gdb -ex run --args">
-    <param name="world_frame_id" type="string" value="/map" />
-    <param name="acquisition_time"   type="double" value="9.0" />
-  </node>
-</launch>

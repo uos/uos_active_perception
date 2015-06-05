@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- This launch file starts navigation, manipulation et cetera.
+       It is assumed that the basic PR2 software (real or Gazebo) is running. -->
+
+  <!-- set stereo to true for narrow stereo, false for kinect -->
+  <arg name="stereo" default="false" />
+
+  <!-- use sim if you're in simulation and don't want to run openni_node -->
+  <arg name="sim" default="true" />
+
+  <!-- machine tags for sim and pr2, be sure to set environment variable ROBOT to correct setting -->
+  <include file="$(find pr2_machine)/$(env ROBOT).machine" />
+
+  <include file="$(find active_perception_evaluation)/config/amcl_node.xml" />
+
+  <include file="$(find pr2_navigation_teleop)/teleop.xml" />
+
+  <include file="$(find pr2_navigation_perception)/lasers_and_filters.xml" />
+  <param name="/tilt_shadow_filter/incident_angle_correction" value="false" />  <!-- see http://answers.ros.org/question/37126/pr2-sees-ghost-obstacles-in-tilting-laser/ -->
+
+  <include file="$(find pr2_navigation_perception)/ground_plane.xml" />
+  <param name="/sac_ground_removal/sac_distance_threshold" value="0.10" />
+
+  <!-- The navigation stack and associated parameters -->
+  <include file="$(find pr2_navigation_global)/move_base.xml" />
+
+  <node name="map_server" pkg="map_server" type="map_server"
+    args="$(find active_perception_evaluation)/config/map_$(env ROBOT).pgm 0.05"
+    respawn="true" />
+
+  <!--Set logger level as on my PC move_base spams the log with warning due to tf delays-->
+  <node if="$(arg sim)" name="loglevels_error" pkg="rosservice" type="rosservice"
+    args="call /move_base_node/set_logger_level 'ros' 'ERROR'" output="screen"/>
+
+  <!-- Update the robot's AMCL pose hypothesis by querying the simulation
+       ground truth. Has to be started here, because we only want this update
+       to happen once whenever we start AMCL. -->
+  <node if="$(arg sim)" pkg="active_perception_evaluation" type="sim_amcl_update" name="sim_amcl_update" args="pr2" respawn="false" output="screen" />
+</launch>

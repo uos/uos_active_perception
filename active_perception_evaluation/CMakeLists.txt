@@ -30,3 +30,4 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #target_link_libraries(example ${PROJECT_NAME})
 
 rosbuild_add_executable(floating_kinect_localizer src/floating_kinect_localizer.cpp)
+rosbuild_add_executable(sim_amcl_update src/sim_amcl_update.cpp src/sim_manipulator.cpp)

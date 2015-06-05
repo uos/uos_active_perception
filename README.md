@@ -10,7 +10,7 @@ How to install the system and its dependencies into an empty workspace on ROS Fu
 1. Add the following lines to your .rosinstall:
 
         # The uos_active_perception repo
-        - git: {local-name: uos_active_perception, uri: 'software@kure.informatik.uos.de:uos_active_perception', version: fuerte}
+        - git: {local-name: uos_active_perception, uri: 'https://github.com/uos/uos_active_perception.git', version: fuerte}
         # A fork of the ROS Navigation Stack featuring symmetrical path costs and batch path planning
         - git: {local-name: overlays/navigation, uri: 'https://github.com/uos/navigation.git', version: fuerte_race}
         # Octomap 1.6 (ROS Fuerte comes with version 1.4, which is too old)

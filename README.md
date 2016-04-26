@@ -32,11 +32,11 @@ How to install the system and its dependencies into an empty workspace on ROS Fu
         mkdir -p build && cd build
         cmake ..
         make
-        
+
 4. Compile all ROS packages
 
         rosmake --all
-  
+
 How to run the system with Gazebo
 ---------------------------------
 
@@ -83,29 +83,29 @@ Execute each of the following steps in a new terminal:
 1. Start Gazebo
 
         roslaunch active_perception_evaluation race_world.launch gui:=true
-        
+
 2. Spawn objects of the demo environment and the sensor
 
         roslaunch active_perception_evaluation spawn_race_objects.launch
         roslaunch active_perception_evaluation spawn_floating_kinect.launch
-        
+
 3. Start the simulation; start ground truth robot localiazation
 
         rosservice call /gazebo/unpause_physics
         roslaunch active_perception_evaluation floating_kinect_navigation.launch
-        
+
 4. Launch RViz
 
         rosrun rviz rviz -d $(rospack find race_object_search)/config/object_search.vcg
-        
+
 5. Start mapping and view sampling
 
         roslaunch race_object_search object_search_prerequisites_pr2.launch sim:=true map:=race_extended_inflated fk:=true
-        
+
 6. Start object search using default planner parameters
 
         roslaunch race_object_search object_search_manager.launch robot:=floating_kinect
-        
+
 7. Execute object search with 6 target volumes, each with 20% success probability and 5% termination threshold
 
         rosrun race_object_search object_search_manager_test p table1 0.2 table2 0.2 counter 0.2 shelf1 0.2 shelf2 0.2 shelf3 0.2 min_p_succ 0.05

@@ -2,7 +2,15 @@ uos_active_perception
 =====================
 
 This is a ROS stack for code of the project FLAP for CAOS (Forward-Looking Active Perception for Clutter-Aware Object
-Search). All subdirectories are ROS packages.
+Search).
+
+A video of the system running on the PR2 robot can be found on the [project web page](http://kos.informatik.uos.de/flap4caos/).
+
+More details can be found in the following publication:
+
+Thorsten Gedicke, Martin Günther, and Joachim Hertzberg. FLAP for CAOS:
+Forward-looking active perception for clutter-aware object search. In *Proc.
+9th IFAC Symposium on Intelligent Autonomous Vehicles (IAV)*. IFAC, June 2016.
 
 How to install the system and its dependencies into an empty workspace on ROS Fuerte
 ------------------------------------------------------------------------------------

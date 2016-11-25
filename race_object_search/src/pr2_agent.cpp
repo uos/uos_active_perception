@@ -2,7 +2,7 @@
 
 #include "kmeans.h"
 
-#include <move_base/GetMultiplePlans.h>
+#include <move_base_msgs/GetMultiplePlans.h>
 #include <nav_msgs/Path.h>
 #include <visualization_msgs/Marker.h>
 
@@ -219,7 +219,7 @@ std::vector<double> Pr2Agent::estimateMoveBaseTimes
     }
 
     // generate path planner request
-    move_base::GetMultiplePlans get_plans_call;
+    move_base_msgs::GetMultiplePlans get_plans_call;
     get_plans_call.request.start.resize(cluster_pathmap.size());
     get_plans_call.request.goal.resize(cluster_pathmap.size());
     {

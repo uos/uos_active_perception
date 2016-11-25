@@ -4,7 +4,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <move_base_msgs/MoveBaseAction.h>
-#include <move_base/GetMultiplePlans.h>
+#include <move_base_msgs/GetMultiplePlans.h>
 #include <boost/random.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -45,7 +45,7 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
       start_pose.header.frame_id = "/map";
       tf::poseTFToMsg(robot_pose, start_pose.pose);
 
-      move_base::GetMultiplePlans get_plans_call;
+      move_base_msgs::GetMultiplePlans get_plans_call;
       get_plans_call.request.start.push_back(start_pose);
       get_plans_call.request.goal.push_back(target_pose);
       while(!ros::service::call("/move_base_planner_node/make_multiple_plans", get_plans_call))

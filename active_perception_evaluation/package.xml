@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package>
+  <name>active_perception_evaluation</name>
+  <version>1.0.0</version>
+  <description>Evaluation tools for uos_active_perception</description>
+
+  <maintainer email="martin.guenther@dfki.de">Martin Guenther</maintainer>
+
+  <license>BSD</license>
+
+  <url type="website">http://kos.informatik.uos.de/flap4caos/</url>
+  <url type="repository">https://github.com/uos/uos_active_perception</url>
+  <url type="bugtracker">https://github.com/uos/uos_active_perception/issues</url>
+
+  <author>Thorsten Gedicke</author>
+  <author email="martin.guenther@dfki.de">Martin Guenther</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>gazebo_msgs</build_depend>
+  <build_depend>tf</build_depend>
+
+  <run_depend>gazebo_msgs</run_depend>
+  <run_depend>gazebo_ros</run_depend>
+  <run_depend>pr2_controller_configuration_gazebo</run_depend>
+  <run_depend>pr2_description</run_depend>
+  <run_depend>pr2_gazebo</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>xacro</run_depend>
+
+  <export>
+    <gazebo_ros gazebo_media_path="${prefix}"/>
+  </export>
+</package>

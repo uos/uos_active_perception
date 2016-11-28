@@ -137,4 +137,17 @@ private:
                    uos_active_perception_msgs::ReadWriteFiles::Response&);
 };
 
+template <class PointT>
+static inline void pointcloudPCLToOctomap(const pcl::PointCloud<PointT>& pclCloud, octomap::Pointcloud& octomapCloud){
+  octomapCloud.reserve(pclCloud.points.size());
+
+  typename
+  pcl::PointCloud<PointT>::const_iterator it;
+  for (it = pclCloud.begin(); it != pclCloud.end(); ++it){
+    // Check if the point is invalid
+    if (!std::isnan (it->x) && !std::isnan (it->y) && !std::isnan (it->z))
+      octomapCloud.push_back(it->x, it->y, it->z);
+  }
+}
+
 #endif // NEXT_BEST_VIEW_NODE_H

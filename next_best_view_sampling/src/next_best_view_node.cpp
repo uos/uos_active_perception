@@ -755,7 +755,7 @@ void NextBestViewNode::pointCloudCb(const PointCloud::ConstPtr &cloud)
 
     // Ugly converter cascade to get octomap_cloud
     octomap::Pointcloud octomap_cloud;
-    octomap::pointcloudPCLToOctomap(*pcl_cloud, octomap_cloud);
+    pointcloudPCLToOctomap(*cloud, octomap_cloud);
 
     // Integrate point cloud
     boost::mutex::scoped_lock lock(m_map_mutex);

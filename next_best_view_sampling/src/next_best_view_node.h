@@ -52,9 +52,13 @@
 #include <uos_active_perception_msgs/BoundingBox.h>
 #include <uos_active_perception_msgs/ReadWriteFiles.h>
 #include <boost/thread/mutex.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 
 #include <string>
 #include <vector>
+
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 
 class NextBestViewNode
 {
@@ -110,7 +114,7 @@ private:
     ) const;
 
     // Callbacks
-    void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);
+    void pointCloudCb(const PointCloud::ConstPtr &cloud);
 
     void staticMapCb(nav_msgs::OccupancyGrid const & map);
 

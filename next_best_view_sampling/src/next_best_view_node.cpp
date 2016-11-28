@@ -41,9 +41,7 @@
 #include "observation_pose_sampler.h"
 
 #include <ros/ros.h>
-#include <pcl/ros/conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
+#include <pcl_ros/point_cloud.h>
 #include <octomap_ros/conversions.h>
 #include <octomap/octomap.h>
 #include <visualization_msgs/Marker.h>
@@ -737,15 +735,15 @@ bool NextBestViewNode::evaluateObservationCameraPosesCb
     return true;
 }
 
-void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
+void NextBestViewNode::pointCloudCb(const PointCloud::ConstPtr &cloud)
 {
     // Find sensor origin
     tf::StampedTransform sensor_to_world_tf, camera_to_world_tf;
     try
     {
-        m_tf_listener.waitForTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, ros::Duration(2.0));
-        m_tf_listener.lookupTransform(m_world_frame_id, cloud.header.frame_id, cloud.header.stamp, sensor_to_world_tf);
-        m_tf_listener.lookupTransform(m_world_frame_id, m_camera_constraints.frame_id, cloud.header.stamp, camera_to_world_tf);
+        m_tf_listener.waitForTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), ros::Duration(2.0));
+        m_tf_listener.lookupTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), sensor_to_world_tf);
+        m_tf_listener.lookupTransform(m_world_frame_id, m_camera_constraints.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), camera_to_world_tf);
     }
     catch(tf::TransformException& ex)
     {
@@ -756,10 +754,8 @@ void NextBestViewNode::pointCloudCb(sensor_msgs::PointCloud2 const & cloud)
     }
 
     // Ugly converter cascade to get octomap_cloud
-    pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
     octomap::Pointcloud octomap_cloud;
-    pcl::fromROSMsg(cloud, pcl_cloud);
-    octomap::pointcloudPCLToOctomap(pcl_cloud, octomap_cloud);
+    octomap::pointcloudPCLToOctomap(*pcl_cloud, octomap_cloud);
 
     // Integrate point cloud
     boost::mutex::scoped_lock lock(m_map_mutex);

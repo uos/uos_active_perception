@@ -12,38 +12,39 @@ Thorsten Gedicke, Martin Günther, and Joachim Hertzberg. FLAP for CAOS:
 Forward-looking active perception for clutter-aware object search. In *Proc.
 9th IFAC Symposium on Intelligent Autonomous Vehicles (IAV)*. IFAC, June 2016.
 
-How to install the system and its dependencies into an empty workspace on ROS Fuerte
+How to install the system and its dependencies into an empty workspace on ROS Indigo
 ------------------------------------------------------------------------------------
 
 1. Add the following lines to your .rosinstall:
 
-        # The uos_active_perception repo
-        - git: {local-name: uos_active_perception, uri: 'https://github.com/uos/uos_active_perception.git', version: fuerte}
-        # A fork of the ROS Navigation Stack featuring symmetrical path costs and batch path planning
-        - git: {local-name: overlays/navigation, uri: 'https://github.com/uos/navigation.git', version: fuerte_race}
-        # Octomap 1.6 (ROS Fuerte comes with version 1.4, which is too old)
-        # NOTE: The path libs/octomap is hard-coded in uos_active_perception/next_best_view_sampling/CMakeLists.txt.
-        #       This means you do not need to install octomap, but if this path changes it needs to be manually adjusted.
-        - git: {local-name: libs/octomap, uri: 'https://github.com/OctoMap/octomap.git', version: v1.6.6}
-        # PCL
-        - git: {local-name: stacks/pcl_conversions, uri: 'https://github.com/ros-perception/pcl_conversions.git', version: fuerte-devel}
-        - git: {local-name: stacks/pcl_msgs, uri: 'https://github.com/ros-perception/pcl_msgs', version: fuerte-devel}
+```yaml
+# The uos_active_perception repo
+- git:
+    local-name: uos_active_perception
+    uri: https://github.com/uos/uos_active_perception.git
+    version: indigo
+# A fork of the ROS Navigation Stack featuring symmetrical path costs and batch path planning
+- git:
+    local-name: navigation
+    uri: https://github.com/uos/navigation.git
+    version: indigo-flap4caos
+```
 
 2. Update the workspace
 
-        rosws update
-        source $ROS_WORKSPACE/setup.bash
+```bash
+wstool update
+```
 
-3. Compile octomap
+3. Compile all ROS packages
 
-        cd $ROS_WORKSPACE/libs/octomap/octomap
-        mkdir -p build && cd build
-        cmake ..
-        make
+```bash
+catkin_make -DCMAKE_BUILD_TYPE=Release
+```
 
-4. Compile all ROS packages
+----------------------------------------------------------------------
 
-        rosmake --all
+**NOTE: EVERYTHING BELOW THIS LINE IS OUTDATED (ROS FUERTE)**
 
 How to run the system with Gazebo
 ---------------------------------
@@ -61,7 +62,7 @@ Execute each of the following steps in a new terminal:
         roslaunch active_perception_evaluation spawn_race_objects.launch
         roslaunch active_perception_evaluation spawn_pr2.launch
 
-3. Start the simulation; tuck PR2's arms; start AMCL robot localiazation
+3. Start the simulation; tuck PR2's arms; start AMCL robot localization
 
         rosservice call /gazebo/unpause_physics
         rosrun pr2_tuckarm tuck_arms.py -l t -r t -q
@@ -97,7 +98,7 @@ Execute each of the following steps in a new terminal:
         roslaunch active_perception_evaluation spawn_race_objects.launch
         roslaunch active_perception_evaluation spawn_floating_kinect.launch
 
-3. Start the simulation; start ground truth robot localiazation
+3. Start the simulation; start ground truth robot localization
 
         rosservice call /gazebo/unpause_physics
         roslaunch active_perception_evaluation floating_kinect_navigation.launch

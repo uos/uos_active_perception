@@ -882,7 +882,7 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
         p1 = map_to_world_tf(map_tf(p1));
         p2 = map_to_world_tf(map_tf(p2));
 
-        // Set walls to a height of 3 m.
+        // Set floor to a height of 0 m.
         p1.setZ(0.0);
         p2.setZ(0.0);
 

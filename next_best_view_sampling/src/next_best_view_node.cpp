@@ -112,7 +112,7 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("range_max"     , m_camera_constraints.range_max , 3.0);
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
-    m_node_handle.param("roll"          , m_camera_constraints.roll      , PI);
+    m_node_handle.param("roll"          , m_camera_constraints.roll      , M_PI);
 
     std::string initial_map_prefix;
     m_node_handle.param("initial_map", initial_map_prefix, std::string(""));

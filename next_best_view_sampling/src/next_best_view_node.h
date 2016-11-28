@@ -66,8 +66,6 @@ public:
     NextBestViewNode();
 
 private:
-    static const double PI = 3.14159265359;
-
     ros::NodeHandle m_node_handle, m_node_handle_pub;
     ros::Subscriber m_point_cloud_subscriber;
     ros::Subscriber m_static_map_subscriber;

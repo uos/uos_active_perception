@@ -101,6 +101,7 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.01);
     m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
+    m_node_handle.param("wall_height_2dmap", m_wall_height_2dmap, 2.5);
 
     // Set camera constraints from parameters (Defaults: xtion on calvin)
     m_node_handle.param("camera_frame_id",m_camera_constraints.frame_id  , std::string("/head_mount_kinect"));
@@ -860,9 +861,9 @@ void NextBestViewNode::staticMapCb(nav_msgs::OccupancyGrid const & map)
                 p1 = map_to_world_tf(map_tf(p1));
                 p2 = map_to_world_tf(map_tf(p2));
 
-                // Set walls to a height of 2.5 m.
+                // Set wall height
                 p1.setZ(0.0);
-                p2.setZ(2.5);
+                p2.setZ(m_wall_height_2dmap);
 
                 m_perception_map->setOccupied(octomap::pointTfToOctomap(p1), octomap::pointTfToOctomap(p2));
             }

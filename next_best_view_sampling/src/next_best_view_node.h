@@ -82,6 +82,7 @@ private:
     std::auto_ptr<ActivePerceptionMap> m_perception_map;
     double m_resolution, m_camera_range_tolerance;
     std::string m_world_frame_id;
+    double m_wall_height_2dmap;
     boost::mutex m_map_mutex;
     OcTreeBoxSet last_roi;
 

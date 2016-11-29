@@ -58,7 +58,9 @@ PointCloud2MotionFilter::PointCloud2MotionFilter() :
     m_node_handle.param("max_distance", m_max_distance, 0.01);
     m_node_handle.param("max_rotation", m_max_rotation, 0.002);
 
+    ros::Duration(0.01).sleep();   // wait for valid ROS time
     m_last_movement = ros::Time::now();
+    m_node_startup = ros::Time::now();
 }
 
 
@@ -91,8 +93,10 @@ void PointCloud2MotionFilter::pointCloudCb(sensor_msgs::PointCloud2 const & clou
     }
     catch(tf::TransformException& ex)
     {
-        ROS_ERROR_STREAM("point_cloud_2_motion_filter: Transform error of sensor data: "
-                         << ex.what());
+        // Don't throw errors for the first 5 seconds while the TF buffer fills up
+        if ((ros::Time::now() - m_node_startup) > ros::Duration(5.0))
+            ROS_ERROR_STREAM("point_cloud_2_motion_filter: Transform error of sensor data: "
+                             << ex.what() << " " << ros::Time::now() << " " << m_node_startup);
         return;
     }
 }

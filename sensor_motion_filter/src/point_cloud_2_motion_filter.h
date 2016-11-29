@@ -60,6 +60,7 @@ private:
            m_max_distance,
            m_max_rotation;
     ros::Time m_last_movement;
+    ros::Time m_node_startup;
     std::string m_static_frame;
 
     void pointCloudCb(sensor_msgs::PointCloud2 const & cloud);

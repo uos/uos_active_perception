@@ -86,7 +86,7 @@ int main(int argc, char** argv)
     get_bbox.request.bbox = box;
     if(ros::service::call("/get_bbox_occupancy", get_bbox))
     {
-        ROS_INFO_STREAM("service call get_bbox_occupancy successful: " << get_bbox.response.free << " free / " << get_bbox.response.occupied << " occupied / " << get_bbox.response.unknown << " unknown");
+        ROS_INFO_STREAM("service call get_bbox_occupancy successful: " << get_bbox.response.free.cell_ids.size() << " free / " << get_bbox.response.occupied.cell_ids.size() << " occupied / " << get_bbox.response.unknown.cell_ids.size() << " unknown");
     }
     else
     {
@@ -100,7 +100,7 @@ int main(int argc, char** argv)
     get_ocp.request.ray_skip = 0.8;
     if(ros::service::call("/get_observation_camera_poses", get_ocp))
     {
-        ROS_INFO_STREAM("service call get_observation_camera_poses successful.");
+        ROS_INFO_STREAM("service call get_observation_camera_poses successful: " << get_ocp.response.camera_poses.size() << " camera poses.");
     }
     else
     {

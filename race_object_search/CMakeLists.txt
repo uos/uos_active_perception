@@ -54,6 +54,7 @@ include_directories(${catkin_INCLUDE_DIRS})
 add_executable(object_search_manager src/floating_kinect_agent.cpp
                                      src/geometry.h
                                      src/kmeans.cpp
+                                     src/turtlebot_agent.cpp
                                      src/object_search_manager.h
                                      src/object_search_manager_node.cpp
                                      src/observation_pose_collection.cpp

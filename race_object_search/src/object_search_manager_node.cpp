@@ -1,6 +1,7 @@
 #include "object_search_manager.h"
 #include "pr2_agent.h"
 #include "floating_kinect_agent.h"
+#include "turtlebot_agent.h"
 
 int main(int argc, char** argv)
 {
@@ -19,6 +20,11 @@ int main(int argc, char** argv)
     else if (robot == "floating_kinect")
     {
         ObjectSearchManager<FloatingKinectAgent> node;
+        ros::spin();
+    }
+    else if (robot == "turtlebot")
+    {
+        ObjectSearchManager<TurtlebotAgent> node;
         ros::spin();
     }
     else

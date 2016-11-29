@@ -455,6 +455,7 @@ visualization_msgs::Marker ActivePerceptionMap::genOccupancyMarker() const
                         color.r = grey;
                         color.g = grey;
                         color.b = grey;
+                        color.a = 1.0;
                         marker.points.push_back(octomap::pointOctomapToMsg(coord));
                         marker.colors.push_back(color);
                     }

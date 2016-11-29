@@ -57,12 +57,12 @@ int main(int argc, char** argv)
     box.pose_stamped.header.frame_id = "/map";
     box.pose_stamped.header.stamp = ros::Time::now();
     box.pose_stamped.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
-    n.param("x", box.pose_stamped.pose.position.x, 5.5);
-    n.param("y", box.pose_stamped.pose.position.y, 10.0);
-    n.param("z", box.pose_stamped.pose.position.z, 1.0);
-    n.param("xdim", box.dimensions.x, 1.0);
-    n.param("ydim", box.dimensions.y, 1.0);
-    n.param("zdim", box.dimensions.z, 1.0);
+    nh_private.param("x", box.pose_stamped.pose.position.x, 5.2);
+    nh_private.param("y", box.pose_stamped.pose.position.y, 2.0);
+    nh_private.param("z", box.pose_stamped.pose.position.z, 0.3);
+    nh_private.param("xdim", box.dimensions.x, 1.0);
+    nh_private.param("ydim", box.dimensions.y, 2.0);
+    nh_private.param("zdim", box.dimensions.z, 0.6);
 
     // Send a marker
     visualization_msgs::Marker marker;

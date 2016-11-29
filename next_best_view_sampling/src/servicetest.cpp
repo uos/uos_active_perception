@@ -45,8 +45,9 @@
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "race_object_search_servicetest");
-    ros::NodeHandle n("~");
-    ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("/servicetest_marker", 1);
+    ros::NodeHandle nh;
+    ros::NodeHandle nh_private("~");
+    ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("servicetest_marker", 1);
 
     // Wait for subscribers to connect
     ros::Duration(1).sleep();
@@ -84,7 +85,7 @@ int main(int argc, char** argv)
     // Send request
     uos_active_perception_msgs::GetBboxOccupancy get_bbox;
     get_bbox.request.bbox = box;
-    if(ros::service::call("/get_bbox_occupancy", get_bbox))
+    if(ros::service::call("get_bbox_occupancy", get_bbox))
     {
         ROS_INFO_STREAM("service call get_bbox_occupancy successful: " << get_bbox.response.free.cell_ids.size() << " free / " << get_bbox.response.occupied.cell_ids.size() << " occupied / " << get_bbox.response.unknown.cell_ids.size() << " unknown");
     }
@@ -98,7 +99,7 @@ int main(int argc, char** argv)
     get_ocp.request.roi.push_back(box);
     get_ocp.request.sample_size = 100;
     get_ocp.request.ray_skip = 0.8;
-    if(ros::service::call("/get_observation_camera_poses", get_ocp))
+    if(ros::service::call("get_observation_camera_poses", get_ocp))
     {
         ROS_INFO_STREAM("service call get_observation_camera_poses successful: " << get_ocp.response.camera_poses.size() << " camera poses.");
     }
@@ -110,7 +111,7 @@ int main(int argc, char** argv)
     // Send request
     uos_active_perception_msgs::ResetVolumes reset_volumes_call;
     reset_volumes_call.request.volumes.push_back(box);
-    if(ros::service::call("/reset_volumes", reset_volumes_call))
+    if(ros::service::call("reset_volumes", reset_volumes_call))
     {
         ROS_INFO_STREAM("service call reset_volumes successful.");
     }

@@ -60,6 +60,7 @@
 NextBestViewNode::NextBestViewNode() :
     m_node_handle("~"),
     m_node_handle_pub(),
+    m_tf_prefix(tf::getPrefixParam(m_node_handle)),
     m_point_cloud_subscriber(m_node_handle_pub.subscribe(
                                  "cloud_in",
                                  1,
@@ -72,19 +73,19 @@ NextBestViewNode::NextBestViewNode() :
                                        &NextBestViewNode::markerTranslatorCb,
                                        this)),
     m_get_bbox_percent_unseen_server(m_node_handle_pub.advertiseService(
-                                         "/get_bbox_occupancy",
+                                         "get_bbox_occupancy",
                                          &NextBestViewNode::getBboxOccupancyCb,
                                          this)),
     m_get_observation_camera_poses_server(m_node_handle_pub.advertiseService(
-                                              "/get_observation_camera_poses",
+                                              "get_observation_camera_poses",
                                               &NextBestViewNode::getObservationCameraPosesCb,
                                               this)),
     m_evaluate_observation_camera_poses_server(m_node_handle_pub.advertiseService(
-                                                   "/evaluate_observation_camera_poses",
+                                                   "evaluate_observation_camera_poses",
                                                    &NextBestViewNode::evaluateObservationCameraPosesCb,
                                                    this)),
     m_reset_volumes_server(m_node_handle_pub.advertiseService(
-                                       "/reset_volumes",
+                                       "reset_volumes",
                                        &NextBestViewNode::resetVolumesCb,
                                        this)),
     m_write_map_server(m_node_handle.advertiseService(
@@ -96,7 +97,7 @@ NextBestViewNode::NextBestViewNode() :
                                        &NextBestViewNode::loadMapCb,
                                        this)),
     m_tf_listener(),
-    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_marker", 20000))
+    m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("next_best_view_marker", 20000))
 {
     m_node_handle.param("resolution"    , m_resolution    , 0.05);
     m_node_handle.param("camera_range_tolerance", m_camera_range_tolerance, 0.01);
@@ -114,6 +115,10 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
     m_node_handle.param("roll"          , m_camera_constraints.roll      , M_PI);
+
+    // resolve TF prefixes
+    m_world_frame_id = tf::resolve(m_tf_prefix, m_world_frame_id);
+    m_camera_constraints.frame_id = tf::resolve(m_tf_prefix, m_camera_constraints.frame_id);
 
     std::string initial_map_prefix;
     m_node_handle.param("initial_map", initial_map_prefix, std::string(""));

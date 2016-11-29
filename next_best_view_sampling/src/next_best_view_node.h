@@ -67,6 +67,7 @@ public:
 
 private:
     ros::NodeHandle m_node_handle, m_node_handle_pub;
+    std::string m_tf_prefix;
     ros::Subscriber m_point_cloud_subscriber;
     ros::Subscriber m_static_map_subscriber;
     ros::Subscriber m_marker_translator_subscriber;

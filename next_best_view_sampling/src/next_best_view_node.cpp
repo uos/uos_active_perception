@@ -509,9 +509,9 @@ uos_active_perception_msgs::EvaluateObservationCameraPoses::Response NextBestVie
         marker.action = visualization_msgs::Marker::ADD;
         marker.type = visualization_msgs::Marker::ARROW;
         marker.lifetime = ros::Duration(10);
-        marker.scale.x = 1;
-        marker.scale.y = 1;
-        marker.scale.z = 0.2;
+        marker.scale.x = 0.2;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
         if(gain > 0) {
             marker.color.g = 0.5;
             marker.color.r = 0.5;

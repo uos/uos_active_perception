@@ -147,9 +147,9 @@ public:
             visualization_msgs::Marker marker;
             marker.action = visualization_msgs::Marker::ADD;
             marker.type = visualization_msgs::Marker::ARROW;
-            marker.scale.x = 1;
-            marker.scale.y = 1;
-            marker.scale.z = 0.2;
+            marker.scale.x = 0.2;
+            marker.scale.y = 0.05;
+            marker.scale.z = 0.05;
             marker.color.g = 1.0;
             marker.color.r = 1.0;
             marker.color.b = 1.0;

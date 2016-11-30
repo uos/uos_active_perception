@@ -40,7 +40,7 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
       target_pose.pose.orientation = tf::createQuaternionMsgFromYaw(3.14 * r01(rng));
 
       tf::StampedTransform robot_pose;
-      tf_listener.lookupTransform("/map", "/base_footprint", ros::Time(), robot_pose);
+      tf_listener.lookupTransform("/map", "base_footprint", ros::Time(), robot_pose);
       geometry_msgs::PoseStamped start_pose;
       start_pose.header.frame_id = "/map";
       tf::poseTFToMsg(robot_pose, start_pose.pose);
@@ -87,7 +87,7 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "random_driver");
-    move_base_client = new actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>("/move_base", true);
+    move_base_client = new actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>("move_base", true);
     ros::param::param("~timeout", timeout, 60.0);
     ros::NodeHandle n;
     ros::Subscriber map_sub = n.subscribe("/map", 1, &mapCb);

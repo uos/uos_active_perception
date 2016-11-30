@@ -24,7 +24,7 @@ public:
         m_tfl(),
         m_agent(m_tfl, m_world_frame_id)
     {
-        m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
+        m_node_handle.param("world_frame_id", m_world_frame_id, std::string("odom_combined"));
         // sampling params
         m_node_handle.param("global_sample_size", m_global_sample_size, 1000);
         m_node_handle.param("ray_skip", m_ray_skip, 0.0);
@@ -63,7 +63,7 @@ private:
             pose_candidates_call.request.roi = goal.roi;
             pose_candidates_call.request.keep_blind_poses = true;
             ros::WallTime t0 = ros::WallTime::now();
-            if(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
+            if(!ros::service::call("get_observation_camera_poses", pose_candidates_call))
             {
                 std::cout << "ERROR" << std::endl;
                 m_observe_volumes_server.setAborted();

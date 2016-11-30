@@ -104,8 +104,8 @@ uos_active_perception_msgs::BoundingBox makeShelf3()
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "race_object_search_manager_test");
-    ros::NodeHandle n("~");
-    ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("/race_object_search_manager_test", 10);
+    ros::NodeHandle nh;
+    ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("race_object_search_manager_test", 10);
 
     // Wait for subscribers to connect
     ros::WallDuration(1.0).sleep();
@@ -178,7 +178,7 @@ int main(int argc, char** argv)
 
     // reset regions if commanded to
     if(reset || clearall) {
-        ros::ServiceClient c = n.serviceClient<uos_active_perception_msgs::ResetVolumes>("/reset_volumes");
+        ros::ServiceClient c = nh.serviceClient<uos_active_perception_msgs::ResetVolumes>("reset_volumes");
         uos_active_perception_msgs::ResetVolumes srv;
         srv.request.volumes.insert(srv.request.volumes.end(), boxes.begin(), boxes.end());
         srv.request.keep_occupied = !clearall;
@@ -190,7 +190,7 @@ int main(int argc, char** argv)
     }
 
     if(!nosearch) {
-        actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("/observe_volumes", true);
+        actionlib::SimpleActionClient<race_object_search::ObserveVolumesAction> ac("observe_volumes", true);
         if(!ac.isServerConnected()) {
             ROS_INFO("waiting for /observe_volumes");
             ac.waitForServer();

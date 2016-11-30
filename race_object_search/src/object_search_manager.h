@@ -27,15 +27,15 @@ public:
         m_node_handle("~"),
         m_node_handle_pub(),
         m_tf_listener(),
-        m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/object_search_marker", 10000)),
-        m_map_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("/next_best_view_node/marker_in", 10000)),
+        m_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("object_search_marker", 10000)),
+        m_map_marker_pub(m_node_handle_pub.advertise<visualization_msgs::Marker>("next_best_view_node/marker_in", 10000)),
         m_observe_volumes_server(m_node_handle_pub,
                                  "observe_volumes",
                                  boost::bind(&ObjectSearchManager::observeVolumesCb, this, _1),
                                  false),
         m_agent(m_tf_listener, m_world_frame_id)
     {
-        m_node_handle.param("world_frame_id", m_world_frame_id, std::string("/odom_combined"));
+        m_node_handle.param("world_frame_id", m_world_frame_id, std::string("odom_combined"));
         m_node_handle.param("log_dir", m_log_dir, std::string(""));
         m_node_handle.param("persistent_sample_dir", m_ps_dir, std::string(""));
         // sampling params
@@ -277,7 +277,7 @@ private:
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
                 get_bbox_occupancy.request.bbox = goal.roi[i];
-                while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+                while(!ros::service::call("get_bbox_occupancy", get_bbox_occupancy))
                 {
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
@@ -307,7 +307,7 @@ private:
             {
                 uos_active_perception_msgs::GetBboxOccupancy get_bbox_occupancy;
                 get_bbox_occupancy.request.bbox = goal.roi[i];
-                while(!ros::service::call("/get_bbox_occupancy", get_bbox_occupancy))
+                while(!ros::service::call("get_bbox_occupancy", get_bbox_occupancy))
                 {
                     logerror("get_bbox_occupancy service call failed, will try again");
                     ros::WallDuration(5).sleep();
@@ -367,7 +367,7 @@ private:
                     pose_candidates_call.request.camera_poses = persistent_samples;
                     pose_candidates_call.request.ray_skip = m_ray_skip;
                     pose_candidates_call.request.roi = goal.roi;
-                    while(!ros::service::call("/evaluate_observation_camera_poses", pose_candidates_call))
+                    while(!ros::service::call("evaluate_observation_camera_poses", pose_candidates_call))
                     {
                         logerror("evaluate_observation_camera_poses service call failed");
                         ros::Duration(5).sleep();
@@ -392,7 +392,7 @@ private:
                     tf::pointTFToMsg(m_agent.camPoseForRobotPose(robot_pose).getOrigin(),
                                      pose_candidates_call.request.observation_position.point);
                     pose_candidates_call.request.lock_height = false;
-                    while(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
+                    while(!ros::service::call("get_observation_camera_poses", pose_candidates_call))
                     {
                         logerror("get_observation_camera_poses service call failed (local samples)");
                         ros::Duration(5).sleep();
@@ -408,7 +408,7 @@ private:
                     pose_candidates_call.request.sample_size = m_global_sample_size - persistent_samples.size();
                     pose_candidates_call.request.ray_skip = m_ray_skip;
                     pose_candidates_call.request.roi = goal.roi;
-                    while(!ros::service::call("/get_observation_camera_poses", pose_candidates_call))
+                    while(!ros::service::call("get_observation_camera_poses", pose_candidates_call))
                     {
                         logerror("get_observation_camera_poses service call failed (global samples)");
                         ros::Duration(5).sleep();

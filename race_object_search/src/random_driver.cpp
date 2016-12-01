@@ -26,6 +26,11 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
     tf::TransformListener tf_listener;
     ros::Duration(2.0).sleep();
 
+    // resolve TF prefix
+    ros::NodeHandle nh_priv("~");
+    std::string tf_prefix(tf::getPrefixParam(nh_priv));
+    std::string base_frame_id = tf::resolve(tf_prefix, "base_footprint");
+
     std::ofstream f("random_driver_dump.tab", std::ofstream::trunc);
     f << "cost\ttime\tresult" << std::endl;
 
@@ -40,9 +45,9 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
       target_pose.pose.orientation = tf::createQuaternionMsgFromYaw(3.14 * r01(rng));
 
       tf::StampedTransform robot_pose;
-      tf_listener.lookupTransform("/map", "base_footprint", ros::Time(), robot_pose);
+      tf_listener.lookupTransform("map", base_frame_id, ros::Time(), robot_pose);
       geometry_msgs::PoseStamped start_pose;
-      start_pose.header.frame_id = "/map";
+      start_pose.header.frame_id = "map";
       tf::poseTFToMsg(robot_pose, start_pose.pose);
 
       move_base_msgs::GetMultiplePlans get_plans_call;

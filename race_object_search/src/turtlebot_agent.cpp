@@ -27,6 +27,7 @@ TurtlebotAgent::TurtlebotAgent(tf::TransformListener &tf_listener, const std::st
     m_acquisition_time = 5.0;
   }
   ROS_INFO_STREAM("Sensor acquisition time: " << m_acquisition_time);
+  nh_priv.param("additional_acquisition_time", m_additional_acquisition_time, 5.0);
 
   nh_priv.param("base_frame_id",   m_base_frame_id,   std::string("base_footprint"));
   nh_priv.param("camera_frame_id", m_camera_frame_id, std::string("camera_depth_frame"));

@@ -48,12 +48,12 @@ private:
   /**
     Drive time prediction based on linear regression.
     */
-  double static pathCostToDriveTime(const double path_cost)
+  double pathCostToDriveTime(const double path_cost) const
   {
-    return 0.000305329882947 * path_cost + 2.72422335968;
+    return 0.000305329882947 * path_cost + 2.72422335968 + m_acquisition_time + m_additional_acquisition_time;
   }
 
-  double m_acquisition_time;
+  double m_acquisition_time, m_additional_acquisition_time;
   const std::string &m_world_frame_id;
   std::string m_base_frame_id, m_camera_frame_id;
   tf::TransformListener &m_tf_listener;

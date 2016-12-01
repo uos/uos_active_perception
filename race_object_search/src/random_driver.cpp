@@ -53,7 +53,7 @@ void mapCb(nav_msgs::OccupancyGrid const & map)
       move_base_msgs::GetMultiplePlans get_plans_call;
       get_plans_call.request.start.push_back(start_pose);
       get_plans_call.request.goal.push_back(target_pose);
-      while(!ros::service::call("/move_base_planner_node/make_multiple_plans", get_plans_call))
+      while(!ros::service::call("move_base/make_multiple_plans", get_plans_call))   // TODO: move_base_planner_node?
       {
           ROS_WARN("make_multiple_plans call failed, will retry");
           ros::WallDuration(5.0).sleep();

@@ -54,21 +54,21 @@ public:
         m_node_handle.param("additional_acquisition_time", m_additional_acquisition_time, 5.0);
 
         std::cout << "Parameters:" << std::endl;
-        std::cout << "world_frame_id " << m_world_frame_id << std::endl;
-        std::cout << "log_dir " << m_log_dir << std::endl;
-        std::cout << "persistent_sample_dir " << m_ps_dir << std::endl;
-        std::cout << "local_sample_size " << m_local_sample_size << std::endl;
-        std::cout << "global_sample_size " << m_global_sample_size << std::endl;
-        std::cout << "ray_skip " << m_ray_skip << std::endl;
-        std::cout << "planning_mode " << m_planning_mode << std::endl;
-        std::cout << "depth_limit " << m_depth_limit << std::endl;
-        std::cout << "relative_lookahead " << m_relative_lookahead << std::endl;
-        std::cout << "max_rel_branch_cost " << m_max_rel_branch_cost << std::endl;
-        std::cout << "planning_timeout " << m_planning_timeout << std::endl;
-        std::cout << "keep_planned_poses " << m_keep_planned_poses << std::endl;
-        std::cout << "use_domination " << m_use_domination << std::endl;
-        std::cout << "plan_only " << m_plan_only << std::endl;
-        std::cout << "additional_acquisition_time" << m_additional_acquisition_time << std::endl;
+        std::cout << "world_frame_id              \"" << m_world_frame_id << "\"" << std::endl;
+        std::cout << "log_dir                     \"" << m_log_dir << "\"" << std::endl;
+        std::cout << "persistent_sample_dir       \"" << m_ps_dir << "\"" << std::endl;
+        std::cout << "local_sample_size           " << m_local_sample_size << std::endl;
+        std::cout << "global_sample_size          " << m_global_sample_size << std::endl;
+        std::cout << "ray_skip                    " << m_ray_skip << std::endl;
+        std::cout << "planning_mode               \"" << m_planning_mode << "\"" << std::endl;
+        std::cout << "depth_limit                 " << m_depth_limit << std::endl;
+        std::cout << "relative_lookahead          " << m_relative_lookahead << std::endl;
+        std::cout << "max_rel_branch_cost         " << m_max_rel_branch_cost << std::endl;
+        std::cout << "planning_timeout            " << m_planning_timeout << std::endl;
+        std::cout << "keep_planned_poses          " << m_keep_planned_poses << std::endl;
+        std::cout << "use_domination              " << m_use_domination << std::endl;
+        std::cout << "plan_only                   " << m_plan_only << std::endl;
+        std::cout << "additional_acquisition_time " << m_additional_acquisition_time << std::endl;
 
         m_use_static_poses = !m_ps_dir.empty();
         if(m_use_static_poses) m_keep_planned_poses = false;

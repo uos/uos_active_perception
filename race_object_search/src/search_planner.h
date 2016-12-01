@@ -223,8 +223,10 @@ private:
                 // Even if all poses are reachable from the start pose, some pairs of poses may be unconnected.
                 // This is illogical and possibly due to map updates between subsequent calls of make_plan.
                 // The easiest thing is to just filter these cases here.
-                assert(expop.duration < std::numeric_limits<double>::infinity());
-                memory[stage].expansion_map.insert(std::make_pair(greedy_cost, expop));
+                if(expop.duration < std::numeric_limits<double>::infinity())
+                {
+                  memory[stage].expansion_map.insert(std::make_pair(greedy_cost, expop));
+                }
             }
         }
 

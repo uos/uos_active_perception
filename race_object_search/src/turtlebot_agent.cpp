@@ -289,7 +289,7 @@ bool TurtlebotAgent::achieveCamPose
                                        2)[0];
 
     m_move_base_client.sendGoal(goal);
-    m_move_base_client.waitForResult(ros::Duration(timeout + 5.0));
+    m_move_base_client.waitForResult(ros::Duration(timeout + 30.0));
     if (m_move_base_client.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
     {
       ROS_INFO("goal reached with success");

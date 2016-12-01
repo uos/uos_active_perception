@@ -101,6 +101,42 @@ uos_active_perception_msgs::BoundingBox makeShelf3()
     return box;
 }
 
+uos_active_perception_msgs::BoundingBox makeLuciaAreaE()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 5.2;
+    box.pose_stamped.pose.position.y = 2.1;
+    box.pose_stamped.pose.position.z = 0.275;
+    box.dimensions.x = 1.0;
+    box.dimensions.y = 1.6;
+    box.dimensions.z = 0.55;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeLuciaAreaNW()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 2.3;
+    box.pose_stamped.pose.position.y = 3.6;
+    box.pose_stamped.pose.position.z = 0.275;
+    box.dimensions.x = 1.8;
+    box.dimensions.y = 1.0;
+    box.dimensions.z = 0.55;
+    return box;
+}
+
+uos_active_perception_msgs::BoundingBox makeLuciaAreaSW()
+{
+    uos_active_perception_msgs::BoundingBox box = makeBox();
+    box.pose_stamped.pose.position.x = 1.9;
+    box.pose_stamped.pose.position.y = 1.3;
+    box.pose_stamped.pose.position.z = 0.275;
+    box.dimensions.x = 1.8;
+    box.dimensions.y = 1.0;
+    box.dimensions.z = 0.55;
+    return box;
+}
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "race_object_search_manager_test");
@@ -151,6 +187,15 @@ int main(int argc, char** argv)
         } else if(!strcmp(argv[i], "shelf3")) {
             if(has_p) probs.push_back(std::atof(argv[++i]));
             boxes.push_back(makeShelf3());
+        } else if(!strcmp(argv[i], "lucia_area_e")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
+            boxes.push_back(makeLuciaAreaE());
+        } else if(!strcmp(argv[i], "lucia_area_nw")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
+            boxes.push_back(makeLuciaAreaNW());
+        } else if(!strcmp(argv[i], "lucia_area_sw")) {
+            if(has_p) probs.push_back(std::atof(argv[++i]));
+            boxes.push_back(makeLuciaAreaSW());
         } else {
             ROS_ERROR_STREAM("UNKNOWN ARG: " << argv[i]);
         }

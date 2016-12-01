@@ -241,6 +241,20 @@ private:
         size_t marker_count = 0;
         race_object_search::ObserveVolumesGoal const & goal = *goal_ptr.get();
 
+        if (!(0.0 < goal.min_p_succ && goal.min_p_succ < 1.0))
+        {
+            ROS_ERROR("goal.min_p_succ must be 0 < p < 1, is: %f", goal.min_p_succ);
+            return;
+        }
+        for(size_t i = 0; i < goal.roi.size(); ++i)
+        {
+            if (!(0.0 < goal.p[i] && goal.p[i] < 1.0))
+            {
+                ROS_ERROR("goal.p[%zu] must be 0 < p < 1, is: %f", i, goal.p[i]);
+                return;
+            }
+        }
+
         // persistence buffers
         std::vector<geometry_msgs::Pose> persistent_samples;
         ObservationPoseCollection opc;

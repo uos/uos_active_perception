@@ -54,6 +54,7 @@
 #include <memory>
 #include <stdint.h>
 #include <cstring>
+#include <algorithm>
 
 #define PUB_FRINGE_NORMAL_MARKERS false
 
@@ -115,6 +116,19 @@ NextBestViewNode::NextBestViewNode() :
     m_node_handle.param("hfov"          , m_camera_constraints.hfov      , 1.01229097);
     m_node_handle.param("vfov"          , m_camera_constraints.vfov      , 0.785398163);
     m_node_handle.param("roll"          , m_camera_constraints.roll      , M_PI);
+
+    std::map<std::string, std::string> tmp_frame_id_mapping;
+    m_node_handle.param("frame_id_mapping", tmp_frame_id_mapping         , std::map<std::string, std::string>());
+
+    // Replace '\' by '/' in the keys of frame_id_mapping
+    for (std::map<std::string, std::string>::const_iterator it = tmp_frame_id_mapping.begin();
+         it!= tmp_frame_id_mapping.end();
+         ++it)
+    {
+      std::string key(it->first);
+      std::replace(key.begin(), key.end(), '\\', '/');
+      m_frame_id_mapping[key] = it->second;
+    }
 
     // resolve TF prefixes
     m_world_frame_id = tf::resolve(m_tf_prefix, m_world_frame_id);
@@ -743,13 +757,23 @@ bool NextBestViewNode::evaluateObservationCameraPosesCb
 
 void NextBestViewNode::pointCloudCb(const PointCloud::ConstPtr &cloud)
 {
+    // Look up which camera constraints frame_id should be used for this point cloud
+    // (relevant when data comes from multiple sensors)
+    std::string camera_constraints_frame_id;
+    try {
+        camera_constraints_frame_id = m_frame_id_mapping.at(cloud->header.frame_id);
+    }
+    catch (const std::out_of_range&) {
+        camera_constraints_frame_id = m_camera_constraints.frame_id;
+    }
+
     // Find sensor origin
     tf::StampedTransform sensor_to_world_tf, camera_to_world_tf;
     try
     {
         m_tf_listener.waitForTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), ros::Duration(2.0));
         m_tf_listener.lookupTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), sensor_to_world_tf);
-        m_tf_listener.lookupTransform(m_world_frame_id, m_camera_constraints.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), camera_to_world_tf);
+        m_tf_listener.lookupTransform(m_world_frame_id, camera_constraints_frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), camera_to_world_tf);
     }
     catch(tf::TransformException& ex)
     {
@@ -807,7 +831,7 @@ void NextBestViewNode::pointCloudCb(const PointCloud::ConstPtr &cloud)
         marker.color.r = 1.0;
         marker.color.a = 1.0;
         marker.scale.x = 0.005;
-        marker.header.frame_id = m_camera_constraints.frame_id;
+        marker.header.frame_id = camera_constraints_frame_id;
         marker.id = 0;
         marker.ns = "camera_constraints";
         double lr = m_camera_constraints.hfov / 2.0;

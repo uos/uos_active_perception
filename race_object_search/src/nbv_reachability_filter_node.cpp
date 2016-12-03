@@ -39,6 +39,13 @@ private:
     uos_active_perception_msgs::GetObservationCameraPoses pose_candidates_call;
     pose_candidates_call.request = req;
 
+    if (req.omit_cvm)
+    {
+      // The request field `omit_cm` was set to true. Setting to false because
+      // ObservationPoseCollection requires it.
+      pose_candidates_call.request.omit_cvm = false;
+    }
+
     if (!ros::service::call("get_observation_camera_poses", pose_candidates_call))
     {
       ROS_ERROR("Could not call get_observation_camera_poses service!");
@@ -46,6 +53,7 @@ private:
     }
 
     res.object_sets = pose_candidates_call.response.object_sets;
+    res.roi_cell_counts = pose_candidates_call.response.roi_cell_counts;
 
     ObservationPoseCollection opc;
     opc.addPoses(pose_candidates_call.response.camera_poses,
@@ -59,21 +67,31 @@ private:
                                     m_agent.getCurrentCamPose(),
                                     m_world_frame_id);
 
-    // add reachable poses to response
-    res.roi_cell_counts.reserve(opc.getPoses().size());
-    res.camera_poses.reserve(opc.getPoses().size());
-    res.target_points.reserve(opc.getPoses().size());
-    res.information_gains.reserve(opc.getPoses().size());
-    res.cvms.reserve(opc.getPoses().size());
+    size_t num_poses(opc.getPoses().size());
+    if (pose_candidates_call.response.camera_poses.size()      != num_poses ||
+        pose_candidates_call.response.target_points.size()     != num_poses ||
+        pose_candidates_call.response.information_gains.size() != num_poses ||
+        !(pose_candidates_call.response.cvms.size() == num_poses ||
+          pose_candidates_call.response.cvms.size() == 0))
+    {
+      ROS_ERROR("The wrapped service returned an invalid result!");
+      return false;
+    }
 
-    for (size_t k = 0; k < opc.getPoses().size(); ++k)
+    // add reachable poses to response
+    res.camera_poses.reserve(num_poses);
+    res.target_points.reserve(num_poses);
+    res.information_gains.reserve(num_poses);
+    res.cvms.reserve(num_poses);
+
+    for (size_t k = 0; k < num_poses; ++k)
     {
       if (opc.getInitialTravelTime(k) < std::numeric_limits<double>::infinity())
       {
-        res.roi_cell_counts.push_back(pose_candidates_call.response.roi_cell_counts[k]);
         res.target_points.push_back(pose_candidates_call.response.target_points[k]);
         res.information_gains.push_back(pose_candidates_call.response.information_gains[k]);
-        res.cvms.push_back(pose_candidates_call.response.cvms[k]);
+        if (pose_candidates_call.response.cvms.size() >= k)
+          res.cvms.push_back(pose_candidates_call.response.cvms[k]);
 
         // HACK: Pass on the base_footprint instead of the camera poses
         geometry_msgs::Pose base_pose;
@@ -81,6 +99,9 @@ private:
         res.camera_poses.push_back(base_pose);
       }
     }
+
+    if (req.omit_cvm)
+      res.cvms.clear();
 
     return true;
   }

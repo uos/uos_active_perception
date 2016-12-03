@@ -96,6 +96,15 @@ target_link_libraries(nbv_sampling_evaluator
   ${catkin_LIBRARIES}
 )
 
+add_executable(nbv_reachability_filter_node src/kmeans.cpp
+                                            src/nbv_reachability_filter_node.cpp
+                                            src/observation_pose_collection.cpp
+                                            src/turtlebot_agent.cpp)
+add_dependencies(nbv_reachability_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(nbv_reachability_filter_node
+  ${catkin_LIBRARIES}
+)
+
 
 #############
 ## Install ##

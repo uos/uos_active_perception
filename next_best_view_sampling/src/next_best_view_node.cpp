@@ -771,7 +771,7 @@ void NextBestViewNode::pointCloudCb(const PointCloud::ConstPtr &cloud)
     tf::StampedTransform sensor_to_world_tf, camera_to_world_tf;
     try
     {
-        m_tf_listener.waitForTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), ros::Duration(2.0));
+        m_tf_listener.waitForTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), ros::Duration(5.0));
         m_tf_listener.lookupTransform(m_world_frame_id, cloud->header.frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), sensor_to_world_tf);
         m_tf_listener.lookupTransform(m_world_frame_id, camera_constraints_frame_id, ros::Time().fromNSec(cloud->header.stamp * 1000), camera_to_world_tf);
     }

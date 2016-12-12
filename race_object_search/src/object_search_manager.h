@@ -4,6 +4,7 @@
 #include "observation_pose_collection.h"
 #include "search_plan.h"
 #include "search_planner.h"
+#include "search_planner_tutorial.h"
 #include "ros_serialization_helper.h"
 #include "geometry.h"
 
@@ -576,7 +577,20 @@ private:
                                                  spl.getSequence());
                 plan = spl.getSequence();
             }
-            else
+            else if(m_planning_mode == "tutorial-planner")
+            {
+              ROS_INFO("entering planning phase (tutorial-planner)");
+              double pdone_goal = 1.0 - (1.0 - success_probability) / (1.0 - goal.min_p_succ);
+              SearchPlannerTutorial<RegionalProbabilityCellGain> spl(rpcg,
+                                                                  opc,
+                                                                  m_depth_limit,
+                                                                  pdone_goal * m_relative_lookahead,
+                                                                  m_max_rel_branch_cost,
+                                                                  m_planning_timeout * 1000);
+              plan_finished = spl.makePlan();
+              plan = spl.getSequence();
+            }
+              else
             {
                 ROS_ERROR_STREAM("unknown planning mode: " << m_planning_mode);
             }
